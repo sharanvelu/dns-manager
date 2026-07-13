@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dns-manager
+  namespace: dns-manager
+  labels:
+    app.kubernetes.io/name: dns-manager
+  annotations:
+    # Uncomment if you use cert-manager for TLS:
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+    # Body size must cover what nginx-in-pod allows (10m):
+    nginx.ingress.kubernetes.io/proxy-body-size: 10m
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - dns.example.com # <- your real host
+      secretName: dns-manager-tls # created by cert-manager or by hand
+  rules:
+    - host: dns.example.com # <- your real host
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: dns-manager
+                port:
+                  name: http

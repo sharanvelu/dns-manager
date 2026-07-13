@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dns-manager-scheduler
+  namespace: dns-manager
+  labels:
+    app.kubernetes.io/name: dns-manager
+    app.kubernetes.io/component: scheduler
+spec:
+  replicas: 1
+  # Never run two schedulers at once
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dns-manager
+      app.kubernetes.io/component: scheduler
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dns-manager
+        app.kubernetes.io/component: scheduler
+    spec:
+      containers:
+        - name: scheduler
+          # Replace OWNER with your GitHub username/org
+          image: ghcr.io/OWNER/dns-manager:latest
+          imagePullPolicy: Always
+          command: ["docker-entrypoint"]
+          args:
+            - php
+            - artisan
+            - schedule:work
+          envFrom:
+            - configMapRef:
+                name: dns-manager-config
+            - secretRef:
+                name: dns-manager-secrets
+          livenessProbe:
+            exec:
+              command: ["pgrep", "-f", "schedule:work"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 25m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi

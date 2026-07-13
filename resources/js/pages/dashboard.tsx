@@ -1,0 +1,410 @@
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+    EmptyActivityIllustration,
+    EmptyEntriesIllustration,
+    EmptyProvidersIllustration,
+    ProviderCloudflareMark,
+    ProviderGenericMark,
+    ProviderPiholeMark,
+    StatusDriftedIcon,
+    StatusErrorIcon,
+    StatusSyncedIcon,
+} from '@/components/icons';
+import AppLayout from '@/layouts/app-layout';
+import { cn } from '@/lib/utils';
+import { type BreadcrumbItem } from '@/types';
+import { Head, Link } from '@inertiajs/react';
+import { ArrowRight, Globe, Plus, ServerCog } from 'lucide-react';
+import type { ComponentType, ReactNode, SVGProps } from 'react';
+
+const breadcrumbs: BreadcrumbItem[] = [
+    {
+        title: 'Dashboard',
+        href: '/dashboard',
+    },
+];
+
+interface DashboardProps {
+    stats: {
+        totalEntries: number;
+        inSync: number;
+        drifted: number;
+        errored: number;
+        providersTotal: number;
+        providersHealthy: number;
+    };
+    providers: Array<{
+        id: number;
+        name: string;
+        type: 'cloudflare' | 'pihole';
+        typeLabel: string;
+        enabled: boolean;
+        healthStatus: 'ok' | 'error' | 'unchecked';
+        healthMessage: string | null;
+        lastCheckedAt: string | null;
+        recordsCount: number;
+        syncedCount: number;
+        driftedCount: number;
+        errorCount: number;
+    }>;
+    activity: Array<{
+        id: number;
+        action: string;
+        status: string;
+        message: string | null;
+        provider: { id: number; name: string } | null;
+        entry: { id: number; name: string } | null;
+        createdAt: string;
+    }>;
+}
+
+type Provider = DashboardProps['providers'][number];
+type ActivityItem = DashboardProps['activity'][number];
+
+/** Tiny relative-time formatter — no date library. */
+function timeAgo(iso: string): string {
+    const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+
+    if (seconds < 45) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days}d ago`;
+    const months = Math.floor(days / 30);
+    if (months < 12) return `${months}mo ago`;
+
+    return `${Math.floor(months / 12)}y ago`;
+}
+
+const providerMarks: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
+    cloudflare: ProviderCloudflareMark,
+    pihole: ProviderPiholeMark,
+};
+
+const actionLabels: Record<string, string> = {
+    push: 'Push',
+    delete: 'Delete',
+    'drift-check': 'Drift check',
+};
+
+type StatAccent = 'neutral' | 'green' | 'amber' | 'red';
+
+const accentText: Record<StatAccent, string> = {
+    neutral: 'text-foreground',
+    green: 'text-emerald-600 dark:text-emerald-400',
+    amber: 'text-amber-600 dark:text-amber-400',
+    red: 'text-red-600 dark:text-red-400',
+};
+
+const accentIcon: Record<StatAccent, string> = {
+    neutral: 'text-muted-foreground/70',
+    green: 'text-emerald-500 dark:text-emerald-400',
+    amber: 'text-amber-500 dark:text-amber-400',
+    red: 'text-red-500 dark:text-red-400',
+};
+
+function StatTile({
+    label,
+    value,
+    icon: Icon,
+    accent = 'neutral',
+}: {
+    label: string;
+    value: number;
+    icon: ComponentType<SVGProps<SVGSVGElement>>;
+    accent?: StatAccent;
+}) {
+    return (
+        <Card className="flex flex-col gap-1 p-4">
+            <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-muted-foreground">{label}</span>
+                <Icon className={cn('size-4 shrink-0', accentIcon[accent])} />
+            </div>
+            <span className={cn('text-2xl font-semibold tracking-tight tabular-nums', accentText[accent])}>
+                {value.toLocaleString()}
+            </span>
+        </Card>
+    );
+}
+
+function ProvidersHealthyChip({ healthy, total }: { healthy: number; total: number }) {
+    const allHealthy = total > 0 && healthy === total;
+
+    return (
+        <div className="inline-flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1 text-xs text-muted-foreground shadow-xs">
+            <ServerCog className="size-3.5" />
+            <span>
+                Providers healthy{' '}
+                <span
+                    className={cn(
+                        'font-semibold tabular-nums',
+                        allHealthy
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : total > 0
+                              ? 'text-amber-600 dark:text-amber-400'
+                              : 'text-foreground',
+                    )}
+                >
+                    {healthy}/{total}
+                </span>
+            </span>
+        </div>
+    );
+}
+
+function HealthBadge({ provider }: { provider: Provider }) {
+    if (provider.healthStatus === 'ok') {
+        return (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                <span className="size-1.5 rounded-full bg-emerald-500" />
+                Healthy
+            </span>
+        );
+    }
+
+    if (provider.healthStatus === 'error') {
+        const badge = (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-red-500/20 bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
+                <span className="size-1.5 rounded-full bg-red-500" />
+                Error
+            </span>
+        );
+
+        if (!provider.healthMessage) return badge;
+
+        return (
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <span className="cursor-default">{badge}</span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-72">{provider.healthMessage}</TooltipContent>
+            </Tooltip>
+        );
+    }
+
+    return (
+        <span className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium text-muted-foreground">
+            <span className="size-1.5 rounded-full bg-muted-foreground/40" />
+            Not checked
+        </span>
+    );
+}
+
+function ProviderCard({ provider }: { provider: Provider }) {
+    const Mark = providerMarks[provider.type] ?? ProviderGenericMark;
+
+    return (
+        <Card className={cn('flex flex-col gap-3 p-4', !provider.enabled && 'opacity-60')}>
+            <div className="flex items-start justify-between gap-2">
+                <Link href="/providers" className="group flex min-w-0 items-center gap-3">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-md border bg-muted/40 text-muted-foreground">
+                        <Mark className="size-5" />
+                    </span>
+                    <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium group-hover:underline group-hover:underline-offset-4">
+                            {provider.name}
+                        </span>
+                        <span className="block text-xs text-muted-foreground">{provider.typeLabel}</span>
+                    </span>
+                </Link>
+                <div className="flex shrink-0 items-center gap-1.5">
+                    {!provider.enabled && (
+                        <Badge variant="secondary" className="font-medium">
+                            Disabled
+                        </Badge>
+                    )}
+                    <HealthBadge provider={provider} />
+                </div>
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                <span className="tabular-nums">
+                    {provider.recordsCount.toLocaleString()} {provider.recordsCount === 1 ? 'record' : 'records'} ·{' '}
+                    {provider.syncedCount.toLocaleString()} in sync
+                    {provider.driftedCount > 0 && (
+                        <span className="text-amber-600 dark:text-amber-400"> · {provider.driftedCount} drifted</span>
+                    )}
+                    {provider.errorCount > 0 && (
+                        <span className="text-red-600 dark:text-red-400"> · {provider.errorCount} errored</span>
+                    )}
+                </span>
+                {provider.lastCheckedAt && (
+                    <span className="shrink-0" title={new Date(provider.lastCheckedAt).toLocaleString()}>
+                        Checked {timeAgo(provider.lastCheckedAt)}
+                    </span>
+                )}
+            </div>
+        </Card>
+    );
+}
+
+function ActivityRow({ item }: { item: ActivityItem }) {
+    const isSuccess = item.status === 'success';
+    const StatusIcon = isSuccess ? StatusSyncedIcon : StatusErrorIcon;
+    const actionLabel = actionLabels[item.action] ?? item.action;
+    const context = [item.provider?.name, item.entry?.name].filter(Boolean).join(' · ');
+
+    return (
+        <li className="flex items-start gap-3 py-3">
+            <StatusIcon
+                className={cn(
+                    'mt-0.5 size-4 shrink-0',
+                    isSuccess ? 'text-emerald-500 dark:text-emerald-400' : 'text-red-500 dark:text-red-400',
+                )}
+            />
+            <div className="min-w-0 flex-1">
+                <p className="truncate text-sm" title={item.message ?? undefined}>
+                    {item.message ?? `${actionLabel} ${isSuccess ? 'completed' : 'failed'}`}
+                </p>
+                {context && <p className="truncate text-xs text-muted-foreground">{context}</p>}
+            </div>
+            <span className="shrink-0 text-xs whitespace-nowrap text-muted-foreground" title={new Date(item.createdAt).toLocaleString()}>
+                {timeAgo(item.createdAt)}
+            </span>
+        </li>
+    );
+}
+
+function SectionHeading({ title, action }: { title: string; action?: ReactNode }) {
+    return (
+        <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-medium text-muted-foreground">{title}</h2>
+            {action}
+        </div>
+    );
+}
+
+export default function Dashboard({ stats, providers, activity }: DashboardProps) {
+    const hasProviders = providers.length > 0;
+    const fullySynced = stats.totalEntries > 0 && stats.inSync === stats.totalEntries;
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Dashboard" />
+            <TooltipProvider delayDuration={200}>
+                <div className="flex h-full flex-1 flex-col gap-6 p-4 md:p-6">
+                    {/* Stats */}
+                    <section className="flex flex-col gap-3">
+                        <SectionHeading title="Overview" action={<ProvidersHealthyChip healthy={stats.providersHealthy} total={stats.providersTotal} />} />
+                        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                            <StatTile label="Total managed entries" value={stats.totalEntries} icon={Globe} />
+                            <StatTile
+                                label="Fully in sync"
+                                value={stats.inSync}
+                                icon={StatusSyncedIcon}
+                                accent={fullySynced ? 'green' : 'neutral'}
+                            />
+                            <StatTile
+                                label="Drifted"
+                                value={stats.drifted}
+                                icon={StatusDriftedIcon}
+                                accent={stats.drifted > 0 ? 'amber' : 'neutral'}
+                            />
+                            <StatTile
+                                label="Errors"
+                                value={stats.errored}
+                                icon={StatusErrorIcon}
+                                accent={stats.errored > 0 ? 'red' : 'neutral'}
+                            />
+                        </div>
+                    </section>
+
+                    {/* No entries yet — only when at least one provider exists */}
+                    {hasProviders && stats.totalEntries === 0 && (
+                        <Card className="flex flex-col items-center gap-3 border-dashed p-6 text-center sm:flex-row sm:text-left">
+                            <EmptyEntriesIllustration className="size-20 shrink-0 text-muted-foreground" />
+                            <div className="flex-1">
+                                <p className="text-sm font-medium">No DNS entries yet</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Create your first managed entry and push it to your providers.
+                                </p>
+                            </div>
+                            <Button asChild size="sm">
+                                <Link href="/entries">
+                                    <Plus />
+                                    Add an entry
+                                </Link>
+                            </Button>
+                        </Card>
+                    )}
+
+                    <div className="grid flex-1 items-start gap-6 lg:grid-cols-3">
+                        {/* Providers */}
+                        <section className="flex flex-col gap-3 lg:col-span-2">
+                            <SectionHeading
+                                title="Providers"
+                                action={
+                                    hasProviders ? (
+                                        <Link
+                                            href="/providers"
+                                            className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                                        >
+                                            View all
+                                            <ArrowRight className="size-3.5" />
+                                        </Link>
+                                    ) : undefined
+                                }
+                            />
+                            {hasProviders ? (
+                                <div className="grid gap-3 xl:grid-cols-2">
+                                    {providers.map((provider) => (
+                                        <ProviderCard key={provider.id} provider={provider} />
+                                    ))}
+                                </div>
+                            ) : (
+                                <Card className="flex flex-col items-center gap-4 border-dashed px-6 py-10 text-center">
+                                    <EmptyProvidersIllustration className="text-muted-foreground" />
+                                    <div>
+                                        <p className="text-sm font-medium">No providers connected</p>
+                                        <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+                                            Connect Cloudflare, Pi-hole, or another DNS provider to start managing and
+                                            syncing your records.
+                                        </p>
+                                    </div>
+                                    <Button asChild size="sm">
+                                        <Link href="/providers">
+                                            <Plus />
+                                            Connect a provider
+                                        </Link>
+                                    </Button>
+                                </Card>
+                            )}
+                        </section>
+
+                        {/* Recent activity */}
+                        <section className="flex flex-col gap-3">
+                            <SectionHeading title="Recent activity" />
+                            <Card className="p-4">
+                                {activity.length > 0 ? (
+                                    <ul className="-my-3 divide-y">
+                                        {activity.map((item) => (
+                                            <ActivityRow key={item.id} item={item} />
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
+                                        <EmptyActivityIllustration className="text-muted-foreground" />
+                                        <div>
+                                            <p className="text-sm font-medium">No sync activity yet</p>
+                                            <p className="mt-1 text-sm text-muted-foreground">
+                                                Pushes, deletions, and drift checks will show up here.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </Card>
+                        </section>
+                    </div>
+                </div>
+            </TooltipProvider>
+        </AppLayout>
+    );
+}

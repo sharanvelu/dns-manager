@@ -1,0 +1,120 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Connectors\ConnectorRegistry;
+use App\Http\Requests\DnsEntryRequest;
+use App\Models\DnsEntry;
+use App\Models\Provider;
+use App\Services\SyncService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
+
+class DnsEntryController extends Controller
+{
+    public function __construct(private SyncService $sync) {}
+
+    public function index(Request $request, ConnectorRegistry $registry): Response
+    {
+        $filters = $request->only(['search', 'type', 'provider', 'status']);
+
+        $entries = DnsEntry::query()
+            ->with(['syncStates.provider:id,name,type'])
+            ->when($filters['search'] ?? null, function ($q, $search) {
+                $term = '%'.mb_strtolower($search).'%';
+
+                $q->where(fn ($q) => $q
+                    ->whereRaw('LOWER(name) LIKE ?', [$term])
+                    ->orWhereRaw('LOWER(content) LIKE ?', [$term]));
+            })
+            ->when($filters['type'] ?? null, fn ($q, $type) => $q->where('type', $type))
+            ->when($filters['provider'] ?? null, fn ($q, $provider) => $q->whereHas(
+                'syncStates', fn ($q) => $q->where('provider_id', $provider),
+            ))
+            ->when($filters['status'] ?? null, fn ($q, $status) => $q->whereHas(
+                'syncStates', fn ($q) => $q->where('sync_status', $status),
+            ))
+            ->orderBy('name')
+            ->paginate(25)
+            ->withQueryString()
+            ->through(fn (DnsEntry $entry) => $this->presentEntry($entry));
+
+        return Inertia::render('entries/index', [
+            'entries' => $entries,
+            'filters' => $filters,
+            'providers' => $this->presentProviders(),
+            'connectors' => $registry->descriptors(),
+        ]);
+    }
+
+    public function store(DnsEntryRequest $request): RedirectResponse
+    {
+        $entry = DnsEntry::create($request->safe()->except('providers'));
+
+        $this->sync->syncEntry($entry, $request->validated('providers'));
+
+        return back()->with('success', "Entry {$entry->name} created — syncing to providers.");
+    }
+
+    public function update(DnsEntryRequest $request, DnsEntry $entry): RedirectResponse
+    {
+        $entry->update($request->safe()->except('providers'));
+
+        $this->sync->syncEntry($entry, $request->validated('providers'));
+
+        return back()->with('success', "Entry {$entry->name} updated — syncing to providers.");
+    }
+
+    public function destroy(DnsEntry $entry): RedirectResponse
+    {
+        $this->sync->deleteEntry($entry);
+
+        return back()->with('success', "Entry {$entry->name} is being removed from all providers.");
+    }
+
+    public function sync(DnsEntry $entry): RedirectResponse
+    {
+        $this->sync->syncEntry($entry);
+
+        return back()->with('success', "Re-syncing {$entry->name} to all providers.");
+    }
+
+    private function presentEntry(DnsEntry $entry): array
+    {
+        return [
+            'id' => $entry->id,
+            'name' => $entry->name,
+            'type' => $entry->type->value,
+            'content' => $entry->content,
+            'ttl' => $entry->ttl,
+            'priority' => $entry->priority,
+            'proxied' => $entry->proxied,
+            'comment' => $entry->comment,
+            'updatedAt' => $entry->updated_at->toIso8601String(),
+            'syncStates' => $entry->syncStates->map(fn ($state) => [
+                'id' => $state->id,
+                'provider' => $state->provider?->only(['id', 'name']) + ['type' => $state->provider?->type->value],
+                'status' => $state->sync_status->value,
+                'lastSyncedAt' => $state->last_synced_at?->toIso8601String(),
+                'lastError' => $state->last_error,
+            ])->values(),
+        ];
+    }
+
+    private function presentProviders(): array
+    {
+        return Provider::query()
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Provider $provider) => [
+                'id' => $provider->id,
+                'name' => $provider->name,
+                'type' => $provider->type->value,
+                'enabled' => $provider->enabled,
+                'managedRecordTypes' => $provider->managed_record_types ?? [],
+            ])
+            ->all();
+    }
+}

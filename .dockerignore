@@ -1,0 +1,51 @@
+# VCS / CI
+.git
+.gitignore
+.gitattributes
+.github
+
+# Dependencies (rebuilt inside the image)
+node_modules
+vendor
+
+# Build output (produced in the assets stage)
+public/build
+public/hot
+public/storage
+
+# Environment / secrets — never bake into the image
+.env
+.env.*
+*.key
+auth.json
+
+# Runtime state from local dev
+storage/logs
+storage/framework/cache
+storage/framework/sessions
+storage/framework/testing
+storage/framework/views
+storage/pail
+bootstrap/cache
+database/database.sqlite
+
+# Tests & tooling not needed at runtime
+tests
+phpunit.xml
+.npmrc
+.prettierrc
+.prettierignore
+.editorconfig
+
+# Deployment artifacts (not part of the app itself)
+k8s
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Docs / editor cruft
+*.md
+.vscode
+.idea
+.DS_Store
+npm-debug.log*
