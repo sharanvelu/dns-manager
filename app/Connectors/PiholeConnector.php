@@ -57,6 +57,14 @@ class PiholeConnector extends AbstractDnsConnector
                 help: 'Disable when the Pi-hole uses a self-signed certificate.',
                 default: true,
             ),
+            new ConfigField(
+                key: 'adopt_existing',
+                label: 'Adopt existing records',
+                type: 'boolean',
+                required: false,
+                help: 'When a record you create already exists in Pi-hole, adopt and manage it instead of failing.',
+                default: true,
+            ),
         ];
     }
 
@@ -175,12 +183,22 @@ class PiholeConnector extends AbstractDnsConnector
 
         $response = $this->http($sid)->put($path.'/'.rawurlencode($value));
 
-        // 400 "already exists" means the desired state is already in place.
+        // 400 "already exists" means the desired state is already in place —
+        // adopt it, unless the provider is configured not to.
+        if ($response->status() === 400 && ! $this->shouldAdoptExisting()) {
+            throw $this->failed($response, "creating {$entry->type->value} record {$entry->name} (a matching record already exists and adoption is disabled)");
+        }
+
         if ($response->failed() && $response->status() !== 400) {
             throw $this->failed($response, "creating {$entry->type->value} record {$entry->name}");
         }
 
         return $value;
+    }
+
+    protected function shouldAdoptExisting(): bool
+    {
+        return (bool) $this->config('adopt_existing', true);
     }
 
     protected function deleteEntry(string $sid, string $externalId): void

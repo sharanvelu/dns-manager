@@ -1,11 +1,13 @@
 import { EmptyEntriesIllustration } from '@/components/icons';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import { Plus, SearchX, Upload } from 'lucide-react';
 import { useState } from 'react';
+import { BulkActionsBar } from './bulk-actions-bar';
 import { DeleteEntryDialog } from './delete-entry-dialog';
 import { EntriesFilterBar } from './entries-filter-bar';
 import { EntryFormDialog } from './entry-form-dialog';
@@ -62,9 +64,35 @@ export default function EntriesIndex({ entries, filters, providers, connectors }
     const [importOpen, setImportOpen] = useState(false);
     const [editingEntry, setEditingEntry] = useState<EntryItem | null>(null);
     const [deletingEntry, setDeletingEntry] = useState<EntryItem | null>(null);
+    const [selected, setSelected] = useState<Set<number>>(new Set());
 
     const hasActiveFilters = Boolean(filters.search || filters.type || filters.provider || filters.status);
     const isEmpty = entries.data.length === 0;
+
+    const pageIds = entries.data.map((entry) => entry.id);
+    const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
+
+    const toggleEntry = (entry: EntryItem, checked: boolean) => {
+        setSelected((current) => {
+            const next = new Set(current);
+            if (checked) {
+                next.add(entry.id);
+            } else {
+                next.delete(entry.id);
+            }
+
+            return next;
+        });
+    };
+
+    const togglePage = (checked: boolean) => {
+        setSelected((current) => {
+            const next = new Set(current);
+            pageIds.forEach((id) => (checked ? next.add(id) : next.delete(id)));
+
+            return next;
+        });
+    };
 
     const openCreate = () => {
         setEditingEntry(null);
@@ -105,6 +133,10 @@ export default function EntriesIndex({ entries, filters, providers, connectors }
 
                     <EntriesFilterBar filters={filters} providers={providers} />
 
+                    {canManage && selected.size > 0 && (
+                        <BulkActionsBar selectedIds={[...selected]} providers={providers} onClear={() => setSelected(new Set())} />
+                    )}
+
                     {isEmpty ? (
                         hasActiveFilters ? (
                             <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed py-16 text-center">
@@ -140,6 +172,15 @@ export default function EntriesIndex({ entries, filters, providers, connectors }
                                 <table className="w-full text-sm">
                                     <thead>
                                         <tr className="bg-muted/40 text-muted-foreground border-b text-left text-xs">
+                                            {canManage && (
+                                                <th className="py-2.5 pl-4">
+                                                    <Checkbox
+                                                        checked={allPageSelected}
+                                                        onCheckedChange={(checked) => togglePage(checked === true)}
+                                                        aria-label="Select all entries on this page"
+                                                    />
+                                                </th>
+                                            )}
                                             <th className="px-4 py-2.5 font-medium">Name</th>
                                             <th className="px-4 py-2.5 font-medium">Type</th>
                                             <th className="px-4 py-2.5 font-medium">Content</th>
@@ -157,6 +198,8 @@ export default function EntriesIndex({ entries, filters, providers, connectors }
                                                 key={entry.id}
                                                 entry={entry}
                                                 canManage={canManage}
+                                                selected={selected.has(entry.id)}
+                                                onSelect={toggleEntry}
                                                 onEdit={openEdit}
                                                 onDelete={setDeletingEntry}
                                             />

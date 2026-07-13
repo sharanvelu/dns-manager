@@ -1,5 +1,6 @@
 import { RecordTypeBadge, StatusDeletingIcon, StatusDriftedIcon, StatusErrorIcon, StatusPendingIcon, StatusSyncedIcon } from '@/components/icons';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -55,17 +56,28 @@ function SyncStateChip({ state }: { state: SyncStateItem }) {
 interface EntryRowProps {
     canManage: boolean;
     entry: EntryItem;
+    selected: boolean;
+    onSelect: (entry: EntryItem, checked: boolean) => void;
     onEdit: (entry: EntryItem) => void;
     onDelete: (entry: EntryItem) => void;
 }
 
-export function EntryRow({ entry, canManage, onEdit, onDelete }: EntryRowProps) {
+export function EntryRow({ entry, canManage, selected, onSelect, onEdit, onDelete }: EntryRowProps) {
     const syncNow = () => {
         router.post(route('entries.sync', entry.id), {}, { preserveScroll: true });
     };
 
     return (
-        <tr className="hover:bg-muted/40 border-b transition-colors last:border-b-0">
+        <tr className={cn('hover:bg-muted/40 border-b transition-colors last:border-b-0', selected && 'bg-primary/5')}>
+            {canManage && (
+                <td className="py-3 pl-4">
+                    <Checkbox
+                        checked={selected}
+                        onCheckedChange={(checked) => onSelect(entry, checked === true)}
+                        aria-label={`Select ${entry.name}`}
+                    />
+                </td>
+            )}
             <td className="px-4 py-3">
                 <span className="inline-flex items-center gap-1.5">
                     <span className="font-mono text-[13px] font-medium">{entry.name}</span>

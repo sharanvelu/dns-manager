@@ -146,6 +146,21 @@ it('treats a 400 already-exists response as a successful create', function () {
         && $request->url() === PIHOLE_BASE.'/api/auth');
 });
 
+it('throws on 400 already-exists when adoption is disabled', function () {
+    fakePihole([
+        'PUT /api/config/dns/hosts/' => piholeError('bad_request', 'Item already present', 400, 'Uniqueness of items is enforced'),
+    ]);
+
+    $connector = new PiholeConnector(piholeProvider(['adopt_existing' => false]));
+    $entry = DnsEntry::factory()->create([
+        'name' => 'host.example.com',
+        'content' => '192.168.1.10',
+    ]);
+
+    expect(fn () => $connector->createRecord($entry))
+        ->toThrow(ConnectorException::class, 'adoption is disabled');
+});
+
 it('updates a record by deleting the old entry then putting the new one in a single session', function () {
     fakePihole();
 

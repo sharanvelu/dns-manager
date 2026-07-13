@@ -52,6 +52,14 @@ class CloudflareConnector extends AbstractDnsConnector
                 label: 'Zone ID',
                 help: 'Found on the zone Overview page in the Cloudflare dashboard.',
             ),
+            new ConfigField(
+                key: 'adopt_existing',
+                label: 'Adopt existing records',
+                type: 'boolean',
+                required: false,
+                help: 'When a record you create already exists at Cloudflare, adopt and manage it (aligning TTL/proxy to your entry) instead of failing.',
+                default: true,
+            ),
         ];
     }
 
@@ -69,12 +77,10 @@ class CloudflareConnector extends AbstractDnsConnector
     public function testConnection(): TestResult
     {
         try {
-            $verify = $this->http()->get('/user/tokens/verify');
-
-            if (! $verify->successful() || $verify->json('success') !== true) {
-                return TestResult::failure('Token verification failed: '.$this->errorMessageFrom($verify));
-            }
-
+            // A zone lookup validates both the token and the zone ID in one
+            // call. Deliberately NOT /user/tokens/verify: that endpoint
+            // rejects account-owned tokens even when they are fully valid
+            // for zone operations.
             $zone = $this->http()->get('/zones/'.$this->config('zone_id'));
 
             if (! $zone->successful() || $zone->json('success') !== true) {
@@ -118,15 +124,31 @@ class CloudflareConnector extends AbstractDnsConnector
         return $records;
     }
 
+    /**
+     * Cloudflare error codes meaning "a record like this is already there":
+     * 81057 = identical record exists, 81053 = conflicting record on the name.
+     */
+    protected const ALREADY_EXISTS_CODES = [81057, 81053];
+
     public function createRecord(DnsEntry $entry): string
     {
         $response = $this->http()->post($this->recordsPath(), $this->payloadFor($entry));
 
-        if (! $response->successful()) {
-            throw $this->failed($response, 'create record');
+        if ($response->successful()) {
+            return (string) $response->json('result.id');
         }
 
-        return (string) $response->json('result.id');
+        if ($this->shouldAdoptExisting() && $this->isAlreadyExistsError($response)) {
+            $adopted = $this->findAdoptableRecord($entry);
+
+            if ($adopted !== null) {
+                // Take over the existing record and align it with the local
+                // entry (DB wins — same policy as drift re-push).
+                return $this->updateRecord($entry, $adopted);
+            }
+        }
+
+        throw $this->failed($response, 'create record');
     }
 
     public function updateRecord(DnsEntry $entry, string $externalId): string
@@ -184,6 +206,47 @@ class CloudflareConnector extends AbstractDnsConnector
     protected function recordsPath(): string
     {
         return '/zones/'.$this->config('zone_id').'/dns_records';
+    }
+
+    protected function shouldAdoptExisting(): bool
+    {
+        return (bool) $this->config('adopt_existing', true);
+    }
+
+    protected function isAlreadyExistsError(Response $response): bool
+    {
+        return collect($response->json('errors', []))
+            ->pluck('code')
+            ->intersect(self::ALREADY_EXISTS_CODES)
+            ->isNotEmpty();
+    }
+
+    /**
+     * Find the remote record to adopt after an already-exists conflict:
+     * same type + name, preferring an exact content match; otherwise only
+     * an unambiguous single record (e.g. the one conflicting CNAME).
+     */
+    protected function findAdoptableRecord(DnsEntry $entry): ?string
+    {
+        $response = $this->http()->get($this->recordsPath(), [
+            'type' => $entry->type->value,
+            'name' => $entry->name,
+            'per_page' => 100,
+        ]);
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        $candidates = collect($response->json('result', []));
+
+        $normalize = fn (string $value): string => strtolower(rtrim($value, '.'));
+
+        $contentMatch = $candidates->first(fn (array $record): bool => $normalize($this->contentFrom($record)) === $normalize($entry->content));
+
+        $adopted = $contentMatch ?? ($candidates->count() === 1 ? $candidates->first() : null);
+
+        return $adopted !== null ? (string) $adopted['id'] : null;
     }
 
     /**

@@ -7,9 +7,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { router } from '@inertiajs/react';
-import { CircleAlert, CircleCheck, CircleDashed, MoreHorizontal, Pencil, Power, RefreshCw, Trash2 } from 'lucide-react';
+import { type SharedData } from '@/types';
+import { router, usePage } from '@inertiajs/react';
+import { CircleAlert, CircleCheck, CircleDashed, Download, MoreHorizontal, Pencil, Power, RefreshCw, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { ImportRecordsDialog } from './import-records-dialog';
 import { providerMark, providerPayload, relativeTime } from './lib';
 import type { Provider } from './types';
 
@@ -68,7 +70,9 @@ interface ProviderCardProps {
 }
 
 export function ProviderCard({ provider, canManage, onEdit }: ProviderCardProps) {
+    const canImport = usePage<SharedData>().props.auth.can.manageEntries;
     const [confirmingDelete, setConfirmingDelete] = useState(false);
+    const [importing, setImporting] = useState(false);
 
     const Mark = providerMark(provider.type);
     const lastChecked = relativeTime(provider.lastCheckedAt);
@@ -162,18 +166,30 @@ export function ProviderCard({ provider, canManage, onEdit }: ProviderCardProps)
                 <span>{lastChecked ? `Checked ${lastChecked}` : 'Never checked'}</span>
             </div>
 
-            {canManage && (
+            {(canManage || canImport) && (
                 <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="flex-1" onClick={() => onEdit(provider)}>
-                        <Pencil className="size-3.5" />
-                        Edit
-                    </Button>
-                    <Button variant="outline" size="sm" className="flex-1" onClick={checkDrift}>
-                        <RefreshCw className="size-3.5" />
-                        Check drift
-                    </Button>
+                    {canManage && (
+                        <>
+                            <Button variant="outline" size="sm" className="flex-1" onClick={() => onEdit(provider)}>
+                                <Pencil className="size-3.5" />
+                                Edit
+                            </Button>
+                            <Button variant="outline" size="sm" className="flex-1" onClick={checkDrift}>
+                                <RefreshCw className="size-3.5" />
+                                Check drift
+                            </Button>
+                        </>
+                    )}
+                    {canImport && (
+                        <Button variant="outline" size="sm" className="flex-1" onClick={() => setImporting(true)}>
+                            <Download className="size-3.5" />
+                            Import
+                        </Button>
+                    )}
                 </div>
             )}
+
+            {canImport && <ImportRecordsDialog provider={provider} open={importing} onOpenChange={setImporting} />}
 
             <Dialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
                 <DialogContent className="max-w-md">

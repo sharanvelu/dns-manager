@@ -200,8 +200,94 @@ describe('createRecord', function () {
 
         $entry = DnsEntry::factory()->create();
 
-        expect(fn () => $this->connector->createRecord($entry))
+        $provider = Provider::factory()->cloudflare()->create([
+            'config' => ['api_token' => 'test-token', 'zone_id' => 'zone-abc-123', 'adopt_existing' => false],
+        ]);
+
+        expect(fn () => (new CloudflareConnector($provider))->createRecord($entry))
             ->toThrow(ConnectorException::class, '[81057] Record already exists.');
+    });
+});
+
+describe('adopt-on-conflict', function () {
+    function alreadyExistsResponse(int $code = 81057)
+    {
+        return Http::response(cloudflareEnvelope(null, [
+            'success' => false,
+            'errors' => [['code' => $code, 'message' => 'Record already exists.']],
+        ]), 400);
+    }
+
+    it('adopts an identical existing record and aligns it with the entry', function () {
+        $entry = DnsEntry::factory()->create([
+            'name' => 'www.example.com',
+            'type' => RecordType::A,
+            'content' => '192.0.2.1',
+            'ttl' => 3600,
+        ]);
+
+        Http::fake([
+            $this->recordsUrl.'/existing-id-1' => Http::response(cloudflareEnvelope(cloudflareApiRecord(['id' => 'existing-id-1']))),
+            $this->recordsUrl.'?*' => Http::response(cloudflareEnvelope([
+                cloudflareApiRecord(['id' => 'existing-id-1', 'name' => 'www.example.com', 'content' => '192.0.2.1']),
+            ])),
+            $this->recordsUrl => alreadyExistsResponse(),
+        ]);
+
+        expect($this->connector->createRecord($entry))->toBe('existing-id-1');
+
+        // The adopted record gets aligned via PUT (DB wins).
+        Http::assertSent(fn (Request $request) => $request->method() === 'PUT'
+            && str_ends_with(parse_url($request->url(), PHP_URL_PATH), '/existing-id-1')
+            && $request['ttl'] === 3600);
+    });
+
+    it('adopts a single conflicting record without a content match (CNAME retarget)', function () {
+        $entry = DnsEntry::factory()->cname('new-target.example.com')->create(['name' => 'alias.example.com']);
+
+        Http::fake([
+            $this->recordsUrl.'/cname-1' => Http::response(cloudflareEnvelope(cloudflareApiRecord(['id' => 'cname-1', 'type' => 'CNAME']))),
+            $this->recordsUrl.'?*' => Http::response(cloudflareEnvelope([
+                cloudflareApiRecord(['id' => 'cname-1', 'type' => 'CNAME', 'name' => 'alias.example.com', 'content' => 'old-target.example.com']),
+            ])),
+            $this->recordsUrl => alreadyExistsResponse(81053),
+        ]);
+
+        expect($this->connector->createRecord($entry))->toBe('cname-1');
+
+        Http::assertSent(fn (Request $request) => $request->method() === 'PUT' && $request['content'] === 'new-target.example.com');
+    });
+
+    it('rethrows the original error when no unambiguous record can be adopted', function () {
+        $entry = DnsEntry::factory()->create(['name' => 'multi.example.com', 'content' => '10.9.9.9']);
+
+        Http::fake([
+            $this->recordsUrl.'?*' => Http::response(cloudflareEnvelope([
+                cloudflareApiRecord(['id' => 'a-1', 'name' => 'multi.example.com', 'content' => '10.0.0.1']),
+                cloudflareApiRecord(['id' => 'a-2', 'name' => 'multi.example.com', 'content' => '10.0.0.2']),
+            ])),
+            $this->recordsUrl => alreadyExistsResponse(),
+        ]);
+
+        expect(fn () => $this->connector->createRecord($entry))
+            ->toThrow(ConnectorException::class, '[81057]');
+
+        Http::assertNotSent(fn (Request $request) => $request->method() === 'PUT');
+    });
+
+    it('does not attempt adoption for non-conflict errors', function () {
+        Http::fake([
+            $this->recordsUrl => Http::response(cloudflareEnvelope(null, [
+                'success' => false,
+                'errors' => [['code' => 9207, 'message' => 'Invalid content.']],
+            ]), 400),
+        ]);
+
+        $entry = DnsEntry::factory()->create();
+
+        expect(fn () => $this->connector->createRecord($entry))->toThrow(ConnectorException::class, '[9207]');
+
+        Http::assertNotSent(fn (Request $request) => $request->method() === 'GET');
     });
 });
 
@@ -393,11 +479,8 @@ describe('listRecords', function () {
 });
 
 describe('testConnection', function () {
-    it('verifies the token and fetches the zone on success', function () {
+    it('fetches the zone on success', function () {
         Http::fake([
-            'https://api.cloudflare.com/client/v4/user/tokens/verify' => Http::response(
-                cloudflareEnvelope(['id' => 'token-1', 'status' => 'active']),
-            ),
             'https://api.cloudflare.com/client/v4/zones/zone-abc-123' => Http::response(
                 cloudflareEnvelope(['id' => 'zone-abc-123', 'name' => 'example.com', 'status' => 'active']),
             ),
@@ -408,11 +491,15 @@ describe('testConnection', function () {
         expect($result->ok)->toBeTrue()
             ->and($result->message)->toBe('Connected to zone example.com')
             ->and($result->details)->toBe(['zone' => 'example.com', 'status' => 'active']);
+
+        // Regression guard: /user/tokens/verify rejects account-owned tokens,
+        // so the connection test must go through the zone endpoint only.
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'tokens/verify'));
     });
 
     it('fails with the Cloudflare error message when the token is invalid', function () {
         Http::fake([
-            'https://api.cloudflare.com/client/v4/user/tokens/verify' => Http::response(cloudflareEnvelope(null, [
+            'https://api.cloudflare.com/client/v4/zones/zone-abc-123' => Http::response(cloudflareEnvelope(null, [
                 'success' => false,
                 'errors' => [['code' => 1000, 'message' => 'Invalid API Token']],
             ]), 401),
@@ -426,9 +513,6 @@ describe('testConnection', function () {
 
     it('fails when the zone cannot be fetched', function () {
         Http::fake([
-            'https://api.cloudflare.com/client/v4/user/tokens/verify' => Http::response(
-                cloudflareEnvelope(['id' => 'token-1', 'status' => 'active']),
-            ),
             'https://api.cloudflare.com/client/v4/zones/zone-abc-123' => Http::response(cloudflareEnvelope(null, [
                 'success' => false,
                 'errors' => [['code' => 7003, 'message' => 'Could not route to /zones/zone-abc-123']],
@@ -456,6 +540,6 @@ describe('static metadata', function () {
             ->and($capabilities->maxTtl)->toBe(86400);
 
         $keys = array_map(fn ($field) => $field->key, CloudflareConnector::configSchema());
-        expect($keys)->toBe(['api_token', 'zone_id']);
+        expect($keys)->toBe(['api_token', 'zone_id', 'adopt_existing']);
     });
 });

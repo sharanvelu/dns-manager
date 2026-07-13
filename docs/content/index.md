@@ -21,6 +21,9 @@ Version 1.0.0 ships with connectors for **Cloudflare** (public DNS) and **Pi-hol
 - **OIDC single sign-on** — authentication is delegated to any spec-compliant OpenID Connect provider (Authentik, Keycloak, Auth0, ...). Users are auto-provisioned on first login, with Gravatar avatars and an initials fallback.
 - **Role-based access control** — assign predefined roles (Super Admin, DNS Manager, Providers Manager, Viewer) per user, combinable as a union of permissions. The first user becomes Super Admin. See [Users & Roles](users).
 - **Dynamic provider forms** — each connector declares its own configuration schema, and the Providers UI renders the form from it, including a test-connection button that validates credentials before you save.
+- **Adopt existing records** — create an entry that already exists at a provider and the app takes over managing it (configurable per provider). See [Providers](providers).
+- **Import from provider** — browse a provider's live records and selectively pull them in; existing entries are updated and linked, never duplicated. See [Providers](providers).
+- **Bulk actions** — select entries in the list and sync, retarget providers, edit shared fields (type, value, TTL, comment), or delete them in one go, with per-entry validation that skips anything that would become invalid or duplicated. See [DNS Entries](dns-entries).
 - **CSV import** — bulk-create entries from a CSV file with per-row validation, duplicate skipping, and a downloadable sample template. See [DNS Entries](dns-entries).
 - **Live list refresh** — refresh the entries list in place (no page reload), or turn on auto-reload at a chosen interval to watch sync statuses settle.
 - **Activity log** — every push, delete, and drift check is recorded and shown in the dashboard's recent-activity feed.

@@ -20,6 +20,7 @@ You can add the same connector type more than once — for example one Cloudflar
 | --- | --- |
 | **API Token** | A token with **Zone.DNS Edit** and **Zone Read** permissions. |
 | **Zone ID** | Found on the zone **Overview** page in the Cloudflare dashboard (right-hand column). |
+| **Adopt existing records** | On by default — see [Adopting existing records](#adopting-existing-records). |
 
 To create the token in the Cloudflare dashboard: profile icon → **My Profile** → **API Tokens** → **Create Token** → use the **Edit zone DNS** template. It grants `Zone.DNS: Edit`; add `Zone.Zone: Read` under permissions, and scope the token to the specific zone under "Zone Resources". Copy the token immediately — Cloudflare shows it only once.
 
@@ -30,8 +31,28 @@ To create the token in the Cloudflare dashboard: profile icon → **My Profile**
 | **Base URL** | The Pi-hole address, e.g. `https://pihole.local` — no trailing slash. |
 | **App password** | Generate one in Pi-hole under **Settings → Web interface/API → app password**. This is separate from your admin login password. |
 | **Verify TLS certificate** | On by default. Turn it off when your Pi-hole serves a self-signed certificate. |
+| **Adopt existing records** | On by default — see [Adopting existing records](#adopting-existing-records). |
 
 Requires Pi-hole v6 (the REST API generation). The app authenticates per operation and releases its session immediately afterwards, so it stays well under Pi-hole's concurrent-session cap.
+
+## Adopting existing records
+
+What happens when you create an entry that **already exists at the provider** is controlled per provider by the **Adopt existing records** toggle:
+
+- **On (default)** — the app adopts the existing remote record and manages it from then on. The remote record is aligned to your entry (TTL, proxy status, and — for an existing CNAME with a different target — the content too): the app's database wins, consistently with drift handling. This is the way to start managing records that predate DNS Manager: create the same entry here and it takes over.
+- **Off** — creating an entry that already exists at the provider fails, and the entry's status chip shows an error explaining the conflict. Use this if you want the app to only ever touch records it created itself.
+
+Adoption applies only to unambiguous matches (same name and type). If Cloudflare holds several records on the same name (round-robin A records) and none matches your entry's content exactly, the conflict is reported as an error instead of guessing.
+
+## Importing records from a provider
+
+The **Import** action on a provider card (requires the DNS Manager role) pulls the provider's live records into DNS Manager — the bulk counterpart to adopt-on-conflict:
+
+1. The dialog lists every remote record whose type this provider manages, each marked **New** (no matching local entry), **Will update** (a matching entry exists and will be updated and linked), or **Managed** (already linked to this provider — shown for completeness, not selectable).
+2. Tick the records you want — everything not already managed is preselected — and press **Import**.
+3. Selected records are **upserted**: new entries are created, matching entries (same name, type, and content) are updated in place, and each is linked to this provider as already-synced. Nothing is ever duplicated and existing records never cause errors.
+
+Imported entries are assigned to **this provider only** — they are not pushed anywhere else. To sync an imported entry to additional providers, edit it and tick them under provider selection. Records with types outside the provider's managed list are hidden (the dialog shows how many).
 
 ## Managed record types
 
@@ -43,7 +64,7 @@ If you remove a type that existing entries already use on this provider, those r
 
 **Test connection** in the add/edit dialog runs against the values currently in the form, before anything is saved (when editing, blank secret fields fall back to the stored values):
 
-- **Cloudflare** — verifies the API token, then looks up the zone; on success it reports the zone name and status.
+- **Cloudflare** — looks up the configured zone, which validates the token and the Zone ID in one call; on success it reports the zone name and status. Both user-owned and account-owned API tokens work (the app deliberately avoids Cloudflare's `/user/tokens/verify` endpoint, which rejects account-owned tokens).
 - **Pi-hole** — authenticates with the app password and reads the Pi-hole version; on success it reports the connected version.
 
 The result renders inline in the dialog, including the provider's error message on failure.

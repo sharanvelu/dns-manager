@@ -92,9 +92,6 @@ test('secrets are never exposed on the providers page', function () {
 
 test('test connection endpoint proxies the connector result', function () {
     Http::fake([
-        'api.cloudflare.com/client/v4/user/tokens/verify' => Http::response([
-            'success' => true, 'errors' => [], 'result' => ['id' => 't', 'status' => 'active'],
-        ]),
         'api.cloudflare.com/client/v4/zones/zone-1' => Http::response([
             'success' => true, 'errors' => [], 'result' => ['id' => 'zone-1', 'name' => 'example.com', 'status' => 'active'],
         ]),

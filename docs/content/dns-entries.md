@@ -6,7 +6,7 @@ description: Create, edit, sync, and delete DNS records and understand per-provi
 
 # DNS Entries
 
-The DNS Entries page is where you manage records. The table shows one row per entry with columns for **Name** (with an orange cloud icon when the record is proxied), **Type**, **Content**, **TTL** (`Auto` when unset), **Providers** (one status chip per assigned provider), and **Updated**. Row actions — Edit, Sync now, Delete — live behind the kebab menu at the end of each row.
+The DNS Entries page is where you manage records. The table shows one row per entry with columns for **Name** (with an orange cloud icon when the record is proxied), **Type**, **Content**, **TTL** (`Auto` when unset), **Providers** (one status chip per assigned provider), and **Updated**. Row actions — Edit, Sync now, Delete — live behind the kebab menu at the end of each row. Users with the DNS Manager role also get a **selection checkbox** per row for [bulk actions](#bulk-actions).
 
 Above the table you can search (matches name and content, case-insensitive) and filter by record type, provider, and sync status. Results are paginated 25 per page. Filters combine, and a "Clear filters" button appears when a filtered view is empty.
 
@@ -86,6 +86,17 @@ Drift and error chips show the detail in a tooltip on hover; the same events app
 
 - Overwrite drift — the app's database is the source of truth, so re-pushing restores the record at the provider to what the entry says.
 - Retry after fixing the cause of an error.
+
+## Bulk actions
+
+Tick the checkbox on one or more rows (the header checkbox selects the whole page; selections accumulate across pages) and a **bulk actions bar** appears above the table showing the count, a **Clear** button, and four actions applied to every selected entry:
+
+- **Sync now** — re-queues a push for each entry to its currently assigned providers, exactly like the per-row action.
+- **Providers** — replaces each entry's provider assignment with the selection you make in the dialog: records sync to the ticked providers and are **removed from unticked ones**. Providers that don't manage an entry's record type are skipped for that entry (nothing is force-pushed somewhere incompatible). Ticking nothing turns the entries local-only — as always, disabled providers are paused, not purged.
+- **Edit** — bulk-edits the **type**, **value**, **TTL**, and/or **comment**. Tick only the fields you want to change; unticked fields keep each entry's current value. An empty TTL means automatic, and an empty comment clears it. Every entry is re-validated with the change merged in — entries that would become invalid (say, changing the type to A when the value isn't an IPv4 address) or that would duplicate another entry are **skipped, never half-applied**, and the result message reports how many were updated and how many skipped and why. Changing the type re-targets providers automatically: providers that don't manage the new type get a remote delete, priority is cleared when the new type doesn't carry one. Successful edits push to each entry's assigned providers.
+- **Delete** — after a confirmation dialog, removes each entry from every provider it is assigned to and then from the list, with the same semantics as single delete (local-only entries disappear immediately; records at disabled providers are left in place).
+
+Entries deleted elsewhere while selected are silently dropped from the action rather than failing it.
 
 ## Importing entries from CSV
 
