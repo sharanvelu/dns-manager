@@ -1,0 +1,85 @@
+---
+title: Providers
+nav_order: 5
+description: Connect Cloudflare and Pi-hole, test connections, check drift, and manage provider lifecycle.
+---
+
+# Providers
+
+The Providers page shows one card per configured provider: its health badge (**Healthy**, **Error** with the message on hover, or **Not checked**), the record types it manages, how many records are assigned to it and how many are in sync, and when it was last checked. Card actions: **Edit**, **Check drift**, **Enable/Disable**, and **Delete** (the latter two behind the kebab menu). Disabled providers render dimmed with a "Disabled" badge.
+
+## Adding a provider
+
+Click **Add provider** and pick a provider type (Cloudflare or Pi-hole in v1). The connection form below is generated from the connector's own schema, so each type asks only for what it needs. Give the provider a display name (max 100 characters, e.g. "Home Pi-hole"), fill in the connection fields, optionally trim the managed record types, then **Test connection** and save. A drift check is queued immediately after saving, which also sets the health badge.
+
+You can add the same connector type more than once — for example one Cloudflare provider per zone.
+
+### Cloudflare
+
+| Field | Value |
+| --- | --- |
+| **API Token** | A token with **Zone.DNS Edit** and **Zone Read** permissions. |
+| **Zone ID** | Found on the zone **Overview** page in the Cloudflare dashboard (right-hand column). |
+
+To create the token in the Cloudflare dashboard: profile icon → **My Profile** → **API Tokens** → **Create Token** → use the **Edit zone DNS** template. It grants `Zone.DNS: Edit`; add `Zone.Zone: Read` under permissions, and scope the token to the specific zone under "Zone Resources". Copy the token immediately — Cloudflare shows it only once.
+
+### Pi-hole (v6)
+
+| Field | Value |
+| --- | --- |
+| **Base URL** | The Pi-hole address, e.g. `https://pihole.local` — no trailing slash. |
+| **App password** | Generate one in Pi-hole under **Settings → Web interface/API → app password**. This is separate from your admin login password. |
+| **Verify TLS certificate** | On by default. Turn it off when your Pi-hole serves a self-signed certificate. |
+
+Requires Pi-hole v6 (the REST API generation). The app authenticates per operation and releases its session immediately afterwards, so it stays well under Pi-hole's concurrent-session cap.
+
+## Managed record types
+
+Each connector supports a fixed set of record types (see the matrix below), and every provider instance can narrow that further with the **Managed record types** checkboxes — at least one must stay selected. Only the selected types are synced to this provider; entries of other types simply never target it. Use this, for example, to let a Cloudflare provider manage only TXT records while another system owns the rest of the zone.
+
+If you remove a type that existing entries already use on this provider, those records are deleted from the provider the next time each affected entry is saved or re-synced.
+
+## Test connection
+
+**Test connection** in the add/edit dialog runs against the values currently in the form, before anything is saved (when editing, blank secret fields fall back to the stored values):
+
+- **Cloudflare** — verifies the API token, then looks up the zone; on success it reports the zone name and status.
+- **Pi-hole** — authenticates with the app password and reads the Pi-hole version; on success it reports the connected version.
+
+The result renders inline in the dialog, including the provider's error message on failure.
+
+## Check drift
+
+**Check drift** queues an immediate drift check for the provider, the same one the scheduler runs every 15 minutes: the app lists all records at the provider, compares each assigned entry against its remote counterpart, and marks entries `synced` or `drifted`. It only compares fields the provider actually supports (for example, TTL is never compared for Pi-hole hosts entries). A successful check sets the health badge to Healthy; a failed one sets it to Error with the message. Drift checks only run for enabled providers.
+
+## Enable / Disable
+
+Disabling a provider **pauses** it:
+
+- Nothing is pushed to it — it disappears from the provider checkboxes in the entry form, and scheduled drift checks skip it.
+- Its records are **protected from deletion**: existing entry-to-provider assignments are kept, and saving or deleting entries never triggers remote deletes against a disabled provider.
+
+Re-enable the provider and use **Sync now** on affected entries (or wait for edits) to bring it back up to date.
+
+## Editing a provider
+
+Edit changes the name, connection settings, managed record types, and enabled flag; the provider *type* cannot be changed after creation. Secret fields show a masked placeholder — **leave a secret blank to keep the stored value**; only type a new one to replace it. Saving queues a fresh drift check.
+
+## Deleting a provider
+
+Deleting a provider removes it, its sync states, and its history from the app — but **records at the provider are left untouched**; the app just stops managing them. The confirmation dialog states exactly that. If you want the remote records gone, delete the entries (or deselect this provider on them) *before* deleting the provider.
+
+## How credentials are stored
+
+Provider configuration (API tokens, app passwords, URLs) is encrypted at rest in the database with AES-256 using your `APP_KEY`. Secrets are never included in pages sent to the browser — edit forms receive blank secret fields. Consequence: if you lose `APP_KEY`, stored credentials cannot be decrypted and must be re-entered. See [Installation](installation).
+
+## Provider capability matrix
+
+| Capability | Cloudflare | Pi-hole v6 |
+| --- | --- | --- |
+| Record types | A, AAAA, CNAME, MX, TXT, SRV, NS, CAA, PTR | A, AAAA, CNAME |
+| Proxied | A, AAAA, and CNAME records only | Not supported |
+| TTL | 60–86400 seconds, or automatic when empty; proxied records always use automatic | Hosts entries (A/AAAA): none; CNAME: optional TTL. TTL is excluded from drift comparison |
+| Priority | MX and SRV records | Not supported |
+
+Fields a provider does not support are simply not sent to it and are never counted as drift there. See [DNS Entries](dns-entries) for how these fields appear in the entry form.

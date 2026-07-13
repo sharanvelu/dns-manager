@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Support\Gravatar;
@@ -60,6 +61,12 @@ class OidcController extends Controller
         if ($user) {
             $user->update($attributes);
         } else {
+            // The very first user becomes Super Admin; everyone after
+            // starts read-only until a Super Admin assigns roles.
+            $attributes['roles'] = User::count() === 0
+                ? [Role::SuperAdmin->value]
+                : [Role::Viewer->value];
+
             $user = User::create($attributes);
         }
 

@@ -75,3 +75,9 @@ export interface EntriesPageProps {
     providers: ProviderInfo[];
     connectors: ConnectorInfo[];
 }
+
+export interface ImportResult {
+    imported: number;
+    skipped: number;
+    failed: Array<{ line: number; message: string }>;
+}

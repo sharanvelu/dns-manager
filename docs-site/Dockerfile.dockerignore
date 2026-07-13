@@ -1,0 +1,11 @@
+# Per-Dockerfile ignore for docs-site/Dockerfile (BuildKit picks this over the
+# root .dockerignore, which excludes docs-site/ for the app image build).
+# Whitelist: only what the docs-site build needs from the repo-root context.
+*
+!VERSION
+!docs/content
+!docs-site
+docs-site/node_modules
+docs-site/.next
+docs-site/out
+docs-site/next-env.d.ts

@@ -134,6 +134,10 @@ class ProviderController extends Controller
 
     public function check(Provider $provider): RedirectResponse
     {
+        if (! $provider->enabled) {
+            return back()->with('error', "{$provider->name} is disabled — enable it to run drift checks.");
+        }
+
         CheckProviderDrift::dispatch($provider->id);
 
         return back()->with('success', "Drift check queued for {$provider->name}.");

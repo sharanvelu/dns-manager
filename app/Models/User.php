@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Role;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -23,6 +24,7 @@ class User extends Authenticatable
         'password',
         'oidc_sub',
         'avatar_url',
+        'roles',
     ];
 
     /**
@@ -45,6 +47,27 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'roles' => 'array',
         ];
+    }
+
+    public function hasRole(Role $role): bool
+    {
+        return in_array($role->value, $this->roles ?? [], true);
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->hasRole(Role::SuperAdmin);
+    }
+
+    public function canManageEntries(): bool
+    {
+        return $this->isSuperAdmin() || $this->hasRole(Role::DnsManager);
+    }
+
+    public function canManageProviders(): bool
+    {
+        return $this->isSuperAdmin() || $this->hasRole(Role::ProvidersManager);
     }
 }

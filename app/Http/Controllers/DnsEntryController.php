@@ -6,11 +6,13 @@ use App\Connectors\ConnectorRegistry;
 use App\Http\Requests\DnsEntryRequest;
 use App\Models\DnsEntry;
 use App\Models\Provider;
+use App\Services\DnsEntryImporter;
 use App\Services\SyncService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DnsEntryController extends Controller
 {
@@ -79,6 +81,30 @@ class DnsEntryController extends Controller
         $this->sync->syncEntry($entry);
 
         return back()->with('success', "Re-syncing {$entry->name} to all providers.");
+    }
+
+    public function import(Request $request, DnsEntryImporter $importer): RedirectResponse
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:csv,txt', 'max:1024'],
+        ]);
+
+        try {
+            $result = $importer->import($request->file('file')->get());
+        } catch (\InvalidArgumentException $e) {
+            return back()->withErrors(['file' => $e->getMessage()]);
+        }
+
+        return back()->with('importResult', $result);
+    }
+
+    public function importSample(): StreamedResponse
+    {
+        return response()->streamDownload(
+            fn () => print DnsEntryImporter::sampleCsv(),
+            'dns-entries-sample.csv',
+            ['Content-Type' => 'text/csv'],
+        );
     }
 
     private function presentEntry(DnsEntry $entry): array

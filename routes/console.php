@@ -1,12 +1,13 @@
 <?php
 
-use App\Jobs\CheckProviderDrift;
-use App\Models\Provider;
 use Illuminate\Support\Facades\Schedule;
 
-Schedule::call(function () {
-    Provider::query()
-        ->where('enabled', true)
-        ->pluck('id')
-        ->each(fn (int $id) => CheckProviderDrift::dispatch($id));
-})->name('dns-drift-check')->everyFifteenMinutes();
+// The built-in drift-check schedule. Timing comes from DRIFT_CHECK_CRON;
+// SCHEDULER_ENABLED=false turns it off entirely (e.g. when an external
+// automation tool triggers POST /api/hooks/drift-check instead).
+if (config('dns.scheduler_enabled')) {
+    Schedule::command('dns:check-drift')
+        ->cron(config('dns.drift_check_cron'))
+        ->withoutOverlapping()
+        ->onOneServer();
+}

@@ -63,10 +63,11 @@ function HealthBadge({ provider }: { provider: Provider }) {
 
 interface ProviderCardProps {
     provider: Provider;
+    canManage: boolean;
     onEdit: (provider: Provider) => void;
 }
 
-export function ProviderCard({ provider, onEdit }: ProviderCardProps) {
+export function ProviderCard({ provider, canManage, onEdit }: ProviderCardProps) {
     const [confirmingDelete, setConfirmingDelete] = useState(false);
 
     const Mark = providerMark(provider.type);
@@ -101,36 +102,38 @@ export function ProviderCard({ provider, onEdit }: ProviderCardProps) {
                     <p className="text-muted-foreground text-xs">{provider.typeLabel}</p>
                 </div>
 
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="text-muted-foreground size-8 shrink-0">
-                            <MoreHorizontal className="size-4" />
-                            <span className="sr-only">Provider actions</span>
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-44">
-                        <DropdownMenuItem onSelect={() => onEdit(provider)}>
-                            <Pencil className="size-4" />
-                            Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={checkDrift}>
-                            <RefreshCw className="size-4" />
-                            Check drift
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={toggleEnabled}>
-                            <Power className="size-4" />
-                            {provider.enabled ? 'Disable' : 'Enable'}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                            className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
-                            onSelect={() => setConfirmingDelete(true)}
-                        >
-                            <Trash2 className="size-4" />
-                            Delete
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                {canManage && (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="text-muted-foreground size-8 shrink-0">
+                                <MoreHorizontal className="size-4" />
+                                <span className="sr-only">Provider actions</span>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44">
+                            <DropdownMenuItem onSelect={() => onEdit(provider)}>
+                                <Pencil className="size-4" />
+                                Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={checkDrift}>
+                                <RefreshCw className="size-4" />
+                                Check drift
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={toggleEnabled}>
+                                <Power className="size-4" />
+                                {provider.enabled ? 'Disable' : 'Enable'}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                                className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
+                                onSelect={() => setConfirmingDelete(true)}
+                            >
+                                <Trash2 className="size-4" />
+                                Delete
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                )}
             </div>
 
             <div className="flex flex-wrap items-center gap-1.5">
@@ -159,16 +162,18 @@ export function ProviderCard({ provider, onEdit }: ProviderCardProps) {
                 <span>{lastChecked ? `Checked ${lastChecked}` : 'Never checked'}</span>
             </div>
 
-            <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1" onClick={() => onEdit(provider)}>
-                    <Pencil className="size-3.5" />
-                    Edit
-                </Button>
-                <Button variant="outline" size="sm" className="flex-1" onClick={checkDrift}>
-                    <RefreshCw className="size-3.5" />
-                    Check drift
-                </Button>
-            </div>
+            {canManage && (
+                <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="flex-1" onClick={() => onEdit(provider)}>
+                        <Pencil className="size-3.5" />
+                        Edit
+                    </Button>
+                    <Button variant="outline" size="sm" className="flex-1" onClick={checkDrift}>
+                        <RefreshCw className="size-3.5" />
+                        Check drift
+                    </Button>
+                </div>
+            )}
 
             <Dialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
                 <DialogContent className="max-w-md">

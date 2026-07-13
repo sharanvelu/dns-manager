@@ -139,6 +139,31 @@ test('deleting a provider keeps dns entries', function () {
         ->and($entry->syncStates()->count())->toBe(0);
 });
 
+test('drift check on a disabled provider is rejected with feedback', function () {
+    $provider = Provider::factory()->cloudflare()->disabled()->create();
+
+    $this->post("/providers/{$provider->id}/check")->assertRedirect();
+
+    Queue::assertNotPushed(CheckProviderDrift::class);
+    expect(session('error'))->toContain('disabled');
+});
+
+test('underscore-prefixed labels are valid entry names', function () {
+    foreach (['_dmarc.example.com', '_sip._tcp.example.com'] as $name) {
+        $this->post('/entries', [
+            'name' => $name,
+            'type' => 'TXT',
+            'content' => 'v=1',
+        ])->assertSessionHasNoErrors();
+    }
+
+    $this->post('/entries', [
+        'name' => 'bad_label.example.com',
+        'type' => 'TXT',
+        'content' => 'v=1',
+    ])->assertSessionHasErrors('name');
+});
+
 test('dns entry validation rejects bad payloads', function () {
     $this->post('/entries', [
         'name' => 'not a domain!!',

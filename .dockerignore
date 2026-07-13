@@ -43,8 +43,14 @@ Dockerfile
 .dockerignore
 docker-compose*.yml
 
+# The standalone docs website builds its own image (docs-site/Dockerfile)
+docs-site
+
 # Docs / editor cruft
+# NOTE: docs/content/*.md is re-included below — the in-app /docs endpoint
+# renders those files at runtime. Do not remove the exception.
 *.md
+!docs/content/*.md
 .vscode
 .idea
 .DS_Store

@@ -39,10 +39,16 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'auth' => [
                 'user' => $request->user(),
+                'can' => [
+                    'manageEntries' => $request->user()?->canManageEntries() ?? false,
+                    'manageProviders' => $request->user()?->canManageProviders() ?? false,
+                    'manageUsers' => $request->user()?->isSuperAdmin() ?? false,
+                ],
             ],
             'flash' => [
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),
+                'importResult' => $request->session()->get('importResult'),
             ],
         ]);
     }

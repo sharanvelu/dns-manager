@@ -17,6 +17,30 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Application Version
+    |--------------------------------------------------------------------------
+    |
+    | Read from the VERSION file at the repo root — the single source of
+    | truth also used by the docs site build and release tagging.
+    |
+    */
+
+    'version' => trim((string) @file_get_contents(base_path('VERSION')) ?: '0.0.0'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Documentation Site URL
+    |--------------------------------------------------------------------------
+    |
+    | Public site hosting docs for the LATEST version. The in-app /docs
+    | endpoint links here from its version banner.
+    |
+    */
+
+    'docs_site_url' => env('DOCS_SITE_URL', 'https://dns-manager-docs.example.com'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |

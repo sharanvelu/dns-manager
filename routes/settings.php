@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Settings\ProfileController;
+use App\Http\Controllers\Settings\UserController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -13,4 +14,10 @@ Route::middleware('auth')->group(function () {
     Route::get('settings/appearance', function () {
         return Inertia::render('settings/appearance');
     })->name('appearance');
+
+    Route::middleware('can:manage-users')->group(function () {
+        Route::get('settings/users', [UserController::class, 'index'])->name('users.index');
+        Route::put('settings/users/{user}', [UserController::class, 'update'])->name('users.update');
+        Route::delete('settings/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
+    });
 });

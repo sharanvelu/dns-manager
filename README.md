@@ -4,6 +4,13 @@ Manage DNS entries across multiple providers from one place. Entries created her
 
 **Providers in v1:** Cloudflare (public DNS, 9 record types) and Pi-hole v6 (local DNS: A / AAAA / CNAME). The connector architecture is designed for adding Technitium, Unbound, and others later.
 
+## Documentation
+
+- **User docs**: source of truth in [`docs/content/`](docs/content/) — served by your running instance at **`/docs`** (matching your installed version) and published for the latest version by the standalone [`docs-site/`](docs-site/) (Next.js).
+- **Agent/contributor docs**: [AGENTS.md](AGENTS.md) (start here), [ARCHITECTURE.md](ARCHITECTURE.md), [DESIGN.md](DESIGN.md), [CLAUDE.md](CLAUDE.md).
+
+> ⚠️ These docs are kept in sync with the code as a hard rule: any change to the application must update the matching documentation in the same change set. See AGENTS.md.
+
 ## Stack
 
 - Laravel 12 (PHP 8.4) + Inertia.js 2 + React 19 + TypeScript + Tailwind CSS 4

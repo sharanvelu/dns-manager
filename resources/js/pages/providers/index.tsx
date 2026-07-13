@@ -1,8 +1,8 @@
 import { EmptyProvidersIllustration } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
+import { type BreadcrumbItem, type SharedData } from '@/types';
+import { Head, usePage } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { FlashToast } from './flash-toast';
@@ -20,6 +20,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 type DialogState = { mode: 'create' } | { mode: 'edit'; provider: Provider } | null;
 
 export default function ProvidersIndex({ providers, connectors }: ProvidersPageProps) {
+    const canManage = usePage<SharedData>().props.auth.can.manageProviders;
     const [dialog, setDialog] = useState<DialogState>(null);
 
     return (
@@ -32,10 +33,12 @@ export default function ProvidersIndex({ providers, connectors }: ProvidersPageP
                         <h1 className="text-xl font-semibold tracking-tight">Providers</h1>
                         <p className="text-muted-foreground text-sm">DNS backends this app pushes records to.</p>
                     </div>
-                    <Button onClick={() => setDialog({ mode: 'create' })}>
-                        <Plus className="size-4" />
-                        Add provider
-                    </Button>
+                    {canManage && (
+                        <Button onClick={() => setDialog({ mode: 'create' })}>
+                            <Plus className="size-4" />
+                            Add provider
+                        </Button>
+                    )}
                 </div>
 
                 {providers.length === 0 ? (
@@ -47,15 +50,22 @@ export default function ProvidersIndex({ providers, connectors }: ProvidersPageP
                                 Connect Cloudflare, Pi-hole or another DNS backend to start managing records from one place.
                             </p>
                         </div>
-                        <Button onClick={() => setDialog({ mode: 'create' })}>
-                            <Plus className="size-4" />
-                            Connect your first provider
-                        </Button>
+                        {canManage && (
+                            <Button onClick={() => setDialog({ mode: 'create' })}>
+                                <Plus className="size-4" />
+                                Connect your first provider
+                            </Button>
+                        )}
                     </div>
                 ) : (
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                         {providers.map((provider) => (
-                            <ProviderCard key={provider.id} provider={provider} onEdit={(p) => setDialog({ mode: 'edit', provider: p })} />
+                            <ProviderCard
+                                key={provider.id}
+                                provider={provider}
+                                canManage={canManage}
+                                onEdit={(p) => setDialog({ mode: 'edit', provider: p })}
+                            />
                         ))}
                     </div>
                 )}

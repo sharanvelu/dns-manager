@@ -30,3 +30,16 @@ data:
   SESSION_DRIVER: "database"
 
   OIDC_PROVIDER_LABEL: "SSO"
+
+  # Public docs site for the LATEST version (linked from the /docs banner).
+  DOCS_SITE_URL: "https://docs.dns.example.com"
+
+  # Dedicated worker/scheduler Deployments run these roles on k8s —
+  # don't also run them inside the web pod's supervisord.
+  SUPERVISOR_WORKER: "false"
+  SUPERVISOR_SCHEDULER: "false"
+
+  # Built-in drift-check schedule (see also DRIFT_CHECK_TRIGGER_TOKEN in the
+  # Secret for external triggering).
+  SCHEDULER_ENABLED: "true"
+  DRIFT_CHECK_CRON: "*/15 * * * *"
