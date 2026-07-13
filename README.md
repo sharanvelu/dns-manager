@@ -73,9 +73,10 @@ app/
 
 ## Deployment
 
-A single container image runs web, queue worker, and scheduler roles (command override per role). See `k8s/README.md` for Kubernetes manifests and deploy order; `.github/workflows/build.yml` builds and pushes `ghcr.io/<owner>/dns-manager` on every merge to `master`.
+A single container image runs the web, queue worker, and scheduler roles together via supervisord — one standalone Docker container, or one pod on Kubernetes (single Deployment, migrations run at pod start via `AUTO_MIGRATE=true`). See `k8s/README.md` for the manifests and deploy order; `.github/workflows/build.yml` builds and pushes `ghcr.io/<owner>/dns-manager` on every merge to `master`.
 
 ```sh
 docker build -t ghcr.io/<owner>/dns-manager:dev .
+kubectl create namespace dns-manager
 kubectl apply -k k8s/
 ```

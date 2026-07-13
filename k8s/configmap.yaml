@@ -2,7 +2,6 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: dns-manager-config
-  namespace: dns-manager
   labels:
     app.kubernetes.io/name: dns-manager
 data:
@@ -34,12 +33,13 @@ data:
   # Public docs site for the LATEST version (linked from the /docs banner).
   DOCS_SITE_URL: "https://docs.dns.example.com"
 
-  # Dedicated worker/scheduler Deployments run these roles on k8s —
-  # don't also run them inside the web pod's supervisord.
-  SUPERVISOR_WORKER: "false"
-  SUPERVISOR_SCHEDULER: "false"
+  # Migrations run automatically at pod start (the entrypoint runs
+  # `php artisan migrate --force`). There is no separate migrate Job in
+  # this single-pod architecture.
+  AUTO_MIGRATE: "true"
 
   # Built-in drift-check schedule (see also DRIFT_CHECK_TRIGGER_TOKEN in the
-  # Secret for external triggering).
+  # Secret for external triggering). Set SCHEDULER_ENABLED to "false" if you
+  # switch to the optional cronjob.yaml.
   SCHEDULER_ENABLED: "true"
   DRIFT_CHECK_CRON: "*/15 * * * *"

@@ -6,7 +6,7 @@ description: Run DNS Manager with Docker or Kubernetes, configure environment va
 
 # Installation
 
-DNS Manager ships as a single container image, `ghcr.io/OWNER/dns-manager` (replace `OWNER` with the GitHub user or organization hosting your build). The same image runs three roles — web, queue worker, and scheduler — selected by the container command.
+DNS Manager ships as a single container image, `ghcr.io/OWNER/dns-manager` (replace `OWNER` with the GitHub user or organization hosting your build). By default one container runs all three roles — web, queue worker, and scheduler — under its supervisor.
 
 ## Requirements
 
@@ -26,9 +26,8 @@ docker run --rm ghcr.io/OWNER/dns-manager php artisan key:generate --show
 A single container is fully self-contained: its supervisor runs nginx + PHP, the queue worker, **and** the scheduler. The web role listens on port 8080.
 
 ```sh
-# AUTO_MIGRATE=true runs database migrations at container start — convenient
-# for single-container setups. On Kubernetes leave it unset and use the
-# migrate Job instead.
+# AUTO_MIGRATE=true runs database migrations at container start — the
+# Kubernetes ConfigMap sets it too, so both setups migrate automatically.
 docker run -d --name dns-manager -p 8080:8080 \
   -e APP_KEY="base64:..." \
   -e AUTO_MIGRATE=true \
@@ -43,7 +42,7 @@ docker run -d --name dns-manager -p 8080:8080 \
   ghcr.io/OWNER/dns-manager
 ```
 
-To split the roles into separate containers instead (as Kubernetes does), set `SUPERVISOR_WORKER=false` and `SUPERVISOR_SCHEDULER=false` on the web container and run two more containers with the same env, overriding the command with `php artisan queue:work redis` and `php artisan schedule:work` respectively.
+To split the roles into separate containers instead (an advanced setup for scaling out — not needed for a homelab), set `SUPERVISOR_WORKER=false` and `SUPERVISOR_SCHEDULER=false` on the web container and run two more containers with the same env, overriding the command with `php artisan queue:work redis` and `php artisan schedule:work` respectively.
 
 The container entrypoint caches configuration (and migrates when `AUTO_MIGRATE=true`), so a fresh database is ready as soon as the container is up. Verify with:
 
@@ -57,21 +56,24 @@ The repository ships ready-made manifests under `k8s/`:
 
 | Manifest | Purpose |
 | --- | --- |
-| `namespace.yaml` | The `dns-manager` namespace |
-| `configmap.yaml` | Non-secret environment (APP_URL, DB/Redis hosts, queue settings) |
+| `configmap.yaml` | Non-secret environment (APP_URL, DB/Redis hosts, queue settings, `AUTO_MIGRATE=true`) |
 | `secret.example.yaml` | Template for secrets (APP_KEY, DB password, OIDC client secret) — copy to `secret.yaml`, never commit it |
-| `job-migrate.yaml` | One-shot Job that runs `php artisan migrate --force` |
-| `deployment-web.yaml`, `deployment-worker.yaml`, `deployment-scheduler.yaml` | The three roles (command override per role) |
-| `service.yaml`, `ingress.yaml` | Expose the web role |
-| `kustomization.yaml` | Ties it all together for `kubectl apply -k` |
+| `deployment.yaml` | The single `dns-manager` pod: nginx + php-fpm + queue worker + scheduler via supervisord (image default command) |
+| `service.yaml`, `ingress.yaml` | Expose the app |
+| `volume.yaml` | *Optional* PersistentVolumeClaim for `storage/app` — excluded by default (the app is stateless; Postgres and Redis are external) |
+| `cronjob.yaml` | *Optional* Kubernetes-native scheduler alternative — runs `php artisan dns:check-drift` every 15 minutes; set `SCHEDULER_ENABLED=false` if you use it |
+| `kustomization.yaml` | Ties it all together for `kubectl apply -k` (secret, volume, and cronjob are commented out by default) |
 
-One-time setup: replace `OWNER` in the deployments and migrate Job, set your hostname in `configmap.yaml` (`APP_URL`) and `ingress.yaml`, point `DB_HOST` / `REDIS_HOST` at your services, and create `secret.yaml` from the example. Then either apply everything with kustomize:
+The deployment runs **one pod** (`replicas: 1`, `Recreate` strategy) covering all three roles, exactly like the single Docker container above. Keep replicas at 1 — the scheduler must run at most once per installation. `AUTO_MIGRATE=true` in the ConfigMap runs database migrations at pod start, so there is no separate migrate Job.
+
+One-time setup: replace `OWNER` in `deployment.yaml`, set your hostname in `configmap.yaml` (`APP_URL`) and `ingress.yaml`, point `DB_HOST` / `REDIS_HOST` at your services, and create `secret.yaml` from the example. Then:
 
 ```sh
+kubectl create namespace dns-manager
 kubectl apply -k k8s/
 ```
 
-or apply plain YAML in order: namespace, configmap, secret, migrate Job (wait for completion), the three deployments, then service and ingress. Health probes hit Laravel's built-in `/up` endpoint on port 8080. See `k8s/README.md` in the repository for the full command sequence and rolling-update recipe.
+Health probes hit Laravel's built-in `/up` endpoint on port 8080. See `k8s/README.md` in the repository for the full command sequence.
 
 ## Environment reference
 
@@ -89,8 +91,8 @@ or apply plain YAML in order: namespace, configmap, secret, migrate Job (wait fo
 | `OIDC_REDIRECT_URI` | Callback URL; defaults to `${APP_URL}/auth/callback`. Register this URI with your identity provider. |
 | `OIDC_PROVIDER_LABEL` | Text on the sign-in button, e.g. `Authentik` renders "Sign in with Authentik". Defaults to `SSO`. |
 | `DOCS_SITE_URL` | URL of the hosted latest-version documentation site, linked from the in-app docs banner. |
-| `AUTO_MIGRATE` | `true` runs database migrations at container start. Use for single-container Docker setups; leave unset on Kubernetes (the migrate Job handles it). Defaults to `false`. |
-| `SUPERVISOR_WORKER` / `SUPERVISOR_SCHEDULER` | Whether the container's supervisor also runs the queue worker / scheduler. Default `true` (self-contained container); set `false` on Kubernetes where dedicated Deployments run those roles. |
+| `AUTO_MIGRATE` | `true` runs database migrations at container start. The Kubernetes ConfigMap sets it to `true`; do the same for single-container Docker setups. Defaults to `false`. |
+| `SUPERVISOR_WORKER` / `SUPERVISOR_SCHEDULER` | Whether the container's supervisor also runs the queue worker / scheduler. Default `true` (self-contained container); only set `false` in the advanced setup that splits the roles into separate containers/Deployments with command overrides. |
 | `SCHEDULER_ENABLED` | `false` disables the built-in drift-check schedule entirely — use when an external tool triggers checks via the webhook instead. Defaults to `true`. |
 | `DRIFT_CHECK_CRON` | Cron expression for the built-in drift-check schedule. Defaults to `*/15 * * * *` (every 15 minutes). |
 | `DRIFT_CHECK_TRIGGER_TOKEN` | Bearer token enabling `POST /api/hooks/drift-check` for external automation. The endpoint stays disabled (404) while unset. |
@@ -105,7 +107,7 @@ The worker and scheduler are **not optional**. The web role only writes to the d
 | Worker | `php artisan queue:work redis` | Nothing is ever pushed to or deleted from any provider; entries sit at "Pending" forever. |
 | Scheduler | `php artisan schedule:work` | No automatic drift checks (manual checks still work, via the worker). |
 
-By default the container's supervisor runs **all three** (see `SUPERVISOR_WORKER` / `SUPERVISOR_SCHEDULER` above). Run at most **one** scheduler across your whole installation — the schedule also takes a cache lock (`onOneServer`) as a safety net.
+By default the container's supervisor runs **all three** (see `SUPERVISOR_WORKER` / `SUPERVISOR_SCHEDULER` above) — on Kubernetes the single pod covers everything, just like a standalone Docker container. Run at most **one** scheduler across your whole installation — the schedule also takes a cache lock (`onOneServer`) as a safety net.
 
 ## Automating drift checks externally
 
@@ -125,6 +127,8 @@ curl -X POST https://dns.example.com/api/hooks/drift-check \
 
 The response reports what was queued: `{"queued": 2, "providers": ["Cloudflare — example.com", "Pi-hole — homelab"]}`. Requests without the correct token get `401`; while no token is configured the endpoint returns `404`. Set `SCHEDULER_ENABLED=false` if the external trigger fully replaces the built-in schedule.
 
+On Kubernetes there is a third option: the optional `cronjob.yaml` manifest runs `php artisan dns:check-drift` as a native CronJob every 15 minutes — set `SCHEDULER_ENABLED=false` when using it.
+
 ## First login
 
 Open the app and click the sign-in button. There is no registration step: users are auto-provisioned on first OIDC login, matched by OIDC subject and then by email. Avatars come from Gravatar (falling back to initials).
@@ -134,8 +138,8 @@ The **first user to sign in becomes the Super Admin**. Everyone after that start
 ## Upgrading
 
 1. Pull the new image tag.
-2. Run the database migration (on Kubernetes: delete and re-apply `job-migrate.yaml`, wait for completion; with plain Docker, set `AUTO_MIGRATE=true` so migrations run at container start).
-3. Restart the web, worker, and scheduler roles.
+2. Restart the container — on Kubernetes bump the image tag or run `kubectl -n dns-manager rollout restart deploy/dns-manager`.
+3. That's it: with `AUTO_MIGRATE=true` set, database migrations run automatically at container start.
 
 Documentation for the exact version you are running is always available on your own instance at `/docs` — no login required.
 

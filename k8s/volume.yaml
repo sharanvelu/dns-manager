@@ -1,0 +1,19 @@
+# OPTIONAL — the app is stateless by default (Postgres and Redis are
+# external), so this PVC is excluded from kustomization.yaml. Enable it only
+# if you want persistent local storage for storage/app (e.g. uploaded
+# files): add this file to kustomization.yaml and uncomment the
+# volumeMounts/volumes blocks in deployment.yaml.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dns-manager-storage
+  labels:
+    app.kubernetes.io/name: dns-manager
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  # Uncomment to pin a storage class instead of the cluster default:
+  # storageClassName: local-path

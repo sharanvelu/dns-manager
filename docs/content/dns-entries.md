@@ -14,7 +14,7 @@ Entries must be unique on the combination of name, type, and content.
 
 ## Refreshing the list
 
-The toolbar has a **refresh button** that reloads just the entries list — filters, scroll position, and any open dialog stay put; the page itself never reloads. Next to it, an **auto-reload dropdown** re-fetches the list on a schedule (every 5s, 15s, 30s, 1m, or 5m — or off). Auto-reload pauses while the browser tab is in the background, and your chosen interval is remembered per browser. This is handy for watching sync statuses settle after a bulk change.
+The toolbar has a **refresh button** that reloads just the entries list — filters, scroll position, and any open dialog stay put; the page itself never reloads. Next to it, an **auto-reload dropdown** re-fetches the list on a schedule (every 5s, 15s, 30s, 1m, or 5m — or off). While auto-reload is on, a **countdown timer** with a progress ring shows exactly when the next refresh fires; pressing the refresh button restarts it. Auto-reload pauses while the browser tab is in the background, and your chosen interval is remembered per browser. This is handy for watching sync statuses settle after a bulk change.
 
 ## Creating an entry
 

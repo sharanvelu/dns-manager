@@ -24,6 +24,39 @@ function reloadEntries(onFinish?: () => void) {
     });
 }
 
+function formatRemaining(seconds: number): string {
+    if (seconds < 60) return `${seconds}s`;
+
+    const minutes = Math.floor(seconds / 60);
+    const rest = seconds % 60;
+
+    return `${minutes}:${String(rest).padStart(2, '0')}`;
+}
+
+/** Small circular progress ring that fills as the countdown elapses. */
+function CountdownRing({ total, remaining }: { total: number; remaining: number }) {
+    const radius = 7;
+    const circumference = 2 * Math.PI * radius;
+    const progress = total > 0 ? (total - remaining) / total : 0;
+
+    return (
+        <svg viewBox="0 0 18 18" className="size-4 -rotate-90" aria-hidden>
+            <circle cx="9" cy="9" r={radius} fill="none" strokeWidth="2" className="stroke-border" />
+            <circle
+                cx="9"
+                cy="9"
+                r={radius}
+                fill="none"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={circumference * (1 - progress)}
+                className="stroke-emerald-500 transition-[stroke-dashoffset] duration-1000 ease-linear dark:stroke-emerald-400"
+            />
+        </svg>
+    );
+}
+
 export function RefreshControls() {
     const [refreshing, setRefreshing] = useState(false);
     const [interval, setIntervalValue] = useState<string>(() => {
@@ -31,35 +64,45 @@ export function RefreshControls() {
 
         return stored && INTERVALS.some((option) => option.value === stored) ? stored : 'off';
     });
-    const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const seconds = interval === 'off' ? 0 : Number(interval);
+    const [remaining, setRemaining] = useState(seconds);
+    const reloadingRef = useRef(false);
 
     const refresh = () => {
         setRefreshing(true);
+        setRemaining(seconds);
         reloadEntries(() => setRefreshing(false));
     };
 
     useEffect(() => {
         localStorage.setItem(STORAGE_KEY, interval);
+        setRemaining(seconds);
 
-        if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
+        if (interval === 'off') {
+            return;
         }
 
-        if (interval !== 'off') {
-            timerRef.current = setInterval(() => {
-                // Skip while the tab is in the background.
-                if (!document.hidden) {
-                    reloadEntries();
+        const ticker = setInterval(() => {
+            setRemaining((current) => {
+                if (current > 1) {
+                    return current - 1;
                 }
-            }, Number(interval) * 1000);
-        }
 
-        return () => {
-            if (timerRef.current) {
-                clearInterval(timerRef.current);
-            }
-        };
+                // Countdown reached zero: reload (unless the tab is hidden or a
+                // reload is already in flight) and restart the countdown.
+                if (!document.hidden && !reloadingRef.current) {
+                    reloadingRef.current = true;
+                    reloadEntries(() => {
+                        reloadingRef.current = false;
+                    });
+                }
+
+                return seconds;
+            });
+        }, 1000);
+
+        return () => clearInterval(ticker);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [interval]);
 
     return (
@@ -72,6 +115,22 @@ export function RefreshControls() {
                 </TooltipTrigger>
                 <TooltipContent>Refresh the list without reloading the page</TooltipContent>
             </Tooltip>
+
+            {interval !== 'off' && (
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <div
+                            className="flex h-9 cursor-default items-center gap-1.5 rounded-md border px-2.5 text-xs text-muted-foreground tabular-nums"
+                            role="timer"
+                            aria-label={`Next refresh in ${remaining} seconds`}
+                        >
+                            <CountdownRing total={seconds} remaining={remaining} />
+                            {formatRemaining(remaining)}
+                        </div>
+                    </TooltipTrigger>
+                    <TooltipContent>Next auto-refresh</TooltipContent>
+                </Tooltip>
+            )}
 
             <Select value={interval} onValueChange={setIntervalValue}>
                 <SelectTrigger className="h-9 w-[150px] text-xs" aria-label="Auto-reload interval">

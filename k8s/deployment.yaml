@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dns-manager
+  labels:
+    app.kubernetes.io/name: dns-manager
+spec:
+  # Single replica BY DESIGN: the pod runs the in-pod scheduler and executes
+  # migrations at start (AUTO_MIGRATE), so a second replica would duplicate
+  # scheduled runs and race migrations. Scaling out requires splitting the
+  # roles into dedicated deployments — see README.md ("Scaling out").
+  replicas: 1
+  # Recreate avoids old+new pods migrating/scheduling concurrently during
+  # an upgrade (brief downtime is the trade-off).
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dns-manager
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dns-manager
+    spec:
+      containers:
+        - name: dns-manager
+          # Replace OWNER with your GitHub username/org
+          image: ghcr.io/OWNER/dns-manager:latest
+          imagePullPolicy: Always
+          # No command override: the image's default entrypoint starts
+          # supervisord, which runs nginx + php-fpm + queue worker +
+          # scheduler in this one container.
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: dns-manager-config
+            - secretRef:
+                name: dns-manager-secrets
+          readinessProbe:
+            httpGet:
+              path: /up
+              port: http
+            # Generous initial delay + failureThreshold: start-time
+            # migrations (AUTO_MIGRATE=true) run before nginx is up.
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 18 # allows ~10s + 18*5s ≈ 100s of startup
+          livenessProbe:
+            httpGet:
+              path: /up
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false # entrypoint writes bootstrap/cache
+          # Optional persistent storage for storage/app (uploads, local
+          # files). The app is stateless by default — Postgres/Redis hold
+          # all state — so this stays commented out. To enable: uncomment
+          # here AND the volumes block below, and add volume.yaml to
+          # kustomization.yaml.
+          # volumeMounts:
+          #   - name: storage
+          #     mountPath: /var/www/html/storage/app
+      # volumes:
+      #   - name: storage
+      #     persistentVolumeClaim:
+      #       claimName: dns-manager-storage

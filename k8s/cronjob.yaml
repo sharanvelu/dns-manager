@@ -1,0 +1,46 @@
+# Optional: k8s-native alternative to the in-pod scheduler. If you use
+# this, set SCHEDULER_ENABLED=false (or SUPERVISOR_SCHEDULER=false) in the
+# ConfigMap and add this file to kustomization.yaml.
+#
+# Keep the schedule below in sync with DRIFT_CHECK_CRON if you change it.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: dns-manager-drift-check
+  labels:
+    app.kubernetes.io/name: dns-manager
+    app.kubernetes.io/component: drift-check
+spec:
+  schedule: "*/15 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: dns-manager
+            app.kubernetes.io/component: drift-check
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: drift-check
+              # Replace OWNER with your GitHub username/org
+              image: ghcr.io/OWNER/dns-manager:latest
+              imagePullPolicy: Always
+              # Goes through the image entrypoint so caches are built first
+              command: ["docker-entrypoint", "php", "artisan", "dns:check-drift"]
+              envFrom:
+                - configMapRef:
+                    name: dns-manager-config
+                - secretRef:
+                    name: dns-manager-secrets
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 256Mi

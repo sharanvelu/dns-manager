@@ -1,50 +1,104 @@
 # DNS Manager — Kubernetes deployment
 
-One image (`ghcr.io/OWNER/dns-manager`), three roles: web (nginx + php-fpm
-via supervisord), queue worker, and scheduler. Postgres 16 and Redis are
-expected to already exist in the cluster (or be reachable externally).
+**One pod = the whole app.** The single container runs nginx + php-fpm +
+queue worker + scheduler via supervisord — exactly like running the image
+as a single Docker container. Postgres 16 and Redis are expected to already
+exist (in-cluster or reachable externally). Migrations run automatically at
+pod start (`AUTO_MIGRATE=true`).
+
+## Files
+
+| File | Purpose | In kustomization? |
+|---|---|---|
+| `kustomization.yaml` | Ties it all together, sets the namespace | — |
+| `configmap.yaml` | Non-secret app config (`APP_URL`, DB/Redis hosts, …) | yes |
+| `deployment.yaml` | The single app pod (all roles) | yes |
+| `service.yaml` | ClusterIP, port 80 → pod 8080 | yes |
+| `ingress.yaml` | TLS ingress (nginx + cert-manager annotations) | yes |
+| `secret.example.yaml` | Template for `secret.yaml` (APP_KEY, DB creds, OIDC, …) | copy first |
+| `volume.yaml` | Optional PVC for persistent `storage/app` | no (optional) |
+| `cronjob.yaml` | Optional k8s-native drift-check scheduler | no (optional) |
+| `docs-site.yaml` | Separate public docs website (not part of the app) | no |
 
 ## One-time setup
 
 1. Replace placeholders:
-   - `OWNER` in `deployment-*.yaml` and `job-migrate.yaml` (your GitHub user/org)
+   - `OWNER` in `deployment.yaml` (and `cronjob.yaml` if used) — your GitHub user/org
    - `dns.example.com` in `configmap.yaml` (`APP_URL`) and `ingress.yaml`
    - `DB_HOST` / `REDIS_HOST` in `configmap.yaml`
-2. Create the secret:
-
-   ```sh
-   cp k8s/secret.example.yaml k8s/secret.yaml   # edit values; do NOT commit
-   # APP_KEY: php artisan key:generate --show
-   ```
-
-   Then uncomment `- secret.yaml` in `kustomization.yaml` (or create the
-   secret with `kubectl create secret generic` — see secret.example.yaml).
-3. If GHCR packages are private, add an image pull secret and reference it
-   in the deployments (`imagePullSecrets`).
+2. If GHCR packages are private, add an image pull secret and reference it
+   in the deployment (`imagePullSecrets`).
 
 ## Deploy
 
 ```sh
-# Everything via kustomize (namespace first is handled automatically)
-kubectl apply -k k8s/
+# 1. The namespace must exist (kustomize's `namespace:` field only labels
+#    resources; it does not create the namespace):
+kubectl create namespace dns-manager
 
-# Or plain YAML, in order:
-kubectl apply -f k8s/namespace.yaml
-kubectl apply -f k8s/configmap.yaml
-kubectl apply -f k8s/secret.yaml
-kubectl apply -f k8s/job-migrate.yaml
-kubectl -n dns-manager wait --for=condition=complete job/dns-manager-migrate --timeout=120s
-kubectl apply -f k8s/deployment-web.yaml -f k8s/deployment-worker.yaml -f k8s/deployment-scheduler.yaml
-kubectl apply -f k8s/service.yaml -f k8s/ingress.yaml
+# 2. Create the secret:
+cp k8s/secret.example.yaml k8s/secret.yaml   # edit values; do NOT commit
+# APP_KEY: php artisan key:generate --show
+# then uncomment `- secret.yaml` in kustomization.yaml
+# (or create it imperatively — see the header of secret.example.yaml)
+
+# 3. Apply everything:
+kubectl apply -k k8s/
 ```
 
-## On each new image (rolling update)
+Health check: probes hit Laravel's `/up` endpoint on port 8080. The
+readiness probe allows generous startup time because migrations run before
+the web server accepts traffic.
+
+## Upgrades
 
 ```sh
-kubectl -n dns-manager delete job dns-manager-migrate --ignore-not-found
-kubectl apply -f k8s/job-migrate.yaml
-kubectl -n dns-manager rollout restart deploy/dns-manager-web deploy/dns-manager-worker deploy/dns-manager-scheduler
+# Bump the image tag in deployment.yaml and re-apply:
+kubectl apply -k k8s/
+
+# ...or, if you track :latest, just restart:
+kubectl -n dns-manager rollout restart deploy/dns-manager
 ```
+
+Migrations run automatically when the new pod starts (`AUTO_MIGRATE=true`
+in the ConfigMap). `strategy: Recreate` guarantees the old pod is gone
+before the new one migrates, at the cost of a brief downtime window.
+
+## Optional: persistent storage
+
+The app is stateless by default — all state lives in Postgres/Redis. If you
+want `storage/app` (e.g. uploaded files) to survive pod restarts:
+
+1. Add `- volume.yaml` to `kustomization.yaml`.
+2. Uncomment the `volumeMounts` and `volumes` blocks in `deployment.yaml`.
+
+## Optional: k8s-native scheduler (CronJob)
+
+By default the in-pod scheduler triggers drift checks (`SCHEDULER_ENABLED`
++ `DRIFT_CHECK_CRON` in the ConfigMap). To use a Kubernetes CronJob
+instead:
+
+1. Set `SCHEDULER_ENABLED: "false"` (or `SUPERVISOR_SCHEDULER: "false"`)
+   in `configmap.yaml`.
+2. Add `- cronjob.yaml` to `kustomization.yaml` (schedule: `*/15 * * * *`,
+   `concurrencyPolicy: Forbid`).
+
+## Scaling out (advanced — not the default)
+
+This layout is intentionally single-replica: the in-pod scheduler and
+start-time migrations are not safe to run in parallel. If you outgrow one
+pod:
+
+1. Set `SUPERVISOR_WORKER: "false"` and `SUPERVISOR_SCHEDULER: "false"` in
+   the ConfigMap so web pods only serve HTTP.
+2. Add dedicated Deployments with command overrides
+   (`docker-entrypoint php artisan queue:work redis ...` and
+   `docker-entrypoint php artisan schedule:work`, the scheduler at
+   exactly 1 replica).
+3. Set `AUTO_MIGRATE: "false"` and run migrations via a one-shot Job (or
+   manually with `kubectl exec ... php artisan migrate --force`) so
+   replicas don't race migrations.
+4. Then the web Deployment can use `RollingUpdate` and `replicas > 1`.
 
 ## Build locally (optional)
 
@@ -59,8 +113,6 @@ CI builds and pushes automatically on merge to `master` (tag `latest` +
 
 ## Notes
 
-- Health probes hit Laravel's built-in `/up` endpoint on port 8080.
 - `config:cache` / `view:cache` run in the entrypoint at container start so
   they pick up k8s env vars; `route:cache` is attempted but skipped while
   routes use closures.
-- Migrations run only via the Job, never in the entrypoint.
