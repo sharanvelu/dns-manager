@@ -47,11 +47,16 @@ export interface ConnectorInfo {
     };
 }
 
+export type SortColumn = 'name' | 'type' | 'content' | 'ttl' | 'updated';
+export type SortDirection = 'asc' | 'desc';
+
 export interface EntryFilters {
     search?: string;
     type?: string;
     provider?: string;
     status?: string;
+    sort?: SortColumn;
+    direction?: SortDirection;
 }
 
 export interface PaginatorLink {

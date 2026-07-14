@@ -18,9 +18,26 @@ class DnsEntryController extends Controller
 {
     public function __construct(private SyncService $sync) {}
 
+    /** Sortable columns: request key => database column. */
+    private const SORTABLE = [
+        'name' => 'name',
+        'type' => 'type',
+        'content' => 'content',
+        'ttl' => 'ttl',
+        'updated' => 'updated_at',
+    ];
+
     public function index(Request $request, ConnectorRegistry $registry): Response
     {
         $filters = $request->only(['search', 'type', 'provider', 'status']);
+
+        // Datatables-style server-side sorting: unknown values fall back to
+        // the defaults instead of erroring.
+        $sort = (string) $request->query('sort', 'name');
+        $sort = array_key_exists($sort, self::SORTABLE) ? $sort : 'name';
+        $direction = $request->query('direction') === 'desc' ? 'desc' : 'asc';
+        $filters['sort'] = $sort;
+        $filters['direction'] = $direction;
 
         $entries = DnsEntry::query()
             ->with(['syncStates.provider:id,name,type'])
@@ -38,7 +55,7 @@ class DnsEntryController extends Controller
             ->when($filters['status'] ?? null, fn ($q, $status) => $q->whereHas(
                 'syncStates', fn ($q) => $q->where('sync_status', $status),
             ))
-            ->orderBy('name')
+            ->tap(fn ($q) => $this->applySort($q, $sort, $direction))
             ->paginate(25)
             ->withQueryString()
             ->through(fn (DnsEntry $entry) => $this->presentEntry($entry));
@@ -49,6 +66,26 @@ class DnsEntryController extends Controller
             'providers' => $this->presentProviders(),
             'connectors' => $registry->descriptors(),
         ]);
+    }
+
+    private function applySort($query, string $sort, string $direction): void
+    {
+        $column = self::SORTABLE[$sort];
+
+        // Null TTL means "automatic" — keep those rows last either way
+        // (portable across Postgres and the sqlite test DB).
+        if ($column === 'ttl') {
+            $query->orderByRaw('(ttl IS NULL) ASC');
+        }
+
+        $query->orderBy($column, $direction);
+
+        // Stable tiebreaks so pagination never shows duplicates.
+        if ($column !== 'name') {
+            $query->orderBy('name');
+        }
+
+        $query->orderBy('id');
     }
 
     public function store(DnsEntryRequest $request): RedirectResponse

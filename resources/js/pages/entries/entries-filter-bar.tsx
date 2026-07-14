@@ -24,6 +24,9 @@ export function EntriesFilterBar({ filters, providers }: EntriesFilterBarProps) 
             type: filters.type ?? '',
             provider: filters.provider ?? '',
             status: filters.status ?? '',
+            // Filtering must not reset the active column sort.
+            sort: filters.sort ?? '',
+            direction: filters.direction ?? '',
             ...overrides,
         };
 
@@ -115,7 +118,11 @@ export function EntriesFilterBar({ filters, providers }: EntriesFilterBarProps) 
                     onClick={() => {
                         suppressNextSearchApply.current = true;
                         setSearch('');
-                        router.get('/entries', {}, { preserveState: true, replace: true });
+                        // Clearing filters keeps the active column sort.
+                        const params = Object.fromEntries(
+                            Object.entries({ sort: filters.sort ?? '', direction: filters.direction ?? '' }).filter(([, value]) => value !== ''),
+                        );
+                        router.get('/entries', params, { preserveState: true, replace: true });
                     }}
                 >
                     <X className="size-3.5" />

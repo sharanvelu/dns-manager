@@ -5,7 +5,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import { Plus, SearchX, Upload } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Plus, SearchX, Upload } from 'lucide-react';
 import { useState } from 'react';
 import { BulkActionsBar } from './bulk-actions-bar';
 import { DeleteEntryDialog } from './delete-entry-dialog';
@@ -15,7 +15,7 @@ import { EntryRow } from './entry-row';
 import { FlashToast } from './flash-toast';
 import { ImportEntriesDialog } from './import-entries-dialog';
 import { RefreshControls } from './refresh-controls';
-import type { EntriesPageProps, EntryItem, PaginatorLink } from './types';
+import type { EntriesPageProps, EntryFilters, EntryItem, PaginatorLink, SortColumn } from './types';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -26,6 +26,42 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 function decodeLabel(label: string): string {
     return label.replace('&laquo;', '«').replace('&raquo;', '»').replace('&hellip;', '…');
+}
+
+function SortableHeader({ column, label, filters }: { column: SortColumn; label: string; filters: EntryFilters }) {
+    const active = (filters.sort ?? 'name') === column;
+    const direction = active ? (filters.direction ?? 'asc') : undefined;
+    const Icon = active ? (direction === 'desc' ? ArrowDown : ArrowUp) : ArrowUpDown;
+
+    const toggle = () => {
+        const params: Record<string, string> = Object.fromEntries(
+            Object.entries({
+                search: filters.search ?? '',
+                type: filters.type ?? '',
+                provider: filters.provider ?? '',
+                status: filters.status ?? '',
+            }).filter(([, value]) => value !== ''),
+        );
+
+        params.sort = column;
+        params.direction = active && direction === 'asc' ? 'desc' : 'asc';
+
+        router.get('/entries', params, { preserveState: true, preserveScroll: true, replace: true });
+    };
+
+    return (
+        <th className="px-4 py-2.5 font-medium" aria-sort={active ? (direction === 'desc' ? 'descending' : 'ascending') : 'none'}>
+            <button
+                type="button"
+                onClick={toggle}
+                className={`hover:text-foreground -mx-1 inline-flex items-center gap-1 rounded px-1 transition-colors ${active ? 'text-foreground' : ''}`}
+                aria-label={`Sort by ${label}`}
+            >
+                {label}
+                <Icon className={`size-3.5 ${active ? '' : 'text-muted-foreground/50'}`} />
+            </button>
+        </th>
+    );
 }
 
 function Pagination({ links, total, currentPage, lastPage }: { links: PaginatorLink[]; total: number; currentPage: number; lastPage: number }) {
@@ -181,12 +217,12 @@ export default function EntriesIndex({ entries, filters, providers, connectors }
                                                     />
                                                 </th>
                                             )}
-                                            <th className="px-4 py-2.5 font-medium">Name</th>
-                                            <th className="px-4 py-2.5 font-medium">Type</th>
-                                            <th className="px-4 py-2.5 font-medium">Content</th>
-                                            <th className="px-4 py-2.5 font-medium">TTL</th>
+                                            <SortableHeader column="name" label="Name" filters={filters} />
+                                            <SortableHeader column="type" label="Type" filters={filters} />
+                                            <SortableHeader column="content" label="Content" filters={filters} />
+                                            <SortableHeader column="ttl" label="TTL" filters={filters} />
                                             <th className="px-4 py-2.5 font-medium">Providers</th>
-                                            <th className="px-4 py-2.5 font-medium">Updated</th>
+                                            <SortableHeader column="updated" label="Updated" filters={filters} />
                                             <th className="px-2 py-2.5">
                                                 <span className="sr-only">Actions</span>
                                             </th>

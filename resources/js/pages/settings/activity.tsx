@@ -357,7 +357,11 @@ export default function Activity({ activities, filters, users, events, subject }
                                                                 aria-expanded={isExpanded}
                                                                 aria-label={isExpanded ? 'Hide changes' : 'Show changes'}
                                                             >
-                                                                {isExpanded ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+                                                                {isExpanded ? (
+                                                                    <ChevronDown className="size-3.5" />
+                                                                ) : (
+                                                                    <ChevronRight className="size-3.5" />
+                                                                )}
                                                             </Button>
                                                         )}
                                                     </td>
