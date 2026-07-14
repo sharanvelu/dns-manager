@@ -65,6 +65,7 @@ routes/console.php       # the schedule (Laravel 12 has no console Kernel — th
 - Vite preloading is **disabled** (`Vite::usePreloadTagAttributes(false)` in `AppServiceProvider`): the preload `Link` header (~4KB+) overflowed default nginx `fastcgi_buffer_size` (4KB) causing 502s on full-page refreshes. `docker/nginx.conf` also raises the buffers. Do not re-enable preloading without checking both.
 - Dev containers that run `config:cache` against a mounted volume poison `bootstrap/cache/config.php` with container paths for host tooling. Clear with `php artisan config:clear` if tests fail with `/var/www/html/...` path errors.
 - Pages live in lowercase `resources/js/pages`; `config/inertia.php` is published to point `testing.page_paths` there. Without it, Inertia's default (`js/Pages`) passes on case-insensitive macOS but fails every `assertInertia` component check on Linux CI ("page component file does not exist").
+- Behind TLS-terminating proxies, `FORCE_HTTPS` (→ `URL::forceScheme`) only fixes generator-built URLs; **pagination links derive from the request URL** and stayed http (mixed-content blocked) until `trustProxies(at: '*')` was added in `bootstrap/app.php`. Keep both.
 - Pi-hole caps concurrent API sessions (~16): the connector must always logout (`DELETE /api/auth`) in a `finally`.
 - Disabled providers are **paused**, not removed — editing an entry must never queue remote deletes against a disabled provider.
 

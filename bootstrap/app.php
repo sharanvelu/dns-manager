@@ -14,6 +14,14 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // The app always sits behind a proxy (in-container nginx, plus the
+        // k8s ingress / reverse proxy that terminates TLS). Trusting the
+        // X-Forwarded-* headers makes request-derived URLs — pagination
+        // links, redirects, signed URLs — reflect the real https scheme
+        // and client IP. FORCE_HTTPS covers generator-built URLs; this
+        // covers the request side.
+        $middleware->trustProxies(at: '*');
+
         $middleware->web(append: [
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,

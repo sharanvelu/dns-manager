@@ -81,7 +81,7 @@ Health probes hit Laravel's built-in `/up` endpoint on port 8080. See `k8s/READM
 | --- | --- |
 | `APP_KEY` | Laravel encryption key. Also encrypts provider credentials at rest — if you lose it, you must re-enter every provider's credentials. Back it up. |
 | `APP_URL` | Public URL of the app (must match your ingress hostname). |
-| `FORCE_HTTPS` | `true` generates every URL (assets, redirects) with the https scheme. Set it whenever TLS terminates in front of the app (Kubernetes ingress, reverse proxy) and the container itself is reached over plain http — otherwise browsers block the http asset URLs as mixed content. Defaults to `false`. |
+| `FORCE_HTTPS` | `true` generates every URL (assets, redirects) with the https scheme. Set it whenever TLS terminates in front of the app (Kubernetes ingress, reverse proxy) and the container itself is reached over plain http — otherwise browsers block the http asset URLs as mixed content. Defaults to `false`. The app additionally trusts proxy `X-Forwarded-*` headers, so request-derived URLs (pagination links) also come out https when the proxy sends `X-Forwarded-Proto: https` — no extra configuration needed. |
 | `APP_ENV` / `APP_DEBUG` | Set to `production` / `false` when deployed. |
 | `DB_CONNECTION` | `pgsql` |
 | `DB_HOST` / `DB_PORT` / `DB_DATABASE` / `DB_USERNAME` / `DB_PASSWORD` | PostgreSQL 16 connection. |
