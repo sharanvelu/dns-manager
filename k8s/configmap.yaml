@@ -10,6 +10,9 @@ data:
   APP_DEBUG: "false"
   # Must match the ingress host
   APP_URL: "https://dns.example.com"
+  # TLS terminates at the ingress, so the pod is reached over plain http —
+  # force generated URLs (assets, redirects) to https to avoid mixed content.
+  FORCE_HTTPS: "true"
   LOG_CHANNEL: "stderr"
   LOG_LEVEL: "info"
 

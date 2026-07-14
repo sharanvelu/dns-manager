@@ -41,6 +41,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Force HTTPS
+    |--------------------------------------------------------------------------
+    |
+    | Generate every URL (assets, redirects, pagination links) with the
+    | https scheme. Needed when TLS terminates in front of the app (k8s
+    | ingress, reverse proxy) and the app itself is reached over plain
+    | http — otherwise asset URLs come out http and browsers block them
+    | as mixed content.
+    |
+    */
+
+    'force_https' => (bool) env('FORCE_HTTPS', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |
