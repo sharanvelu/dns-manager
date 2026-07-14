@@ -75,13 +75,15 @@ want `storage/app` (e.g. uploaded files) to survive pod restarts:
 ## Optional: k8s-native scheduler (CronJob)
 
 By default the in-pod scheduler triggers drift checks (`SCHEDULER_ENABLED`
-+ `DRIFT_CHECK_CRON` in the ConfigMap). To use a Kubernetes CronJob
-instead:
++ `DRIFT_CHECK_CRON` in the ConfigMap) and provider health checks
+(`PROVIDER_HEALTH_CHECK_ENABLED` + `PROVIDER_HEALTH_CHECK_CRON`). To use
+a Kubernetes CronJob instead:
 
 1. Set `SCHEDULER_ENABLED: "false"` (or `SUPERVISOR_SCHEDULER: "false"`)
    in `configmap.yaml`.
 2. Add `- cronjob.yaml` to `kustomization.yaml` (schedule: `*/15 * * * *`,
-   `concurrencyPolicy: Forbid`).
+   `concurrencyPolicy: Forbid`). Duplicate the manifest with
+   `dns:check-provider-health` if you also want scheduled health checks.
 
 ## Scaling out (advanced — not the default)
 

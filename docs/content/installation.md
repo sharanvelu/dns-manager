@@ -94,9 +94,11 @@ Health probes hit Laravel's built-in `/up` endpoint on port 8080. See `k8s/READM
 | `DOCS_SITE_URL` | URL of the hosted latest-version documentation site, linked from the in-app docs banner. |
 | `AUTO_MIGRATE` | `true` runs database migrations at container start. The Kubernetes ConfigMap sets it to `true`; do the same for single-container Docker setups. Defaults to `false`. |
 | `SUPERVISOR_WORKER` / `SUPERVISOR_SCHEDULER` | Whether the container's supervisor also runs the queue worker / scheduler. Default `true` (self-contained container); only set `false` in the advanced setup that splits the roles into separate containers/Deployments with command overrides. |
-| `SCHEDULER_ENABLED` | `false` disables the built-in drift-check schedule entirely — use when an external tool triggers checks via the webhook instead. Defaults to `true`. |
+| `SCHEDULER_ENABLED` | `false` disables the built-in schedules (drift check **and** provider health check) entirely — use when an external tool triggers checks via the webhooks instead. Defaults to `true`. |
 | `DRIFT_CHECK_CRON` | Cron expression for the built-in drift-check schedule. Defaults to `*/15 * * * *` (every 15 minutes). |
-| `DRIFT_CHECK_TRIGGER_TOKEN` | Bearer token enabling `POST /api/hooks/drift-check` for external automation. The endpoint stays disabled (404) while unset. |
+| `PROVIDER_HEALTH_CHECK_ENABLED` | `false` disables just the built-in provider health-check schedule (drift checks keep running). Defaults to `true`. |
+| `PROVIDER_HEALTH_CHECK_CRON` | Cron expression for the built-in provider health-check schedule. Defaults to `*/5 * * * *` (every 5 minutes). |
+| `HOOKS_TRIGGER_TOKEN` | Bearer token enabling `POST /api/hooks/drift-check` and `POST /api/hooks/health-check` for external automation. The endpoints stay disabled (404) while unset. |
 
 ## Running roles
 
@@ -106,29 +108,33 @@ The worker and scheduler are **not optional**. The web role only writes to the d
 | --- | --- | --- |
 | Web | image default (nginx + php-fpm via supervisord) | The UI itself. |
 | Worker | `php artisan queue:work redis` | Nothing is ever pushed to or deleted from any provider; entries sit at "Pending" forever. |
-| Scheduler | `php artisan schedule:work` | No automatic drift checks (manual checks still work, via the worker). |
+| Scheduler | `php artisan schedule:work` | No automatic drift or health checks (manual checks still work, via the worker). |
 
 By default the container's supervisor runs **all three** (see `SUPERVISOR_WORKER` / `SUPERVISOR_SCHEDULER` above) — on Kubernetes the single pod covers everything, just like a standalone Docker container. Run at most **one** scheduler across your whole installation — the schedule also takes a cache lock (`onOneServer`) as a safety net.
 
-## Automating drift checks externally
+## Automating checks externally
 
-The built-in schedule queues the drift checker (`php artisan dns:check-drift`) on the `DRIFT_CHECK_CRON` expression. If you'd rather drive it from an external tool (N8N, cron, CI), set a `DRIFT_CHECK_TRIGGER_TOKEN` and call the webhook:
+The built-in schedule queues the drift checker (`php artisan dns:check-drift`) on the `DRIFT_CHECK_CRON` expression and the provider health checker (`php artisan dns:check-provider-health`) on the `PROVIDER_HEALTH_CHECK_CRON` expression. If you'd rather drive them from an external tool (N8N, cron, CI), set a `HOOKS_TRIGGER_TOKEN` and call the webhooks:
 
 ```sh
-# check all enabled providers
+# drift-check all enabled providers
 curl -X POST https://dns.example.com/api/hooks/drift-check \
-  -H "Authorization: Bearer $DRIFT_CHECK_TRIGGER_TOKEN"
+  -H "Authorization: Bearer $HOOKS_TRIGGER_TOKEN"
 
-# or a single provider
+# health-check all enabled providers
+curl -X POST https://dns.example.com/api/hooks/health-check \
+  -H "Authorization: Bearer $HOOKS_TRIGGER_TOKEN"
+
+# or target a single provider (works on both endpoints)
 curl -X POST https://dns.example.com/api/hooks/drift-check \
-  -H "Authorization: Bearer $DRIFT_CHECK_TRIGGER_TOKEN" \
+  -H "Authorization: Bearer $HOOKS_TRIGGER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"provider_id": 1}'
 ```
 
-The response reports what was queued: `{"queued": 2, "providers": ["Cloudflare — example.com", "Pi-hole — homelab"]}`. Requests without the correct token get `401`; while no token is configured the endpoint returns `404`. Set `SCHEDULER_ENABLED=false` if the external trigger fully replaces the built-in schedule.
+The response reports what was queued: `{"queued": 2, "providers": ["Cloudflare — example.com", "Pi-hole — homelab"]}`. Requests without the correct token get `401`; while no token is configured the endpoints return `404`. Set `SCHEDULER_ENABLED=false` if the external triggers fully replace the built-in schedules.
 
-On Kubernetes there is a third option: the optional `cronjob.yaml` manifest runs `php artisan dns:check-drift` as a native CronJob every 15 minutes — set `SCHEDULER_ENABLED=false` when using it.
+On Kubernetes there is a third option: the optional `cronjob.yaml` manifest runs `php artisan dns:check-drift` as a native CronJob every 15 minutes (duplicate it with `dns:check-provider-health` for health checks) — set `SCHEDULER_ENABLED=false` when using it.
 
 ## First login
 

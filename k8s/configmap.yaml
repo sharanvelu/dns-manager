@@ -41,8 +41,12 @@ data:
   # this single-pod architecture.
   AUTO_MIGRATE: "true"
 
-  # Built-in drift-check schedule (see also DRIFT_CHECK_TRIGGER_TOKEN in the
-  # Secret for external triggering). Set SCHEDULER_ENABLED to "false" if you
-  # switch to the optional cronjob.yaml.
+  # Built-in drift-check + provider health-check schedules (see also
+  # HOOKS_TRIGGER_TOKEN in the Secret for external triggering). Set
+  # SCHEDULER_ENABLED to "false" if you switch to the optional cronjob.yaml;
+  # PROVIDER_HEALTH_CHECK_ENABLED "false" disables just the health-check
+  # schedule.
   SCHEDULER_ENABLED: "true"
   DRIFT_CHECK_CRON: "*/15 * * * *"
+  PROVIDER_HEALTH_CHECK_ENABLED: "true"
+  PROVIDER_HEALTH_CHECK_CRON: "*/5 * * * *"

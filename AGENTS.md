@@ -29,6 +29,7 @@ npx tsc --noEmit          # TypeScript check
 npm run build             # Vite production build
 php artisan migrate       # run migrations (Postgres in dev/prod)
 php artisan dns:check-drift [--provider=ID]   # queue drift checks (what the schedule runs)
+php artisan dns:check-provider-health [--provider=ID]  # queue provider connectivity health checks
 docker build -t dns-manager:dev .   # production image (web+worker+scheduler roles)
 ```
 
@@ -38,7 +39,7 @@ Local dev services: Postgres 16 and Redis 7 (queue). `.env` uses `DB_*`, `REDIS_
 
 ```
 app/Connectors/          # provider integrations — see ARCHITECTURE.md
-app/Jobs/                # SyncEntryToProvider, DeleteEntryFromProvider, CheckProviderDrift
+app/Jobs/                # SyncEntryToProvider, DeleteEntryFromProvider, CheckProviderDrift, CheckProviderHealth
 app/Services/SyncService.php  # provider targeting + push/delete orchestration
 app/Http/Controllers/    # Dashboard, DnsEntry, Provider, Auth\Oidc, Settings
 resources/js/pages/      # Inertia React pages (dashboard, entries/, providers/, auth/, settings/)

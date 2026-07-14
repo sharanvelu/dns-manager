@@ -55,14 +55,14 @@ app/
 │   ├── CloudflareConnector.php
 │   ├── PiholeConnector.php
 │   └── ConnectorRegistry.php        # register new connectors here
-├── Jobs/                   # SyncEntryToProvider, DeleteEntryFromProvider, CheckProviderDrift
+├── Jobs/                   # SyncEntryToProvider, DeleteEntryFromProvider, CheckProviderDrift, CheckProviderHealth
 ├── Services/SyncService.php # decides which providers receive which entries
 └── Http/Controllers/       # Dashboard, DnsEntry, Provider controllers
 ```
 
 - A connector declares the record types it **can** manage (`supportedRecordTypes`) and the settings it needs (`configSchema`, rendered dynamically by the Providers UI).
 - A provider (a configured connector instance) narrows that to the types it **does** manage — chosen in the UI, stored as `managed_record_types`.
-- Saving an entry queues a push to every enabled provider managing that type. The scheduler dispatches a drift check for each provider every 15 minutes.
+- Saving an entry queues a push to every enabled provider managing that type. The scheduler dispatches a drift check for each provider every 15 minutes and a connectivity health check every 5 minutes.
 
 ### Adding a connector
 

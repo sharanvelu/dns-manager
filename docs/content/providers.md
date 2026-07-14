@@ -69,6 +69,8 @@ If you remove a type that existing entries already use on this provider, those r
 
 The result renders inline in the dialog, including the provider's error message on failure.
 
+The same connection test also runs on a schedule (every 5 minutes by default, configurable via `PROVIDER_HEALTH_CHECK_CRON`, disabled with `PROVIDER_HEALTH_CHECK_ENABLED=false`) against every enabled provider and keeps the health badge current between drift checks. It can also be triggered externally via `POST /api/hooks/health-check` — see [Installation](installation) for the webhook setup.
+
 ## Check drift
 
 **Check drift** queues an immediate drift check for the provider, the same one the scheduler runs every 15 minutes: the app lists all records at the provider, compares each assigned entry against its remote counterpart, and marks entries `synced` or `drifted`. It only compares fields the provider actually supports (for example, TTL is never compared for Pi-hole hosts entries). A successful check sets the health badge to Healthy; a failed one sets it to Error with the message. Drift checks only run for enabled providers.
@@ -77,7 +79,7 @@ The result renders inline in the dialog, including the provider's error message 
 
 Disabling a provider **pauses** it:
 
-- Nothing is pushed to it — it disappears from the provider checkboxes in the entry form, and scheduled drift checks skip it.
+- Nothing is pushed to it — it disappears from the provider checkboxes in the entry form, and scheduled drift and health checks skip it.
 - Its records are **protected from deletion**: existing entry-to-provider assignments are kept, and saving or deleting entries never triggers remote deletes against a disabled provider.
 
 Re-enable the provider and use **Sync now** on affected entries (or wait for edits) to bring it back up to date.

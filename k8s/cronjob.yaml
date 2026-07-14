@@ -3,6 +3,9 @@
 # ConfigMap and add this file to kustomization.yaml.
 #
 # Keep the schedule below in sync with DRIFT_CHECK_CRON if you change it.
+# For provider health checks, duplicate this manifest with the command
+# `dns:check-provider-health` and a PROVIDER_HEALTH_CHECK_CRON-aligned
+# schedule.
 apiVersion: batch/v1
 kind: CronJob
 metadata:
