@@ -24,9 +24,14 @@ const adminNavItems: NavItem[] = [
         url: '/settings/users',
         icon: null,
     },
+    {
+        title: 'Activity log',
+        url: '/settings/activity',
+        icon: null,
+    },
 ];
 
-export default function SettingsLayout({ children }: { children: React.ReactNode }) {
+export default function SettingsLayout({ children, fullWidth = false }: { children: React.ReactNode; fullWidth?: boolean }) {
     const { auth } = usePage<SharedData>().props;
     const navItems = auth.can.manageUsers ? [...sidebarNavItems, ...adminNavItems] : sidebarNavItems;
     const currentPath = window.location.pathname;
@@ -58,8 +63,8 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
 
                 <Separator className="my-6 md:hidden" />
 
-                <div className="flex-1 md:max-w-2xl">
-                    <section className="max-w-xl space-y-12">{children}</section>
+                <div className={cn('flex-1', { 'md:max-w-2xl': !fullWidth })}>
+                    <section className={cn('space-y-12', { 'max-w-xl': !fullWidth })}>{children}</section>
                 </div>
             </div>
         </div>

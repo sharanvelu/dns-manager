@@ -43,6 +43,7 @@ class HandleInertiaRequests extends Middleware
                     'manageEntries' => $request->user()?->canManageEntries() ?? false,
                     'manageProviders' => $request->user()?->canManageProviders() ?? false,
                     'manageUsers' => $request->user()?->isSuperAdmin() ?? false,
+                    'viewActivity' => $request->user()?->isSuperAdmin() ?? false,
                 ],
             ],
             'flash' => [

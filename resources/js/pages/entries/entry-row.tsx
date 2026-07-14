@@ -1,12 +1,14 @@
+import { ActivityLogDialog } from '@/components/activity-log-dialog';
 import { RecordTypeBadge, StatusDeletingIcon, StatusDriftedIcon, StatusErrorIcon, StatusPendingIcon, StatusSyncedIcon } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { router } from '@inertiajs/react';
-import { Cloud, MoreHorizontal, Pencil, RefreshCw, Trash2 } from 'lucide-react';
-import type { ComponentType, SVGProps } from 'react';
+import { type SharedData } from '@/types';
+import { router, usePage } from '@inertiajs/react';
+import { Cloud, History, MoreHorizontal, Pencil, RefreshCw, Trash2 } from 'lucide-react';
+import { useState, type ComponentType, type SVGProps } from 'react';
 import { relativeTime } from './helpers';
 import type { EntryItem, SyncStateItem, SyncStatus } from './types';
 
@@ -63,6 +65,9 @@ interface EntryRowProps {
 }
 
 export function EntryRow({ entry, canManage, selected, onSelect, onEdit, onDelete }: EntryRowProps) {
+    const canViewActivity = usePage<SharedData>().props.auth.can.viewActivity;
+    const [viewingActivity, setViewingActivity] = useState(false);
+
     const syncNow = () => {
         router.post(route('entries.sync', entry.id), {}, { preserveScroll: true });
     };
@@ -132,6 +137,12 @@ export function EntryRow({ entry, canManage, selected, onSelect, onEdit, onDelet
                                 <RefreshCw />
                                 Sync now
                             </DropdownMenuItem>
+                            {canViewActivity && (
+                                <DropdownMenuItem onSelect={() => setViewingActivity(true)}>
+                                    <History />
+                                    Activity
+                                </DropdownMenuItem>
+                            )}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                                 onSelect={() => onDelete(entry)}
@@ -142,6 +153,15 @@ export function EntryRow({ entry, canManage, selected, onSelect, onEdit, onDelet
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
+                )}
+                {canViewActivity && (
+                    <ActivityLogDialog
+                        open={viewingActivity}
+                        onOpenChange={setViewingActivity}
+                        subjectType="entry"
+                        subjectId={entry.id}
+                        subjectLabel={entry.name}
+                    />
                 )}
             </td>
         </tr>

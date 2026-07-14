@@ -79,7 +79,19 @@ class ProviderController extends Controller
             }
         }
 
+        $configChanged = $config != $existing;
+
         $provider->update([...$data, 'config' => $config]);
+
+        if ($configChanged) {
+            // The model trait never logs `config` (secrets) — record only
+            // the fact that connection settings changed, never any values.
+            activity('providers')
+                ->performedOn($provider)
+                ->event('updated')
+                ->withProperties(['config_changed' => true])
+                ->log('updated connection settings');
+        }
 
         CheckProviderDrift::dispatch($provider->id);
 

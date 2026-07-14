@@ -73,6 +73,13 @@ class DnsEntryController extends Controller
     {
         $this->sync->deleteEntry($entry);
 
+        // Deferred deletions (queued provider jobs remove the row later)
+        // would otherwise be logged with no causer — attribute the request
+        // here. Inline deletes are already attributed by the model trait.
+        if ($entry->exists) {
+            activity('entries')->performedOn($entry)->event('delete-requested')->log('delete-requested');
+        }
+
         return back()->with('success', "Entry {$entry->name} is being removed from all providers.");
     }
 

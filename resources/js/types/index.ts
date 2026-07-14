@@ -6,6 +6,7 @@ export interface Auth {
         manageEntries: boolean;
         manageProviders: boolean;
         manageUsers: boolean;
+        viewActivity: boolean;
     };
 }
 

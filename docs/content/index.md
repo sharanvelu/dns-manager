@@ -26,7 +26,8 @@ Version 1.0.0 ships with connectors for **Cloudflare** (public DNS) and **Pi-hol
 - **Bulk actions** — select entries in the list and sync, retarget providers, edit shared fields (type, value, TTL, comment), or delete them in one go, with per-entry validation that skips anything that would become invalid or duplicated. See [DNS Entries](dns-entries).
 - **CSV import** — bulk-create entries from a CSV file with per-row validation, duplicate skipping, and a downloadable sample template. See [DNS Entries](dns-entries).
 - **Live list refresh** — refresh the entries list in place (no page reload), or turn on auto-reload at a chosen interval to watch sync statuses settle.
-- **Activity log** — every push, delete, and drift check is recorded and shown in the dashboard's recent-activity feed.
+- **Sync activity feed** — every push, delete, and drift check is recorded and shown in the dashboard's recent-activity feed. See [Dashboard](dashboard).
+- **Audit trail** — every change made by a user (entries, providers, users, roles, sign-ins) is logged with field-level old → new diffs and viewable by Super Admins, filterable per record. Provider secrets are never logged. See [Activity Log](activity-log).
 - **Dark mode** — the whole UI is designed for both light and dark themes.
 - **Kubernetes-ready** — one container image runs the web, queue worker, and scheduler roles via command overrides, with ready-made manifests in the repo. See [Installation](installation).
 - **Extensible connector architecture** — providers are pluggable connectors behind a small interface; Technitium and Unbound connectors are planned.

@@ -12,7 +12,7 @@ DNS Manager uses role-based access control (RBAC). Every user carries one or mor
 
 | Role | What it allows |
 | --- | --- |
-| **Super Admin** | Everything, including user and role management under Settings → Users. |
+| **Super Admin** | Everything, including user and role management under Settings → Users and exclusive access to the [Activity Log](activity-log) audit trail. |
 | **DNS Manager** | Create, edit, sync, import, and delete DNS entries. |
 | **Providers Manager** | Add, configure, test, enable/disable, and delete providers. |
 | **Viewer** | Read-only access to the dashboard, entries, and providers. |
@@ -30,7 +30,7 @@ Upgrading from a version without RBAC? All existing users are granted Super Admi
 
 ## Managing users (Super Admin only)
 
-Open **Settings → Users**. Each user card shows their avatar, email, and a checkbox per role — tick any combination and **Save roles**. Changes apply on the user's next request; no re-login needed.
+Open **Settings → Users**. Each user card shows their avatar, email, and a checkbox per role — tick any combination and **Save roles**. Changes apply on the user's next request; no re-login needed. Role changes are audited: the [Activity Log](activity-log) records the old and new roles and the admin who made the change.
 
 Safety rails:
 

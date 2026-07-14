@@ -6,7 +6,7 @@ description: Connect Cloudflare and Pi-hole, test connections, check drift, and 
 
 # Providers
 
-The Providers page shows one card per configured provider: its health badge (**Healthy**, **Error** with the message on hover, or **Not checked**), the record types it manages, how many records are assigned to it and how many are in sync, and when it was last checked. Card actions: **Edit**, **Check drift**, **Enable/Disable**, and **Delete** (the latter two behind the kebab menu). Disabled providers render dimmed with a "Disabled" badge.
+The Providers page shows one card per configured provider: its health badge (**Healthy**, **Error** with the message on hover, or **Not checked**), the record types it manages, how many records are assigned to it and how many are in sync, and when it was last checked. Card actions: **Edit**, **Check drift**, **Enable/Disable**, and **Delete** (the latter two behind the kebab menu). Super Admins also get an **Activity** item in the kebab menu that opens the provider's audit history from the [Activity Log](activity-log). Disabled providers render dimmed with a "Disabled" badge.
 
 ## Adding a provider
 

@@ -1,6 +1,6 @@
 # DNS Manager
 
-Manage DNS entries across multiple providers from one place. Entries created here are automatically pushed to every enabled provider that supports the record type, and a scheduled drift check flags records that were changed or removed behind the app's back.
+Manage DNS entries across multiple providers from one place. Entries created here are automatically pushed to every enabled provider that supports the record type, and a scheduled drift check flags records that were changed or removed behind the app's back. Every user action — entry, provider, user/role, and sign-in changes — is recorded in a built-in audit trail (Settings → Activity log, Super Admin only) with field-level diffs; provider credentials are never logged.
 
 **Providers in v1:** Cloudflare (public DNS, 9 record types) and Pi-hole v6 (local DNS: A / AAAA / CNAME). The connector architecture is designed for adding Technitium, Unbound, and others later.
 

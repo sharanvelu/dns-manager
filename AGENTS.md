@@ -41,7 +41,7 @@ Local dev services: Postgres 16 and Redis 7 (queue). `.env` uses `DB_*`, `REDIS_
 app/Connectors/          # provider integrations — see ARCHITECTURE.md
 app/Jobs/                # SyncEntryToProvider, DeleteEntryFromProvider, CheckProviderDrift, CheckProviderHealth
 app/Services/SyncService.php  # provider targeting + push/delete orchestration
-app/Http/Controllers/    # Dashboard, DnsEntry, Provider, Auth\Oidc, Settings
+app/Http/Controllers/    # Dashboard, DnsEntry, Provider, Auth\Oidc, Settings (incl. Settings\ActivityLogController → settings/activity page + JSON data endpoint)
 resources/js/pages/      # Inertia React pages (dashboard, entries/, providers/, auth/, settings/)
 resources/js/components/icons/  # custom SVG icon set (original artwork, currentColor)
 docs/content/            # user documentation source (markdown + frontmatter) — single source
@@ -57,7 +57,8 @@ routes/console.php       # the schedule (Laravel 12 has no console Kernel — th
 - **TypeScript/React**: Inertia 2 + React 19, shadcn-style components in `resources/js/components/ui/` (do not hand-roll equivalents), Tailwind CSS 4 tokens (`text-muted-foreground`, `bg-card`, …), dark mode via `dark:` variants everywhere. Page-local components live in the page's folder.
 - **Tests**: Pest 4. `tests/TestCase.php` applies `withoutVite()` and `Http::preventStrayRequests()` — every outbound HTTP call in a test must be faked or the test fails. Factories exist for `User`, `Provider` (`->cloudflare()`, `->pihole()`), `DnsEntry` (`->cname()`, `->mx()`).
 - **Secrets**: provider credentials live in the `providers.config` column with the `encrypted:array` cast. Never expose them in Inertia props; the Providers controller blanks secret fields (blank on update = keep stored value).
-- **RBAC**: mutation routes sit behind `can:manage-entries` / `can:manage-providers` / `can:manage-users` middleware (Gates in `AppServiceProvider`, roles in `App\Enums\Role`). New mutating routes MUST go inside the matching middleware group, and their UI triggers must be hidden via the shared `auth.can` prop. `User::factory()` defaults to Super Admin so tests exercise behavior; use `->viewer()` / `->withRoles(...)` to test authorization itself.
+- **RBAC**: mutation routes sit behind `can:manage-entries` / `can:manage-providers` / `can:manage-users` middleware (Gates in `AppServiceProvider`, roles in `App\Enums\Role`); the activity-log viewer sits behind `can:view-activity` (Super Admin only). New mutating routes MUST go inside the matching middleware group, and their UI triggers must be hidden via the shared `auth.can` prop. `User::factory()` defaults to Super Admin so tests exercise behavior; use `->viewer()` / `->withRoles(...)` to test authorization itself.
+- **Audit trail** (spatie/laravel-activitylog v5, see ARCHITECTURE.md): `DnsEntry`, `Provider`, and `User` carry `LogsActivity` with `logOnly` allowlists. The `Provider` allowlist MUST NEVER include `config` (secrets) or the health columns (`health_status`/`health_message`/`last_checked_at`) — credentials never reach the log (a change is logged as `config_changed: true` only) and background health/drift checks must not write activities. Morph aliases `entry`/`provider`/`user` live in `AppServiceProvider`; viewer is `Settings\ActivityLogController` at `/settings/activity` behind `can:view-activity`.
 
 ## Key gotchas (learned the hard way — keep current)
 

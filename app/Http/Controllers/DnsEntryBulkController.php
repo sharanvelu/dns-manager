@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\RecordType;
+use App\Enums\SyncStatus;
 use App\Models\DnsEntry;
 use App\Services\SyncService;
 use App\Support\DnsEntryRules;
@@ -48,7 +49,24 @@ class DnsEntryBulkController extends Controller
 
         $entries = $this->selectedEntries($request);
 
-        $entries->each(fn (DnsEntry $entry) => $this->sync->syncEntry($entry, $providerIds));
+        $entries->each(function (DnsEntry $entry) use ($providerIds) {
+            $this->sync->syncEntry($entry, $providerIds);
+
+            $assigned = $entry->syncStates()
+                ->where('sync_status', '!=', SyncStatus::Deleting)
+                ->with('provider:id,name')
+                ->get()
+                ->map(fn ($state) => $state->provider?->name)
+                ->filter()
+                ->values()
+                ->all();
+
+            activity('entries')
+                ->performedOn($entry)
+                ->event('providers-changed')
+                ->withProperties(['providers' => $assigned])
+                ->log('providers-changed');
+        });
 
         return back()->with('success', sprintf(
             'Retargeting %d %s — records sync to the selected providers and are removed from deselected ones.',
@@ -155,7 +173,15 @@ class DnsEntryBulkController extends Controller
     {
         $entries = $this->selectedEntries($request);
 
-        $entries->each(fn (DnsEntry $entry) => $this->sync->deleteEntry($entry));
+        $entries->each(function (DnsEntry $entry) {
+            $this->sync->deleteEntry($entry);
+
+            // Attribute deferred deletions (see DnsEntryController@destroy);
+            // inline deletes are already logged by the model trait.
+            if ($entry->exists) {
+                activity('entries')->performedOn($entry)->event('delete-requested')->log('delete-requested');
+            }
+        });
 
         return back()->with('success', sprintf(
             'Deleting %d %s — records are being removed from their providers.',

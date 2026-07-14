@@ -11,11 +11,27 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 
 class Provider extends Model
 {
     /** @use HasFactory<ProviderFactory> */
-    use HasFactory;
+    use HasFactory, LogsActivity;
+
+    /**
+     * Never log `config` (encrypted secrets) or the health columns
+     * (background jobs would flood the audit trail every few minutes —
+     * logOnly + dontLogEmptyChanges guarantees those updates log nothing).
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->useLogName('providers')
+            ->logOnly(['name', 'type', 'enabled', 'managed_record_types'])
+            ->logOnlyDirty()
+            ->dontLogEmptyChanges();
+    }
 
     protected $fillable = [
         'name',

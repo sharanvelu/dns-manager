@@ -1,3 +1,4 @@
+import { ActivityLogDialog } from '@/components/activity-log-dialog';
 import { RecordTypeBadge } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
 import { router, usePage } from '@inertiajs/react';
-import { CircleAlert, CircleCheck, CircleDashed, Download, MoreHorizontal, Pencil, Power, RefreshCw, Trash2 } from 'lucide-react';
+import { CircleAlert, CircleCheck, CircleDashed, Download, History, MoreHorizontal, Pencil, Power, RefreshCw, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { ImportRecordsDialog } from './import-records-dialog';
 import { providerMark, providerPayload, relativeTime } from './lib';
@@ -70,9 +71,11 @@ interface ProviderCardProps {
 }
 
 export function ProviderCard({ provider, canManage, onEdit }: ProviderCardProps) {
-    const canImport = usePage<SharedData>().props.auth.can.manageEntries;
+    const { can } = usePage<SharedData>().props.auth;
+    const canImport = can.manageEntries;
     const [confirmingDelete, setConfirmingDelete] = useState(false);
     const [importing, setImporting] = useState(false);
+    const [viewingActivity, setViewingActivity] = useState(false);
 
     const Mark = providerMark(provider.type);
     const lastChecked = relativeTime(provider.lastCheckedAt);
@@ -127,6 +130,12 @@ export function ProviderCard({ provider, canManage, onEdit }: ProviderCardProps)
                                 <Power className="size-4" />
                                 {provider.enabled ? 'Disable' : 'Enable'}
                             </DropdownMenuItem>
+                            {can.viewActivity && (
+                                <DropdownMenuItem onSelect={() => setViewingActivity(true)}>
+                                    <History className="size-4" />
+                                    Activity
+                                </DropdownMenuItem>
+                            )}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                                 className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
@@ -190,6 +199,16 @@ export function ProviderCard({ provider, canManage, onEdit }: ProviderCardProps)
             )}
 
             {canImport && <ImportRecordsDialog provider={provider} open={importing} onOpenChange={setImporting} />}
+
+            {can.viewActivity && (
+                <ActivityLogDialog
+                    open={viewingActivity}
+                    onOpenChange={setViewingActivity}
+                    subjectType="provider"
+                    subjectId={provider.id}
+                    subjectLabel={provider.name}
+                />
+            )}
 
             <Dialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
                 <DialogContent className="max-w-md">

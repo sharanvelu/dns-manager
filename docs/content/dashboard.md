@@ -46,6 +46,8 @@ The feed shows the 15 most recent sync-log events. Every background job writes o
 
 Each event carries a success or error status and a message, plus the provider and entry involved.
 
+This feed tracks background sync jobs, not user actions — for the audit trail of who changed what, see the [Activity Log](activity-log).
+
 ## When something is amber or red
 
 - **Drifted entries** — someone or something changed records directly at the provider. Open [DNS Entries](dns-entries), hover the amber chip to see what drifted, and use **Sync now** to re-push the entry (the app's database wins and overwrites the remote record). If the remote change is the one you want, edit the entry to match instead.

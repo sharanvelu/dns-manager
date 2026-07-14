@@ -74,11 +74,17 @@ class OidcController extends Controller
 
         $request->session()->regenerate();
 
+        activity('auth')->causedBy($user)->performedOn($user)->event('login')->log('login');
+
         return redirect()->intended(route('dashboard'));
     }
 
     public function logout(Request $request): RedirectResponse
     {
+        if ($user = Auth::guard('web')->user()) {
+            activity('auth')->causedBy($user)->performedOn($user)->event('logout')->log('logout');
+        }
+
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();

@@ -18,7 +18,7 @@ System design reference for DNS Manager. Keep in sync with the code — see the 
 ```
 
 - **Auth**: OIDC only (generic discovery via `kovah/laravel-socialite-oidc`). Users auto-provisioned on first login, matched by `oidc_sub` then email. Avatars: Gravatar (`sha256(email)`, `d=404`) with client-side initials fallback. Sign-in button label from `OIDC_PROVIDER_LABEL`.
-- **RBAC**: predefined roles in `App\Enums\Role` (`super-admin`, `dns-manager`, `providers-manager`, `viewer`), multi-assignable per user (`users.roles` json). Enforced by Gates (`manage-entries`, `manage-providers`, `manage-users` in `AppServiceProvider`) applied as `can:` route middleware; the UI mirrors them via the shared `auth.can` Inertia prop. First-ever user → Super Admin; later users → Viewer. Guards: ≥1 role per user, last Super Admin cannot be demoted/deleted, no self-deletion. User management lives at Settings → Users (`Settings\UserController`).
+- **RBAC**: predefined roles in `App\Enums\Role` (`super-admin`, `dns-manager`, `providers-manager`, `viewer`), multi-assignable per user (`users.roles` json). Enforced by Gates (`manage-entries`, `manage-providers`, `manage-users`, `view-activity` in `AppServiceProvider`) applied as `can:` route middleware; the UI mirrors them via the shared `auth.can` Inertia prop. First-ever user → Super Admin; later users → Viewer. Guards: ≥1 role per user, last Super Admin cannot be demoted/deleted, no self-deletion. User management lives at Settings → Users (`Settings\UserController`).
 - **Frontend**: Inertia 2 + React 19. No separate API; controllers return Inertia pages. One JSON endpoint (`POST /providers/test`) for connection testing.
 
 ## Data model
@@ -28,7 +28,8 @@ System design reference for DNS Manager. Keep in sync with the code — see the 
 | `providers` | A configured connector instance | `type` (`cloudflare`\|`pihole`), `config` (**encrypted** array: tokens/passwords/urls), `managed_record_types` (json — user-chosen subset of connector-supported types), `enabled`, `health_status`/`health_message`/`last_checked_at` |
 | `dns_entries` | Managed DNS records (source of truth) | `name`, `type` (A, AAAA, CNAME, MX, TXT, SRV, NS, CAA, PTR), `content`, `ttl` (null = auto), `priority` (MX/SRV), `proxied` (Cloudflare), `comment`; unique on (name, type, content) |
 | `dns_entry_provider` | **Assignment + sync state** (pivot) | `external_id` (provider-side identifier), `sync_status` (`pending`\|`synced`\|`drifted`\|`error`\|`deleting`), `last_synced_at`, `last_error` |
-| `sync_logs` | Activity feed | action (`push`\|`delete`\|`drift-check`), status, message |
+| `sync_logs` | Dashboard activity feed (background jobs) | action (`push`\|`delete`\|`drift-check`), status, message |
+| `activity_log` | Audit trail (user actions — spatie/laravel-activitylog v5) | `log_name` (`entries`\|`providers`\|`users`\|`auth`), `event`, `subject_*` (morph), `causer_*` (acting user), `attribute_changes` (trait diff), `properties` (custom payloads) |
 | `users` | OIDC-provisioned users | `oidc_sub` unique, `avatar_url`, `roles` (json array of Role enum values), password nullable (unused) |
 
 Enums live in `app/Enums`: `RecordType`, `SyncStatus`, `HealthStatus`, `ProviderType`.
@@ -61,6 +62,16 @@ Enums live in `app/Enums`: `RecordType`, `SyncStatus`, `HealthStatus`, `Provider
 - **Bulk actions** (`DnsEntryBulkController`, behind `can:manage-entries`): `POST entries/bulk/sync` (re-push each), `POST entries/bulk/providers` (replace assignment via `syncEntry(entry, ids)`), `PATCH entries/bulk` (apply a `set` of type/content/ttl/comment per entry, re-validated with `DnsEntryRules` merged in — invalid or duplicate results are skipped and counted, priority cleared on type change, then re-synced), `DELETE entries/bulk`. Missing ids are dropped silently. Literal `bulk` routes are registered before the `{entry}` routes.
 - Every job outcome lands in `sync_logs` (dashboard activity feed).
 - **Conflict policy**: the app DB wins — drift is flagged, and re-push ("Sync now") overwrites the remote.
+
+## Activity log (audit trail)
+
+`spatie/laravel-activitylog` v5 records user actions in `activity_log` (distinct from `sync_logs`, which tracks background jobs).
+
+- **Model instrumentation**: `DnsEntry`, `Provider`, and `User` use the `LogsActivity` trait with `logOnly(...)` + `logOnlyDirty()` + `dontLogEmptyChanges()`, log names `entries` / `providers` / `users`. The `Provider` allowlist (`name`, `type`, `enabled`, `managed_record_types`) deliberately excludes `config` (secrets) and the health columns — background health/drift checks therefore write **no** activities. A credential change is logged by `ProviderController` as `updated connection settings` with only a `config_changed: true` property, never any value.
+- **Custom events** via the `activity()` helper: `delete-requested` on entries when deletion is deferred to queued provider-cleanup jobs (attributes the requesting user; the trait's `deleted` event fires later, system-caused), `providers-changed` on bulk reassignment (property: assigned provider names), and `login` / `logout` in `Auth\OidcController` (log name `auth`).
+- **Storage**: v5 stores trait diffs in the `attribute_changes` column and custom payloads in `properties`. Morph map aliases `entry` / `provider` / `user` are registered in `AppServiceProvider`, keeping `subject_type` values short and stable for filters.
+- **Viewer**: `Settings\ActivityLogController` serves the Inertia page (`/settings/activity`, filters: subject type/id, event, causer, log name, date range; paginated) and a JSON `data` endpoint consumed by the `ActivityLogDialog` component (the kebab-menu "Activity" popup on entry rows and provider cards). Routes in `routes/settings.php` behind `can:view-activity` (Super Admin only, mirrored by the shared `auth.can.viewActivity` prop). Subject labels for deleted records are recovered from the last logged snapshot.
+- **Retention**: `clean_after_days` = 365 in `config/activitylog.php`; pruned by `php artisan activitylog:clean` (not scheduled by the app). `ACTIVITYLOG_ENABLED=false` disables logging.
 
 ## Documentation system
 
