@@ -91,7 +91,9 @@ RUN chmod +x /usr/local/bin/docker-entrypoint \
         /var/lib/nginx \
         /var/log/nginx
 
-USER www-data
+# Numeric UID (www-data on Alpine is 82): kubernetes `runAsNonRoot` cannot
+# verify a named user and rejects the pod with "non-numeric user".
+USER 82:82
 
 EXPOSE 8080
 

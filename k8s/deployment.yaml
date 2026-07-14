@@ -65,6 +65,10 @@ spec:
               memory: 512Mi
           securityContext:
             runAsNonRoot: true
+            # www-data (uid 82 on Alpine); explicit so runAsNonRoot verifies
+            # even on image tags whose USER is the name, not the number.
+            runAsUser: 82
+            runAsGroup: 82
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: false # entrypoint writes bootstrap/cache
           # Optional persistent storage for storage/app (uploads, local
