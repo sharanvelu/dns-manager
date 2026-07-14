@@ -109,7 +109,7 @@ curl -f http://localhost:8080/up
 ```
 
 CI builds and pushes automatically on merge to `master` (tag `latest` +
-`sha-<short>`) and on `v*` tags (semver) — see `.github/workflows/build.yml`.
+`sha-<short>`) and on `v*` tags (semver) — the `build` job in `.github/workflows/ci.yml`, which only runs after lint and tests pass.
 
 ## Notes
 

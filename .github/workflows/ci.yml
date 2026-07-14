@@ -1,22 +1,28 @@
-# Lint + tests, one workflow. Runs on every push to any branch and on
-# pull requests. Image builds live in build.yml and only trigger on
-# pushes to master — which, with branch protection, means merged PRs.
+# One pipeline: lint + tests run on every push to any branch and on pull
+# requests. The image build runs in the SAME workflow, only on pushes to
+# master (i.e. merged PRs once master is push-protected), and only after
+# lint and tests succeed on that same commit. `v*` tag pushes also build,
+# producing the semver image tags.
 name: ci
 
 on:
   push:
     branches:
       - "**"
+    tags:
+      - "v*"
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 # Pushing again before the previous run finishes cancels the superseded
-# run (per ref, so a PR run never cancels its branch-push twin).
+# run (per ref, so a PR run never cancels its branch-push twin) — except
+# on master, where an in-flight image build is left to finish.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 jobs:
   lint:
@@ -84,3 +90,56 @@ jobs:
       # no built assets (TestCase uses withoutVite) needed.
       - name: Run Tests
         run: ./vendor/bin/pest
+
+  build:
+    # Only pushes to master (or a v* release tag) publish an image, and
+    # only after lint + tests pass on the same commit.
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
+    needs: [lint, tests]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # latest on master, sha-<short> on every build,
+          # semver (1.2.3 / 1.2 / 1) on v* release tags
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # Add linux/arm64 for Raspberry Pi / ARM nodes (slower builds):
+          # platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
