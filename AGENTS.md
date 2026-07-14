@@ -45,7 +45,7 @@ app/Http/Controllers/    # Dashboard, DnsEntry, Provider, Auth\Oidc, Settings (i
 resources/js/pages/      # Inertia React pages (dashboard, entries/, providers/, auth/, settings/)
 resources/js/components/icons/  # custom SVG icon set (original artwork, currentColor)
 docs/content/            # user documentation source (markdown + frontmatter) — single source
-docs-site/               # standalone Next.js docs site (latest-version docs)
+docs-site/               # standalone Next.js docs site (latest-version docs; deployed via Vercel, not Docker)
 k8s/                     # Kubernetes manifests; docker/ holds nginx/fpm/supervisor configs
 routes/web.php           # all app routes; routes/auth.php OIDC; routes/api.php automation hooks
 routes/console.php       # the schedule (Laravel 12 has no console Kernel — this file IS the scheduler)
@@ -85,7 +85,7 @@ description: One-liner    # meta/description
 
 Consumers:
 1. **In-app endpoint** `GET /docs[/{slug}]` (public, Blade-rendered) — serves the docs for *the installed version*, with a banner linking to the latest-version site (`config('app.docs_site_url')`).
-2. **`docs-site/`** (Next.js, static export) — public site for *the latest version*, with a banner telling users on older versions to open `/docs` on their own instance.
+2. **`docs-site/`** (Next.js, static export) — public site for *the latest version*, with a banner telling users on older versions to open `/docs` on their own instance. Deployed on **Vercel** straight from the repo (root directory `docs-site`); there is deliberately no Dockerfile, nginx config, k8s manifest, or CI build for it.
 3. Humans reading the repo.
 
 When app behavior changes, update the relevant `docs/content` page — both consumers pick it up automatically (endpoint at runtime, site at next build).

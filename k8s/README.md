@@ -18,7 +18,6 @@ pod start (`AUTO_MIGRATE=true`).
 | `secret.example.yaml` | Template for `secret.yaml` (APP_KEY, DB creds, OIDC, …) | copy first |
 | `volume.yaml` | Optional PVC for persistent `storage/app` | no (optional) |
 | `cronjob.yaml` | Optional k8s-native drift-check scheduler | no (optional) |
-| `docs-site.yaml` | Separate public docs website (not part of the app) | no |
 
 ## One-time setup
 

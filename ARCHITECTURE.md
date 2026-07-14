@@ -77,7 +77,7 @@ Enums live in `app/Enums`: `RecordType`, `SyncStatus`, `HealthStatus`, `Provider
 
 `docs/content/*.md` (frontmatter: `title`, `nav_order`, `description`) is the single source rendered by:
 1. `GET /docs[/{slug}]` — public in-app endpoint (Blade + CommonMark), banner: "docs for installed version vX; latest at DOCS_SITE_URL".
-2. `docs-site/` — standalone Next.js static site for the latest version, banner: "for your installed version, open /docs on your instance".
+2. `docs-site/` — standalone Next.js static site for the latest version (deployed on Vercel directly from the repo — no Docker image), banner: "for your installed version, open /docs on your instance".
 
 `VERSION` (repo root) → `config('app.version')` and the docs-site build. `DOCS_SITE_URL` env → `config('app.docs_site_url')`.
 
@@ -86,7 +86,7 @@ Enums live in `app/Enums`: `RecordType`, `SyncStatus`, `HealthStatus`, `Provider
 - **One image** (multi-stage Dockerfile: node assets → composer → php8.4-fpm-alpine + nginx + supervisord, non-root, port 8080). The default command (supervisord) runs nginx + php-fpm + queue worker + scheduler — a single container is fully functional. `SUPERVISOR_WORKER=false` / `SUPERVISOR_SCHEDULER=false` (entrypoint-defaulted, expanded in supervisord.conf) turn the background programs off — only needed for the advanced scaling-out setup that splits roles into separate deployments via command override.
 - `k8s/`: **single-pod** — one Deployment (`dns-manager`, `replicas: 1`, `Recreate`) running the image default, mirroring a standalone Docker container. `AUTO_MIGRATE=true` in the ConfigMap migrates at pod start (no migrate Job). Plus configmap, secret template, Service, Ingress, optional PVC for `storage/app` (`volume.yaml`, excluded by default — app is stateless, Postgres/Redis external), optional CronJob scheduler alternative (`cronjob.yaml`, runs `dns:check-drift` every 15 min with `SCHEDULER_ENABLED=false`), kustomization (namespace `dns-manager`, created via `kubectl create namespace`). Health probes on Laravel's `/up`.
 - nginx: `fastcgi_buffer_size 32k` (Laravel header sizes vs 4k default — see AGENTS.md gotchas). Vite preloading disabled app-side for the same reason.
-- CI: one pipeline, `ci.yml`. Jobs `lint` (Pint/Prettier/ESLint/tsc/Vite build, check-only) and `tests` (Pest on sqlite `:memory:`) run on every push to any branch and on PRs. Job `build` → GHCR (`latest`, `sha-*`, semver on `v*` tags) runs only on pushes to master or `v*` tags — with master push-protected, that means merged PRs — and `needs: [lint, tests]`, so a red commit never publishes an image. Docs site builds separately (`docs-site` workflow/image). All workflows use only the automatic `GITHUB_TOKEN` — no repo secrets or variables required.
+- CI: one pipeline, `ci.yml`. Jobs `lint` (Pint/Prettier/ESLint/tsc/Vite build, check-only) and `tests` (Pest on sqlite `:memory:`) run on every push to any branch and on PRs. Job `build` → GHCR (`latest`, `sha-*`, semver on `v*` tags) runs only on pushes to master or `v*` tags — with master push-protected, that means merged PRs — and `needs: [lint, tests]`, so a red commit never publishes an image. The docs site is NOT built in CI: Vercel deploys `docs-site/` directly on push (root directory `docs-site`, static export to `out/`). All workflows use only the automatic `GITHUB_TOKEN` — no repo secrets or variables required.
 
 ## Testing strategy
 
