@@ -30,7 +30,7 @@ export function FlashToast() {
     return (
         <div
             role="status"
-            className="fixed right-4 bottom-4 z-50 flex max-w-sm items-start gap-2.5 rounded-lg border bg-background px-4 py-3 text-sm shadow-lg animate-in fade-in-0 slide-in-from-bottom-2"
+            className="bg-background animate-in fade-in-0 slide-in-from-bottom-2 fixed right-4 bottom-4 z-50 flex max-w-sm items-start gap-2.5 rounded-lg border px-4 py-3 text-sm shadow-lg"
         >
             {toast.kind === 'success' ? (
                 <CircleCheck className="mt-px size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
@@ -41,7 +41,7 @@ export function FlashToast() {
             <button
                 type="button"
                 onClick={() => setToast(null)}
-                className="ml-1 shrink-0 rounded-sm text-muted-foreground transition-colors hover:text-foreground"
+                className="text-muted-foreground hover:text-foreground ml-1 shrink-0 rounded-sm transition-colors"
                 aria-label="Dismiss"
             >
                 <X className="size-3.5" />

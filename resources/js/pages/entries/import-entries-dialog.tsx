@@ -66,7 +66,7 @@ export function ImportEntriesDialog({ open, onOpenChange }: ImportEntriesDialogP
                 <div className="grid gap-4">
                     <a
                         href={route('entries.import.sample')}
-                        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground underline-offset-4 hover:underline"
+                        className="text-muted-foreground inline-flex items-center gap-1.5 text-sm underline-offset-4 hover:underline"
                         download
                     >
                         <Download className="size-3.5" />
@@ -82,7 +82,7 @@ export function ImportEntriesDialog({ open, onOpenChange }: ImportEntriesDialogP
                             accept=".csv,text/csv"
                             onChange={(event) => setData('file', event.target.files?.[0] ?? null)}
                         />
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-muted-foreground text-xs">
                             Columns: <code className="font-mono">name, type, content, ttl, priority, proxied, comment</code> — only the first three
                             are required. Max 1000 rows.
                         </p>
@@ -90,7 +90,7 @@ export function ImportEntriesDialog({ open, onOpenChange }: ImportEntriesDialogP
                     </div>
 
                     {result && (
-                        <div className="grid gap-2 rounded-lg border bg-muted/40 p-3 text-sm">
+                        <div className="bg-muted/40 grid gap-2 rounded-lg border p-3 text-sm">
                             <p className="flex items-center gap-2">
                                 <CircleCheck className="size-4 text-emerald-600 dark:text-emerald-400" />
                                 {result.imported} imported
@@ -102,7 +102,7 @@ export function ImportEntriesDialog({ open, onOpenChange }: ImportEntriesDialogP
                                         <FileWarning className="size-4" />
                                         {result.failed.length} row(s) rejected:
                                     </p>
-                                    <ul className="max-h-40 space-y-1 overflow-y-auto text-xs text-muted-foreground">
+                                    <ul className="text-muted-foreground max-h-40 space-y-1 overflow-y-auto text-xs">
                                         {result.failed.map((failure, index) => (
                                             <li key={index} className="flex gap-2">
                                                 {failure.line > 0 && <span className="shrink-0 font-mono">line {failure.line}:</span>}
@@ -113,7 +113,7 @@ export function ImportEntriesDialog({ open, onOpenChange }: ImportEntriesDialogP
                                 </div>
                             )}
                             {result.imported > 0 && result.failed.length === 0 && (
-                                <p className="text-xs text-muted-foreground">All rows imported — syncing to providers in the background.</p>
+                                <p className="text-muted-foreground text-xs">All rows imported — syncing to providers in the background.</p>
                             )}
                         </div>
                     )}

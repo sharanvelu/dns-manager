@@ -60,10 +60,12 @@ export function BulkProvidersDialog({ open, onOpenChange, selectedIds, providers
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Set providers for {selectedIds.length} {selectedIds.length === 1 ? 'entry' : 'entries'}</DialogTitle>
+                    <DialogTitle>
+                        Set providers for {selectedIds.length} {selectedIds.length === 1 ? 'entry' : 'entries'}
+                    </DialogTitle>
                     <DialogDescription>
-                        Replaces each entry's provider assignment: records sync to the ticked providers and are removed from unticked ones.
-                        Providers that don't manage an entry's record type are skipped for that entry.
+                        Replaces each entry's provider assignment: records sync to the ticked providers and are removed from unticked ones. Providers
+                        that don't manage an entry's record type are skipped for that entry.
                     </DialogDescription>
                 </DialogHeader>
 

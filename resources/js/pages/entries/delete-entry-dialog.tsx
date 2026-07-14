@@ -37,7 +37,7 @@ export function DeleteEntryDialog({ entry, onOpenChange }: DeleteEntryDialogProp
                 <DialogHeader>
                     <DialogTitle>Delete entry</DialogTitle>
                     <DialogDescription>
-                        This removes <span className="font-mono font-medium text-foreground">{display?.name}</span> from all providers. The remote
+                        This removes <span className="text-foreground font-mono font-medium">{display?.name}</span> from all providers. The remote
                         records will be deleted.
                     </DialogDescription>
                 </DialogHeader>

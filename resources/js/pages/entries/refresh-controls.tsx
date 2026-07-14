@@ -120,7 +120,7 @@ export function RefreshControls() {
                 <Tooltip>
                     <TooltipTrigger asChild>
                         <div
-                            className="flex h-9 cursor-default items-center gap-1.5 rounded-md border px-2.5 text-xs text-muted-foreground tabular-nums"
+                            className="text-muted-foreground flex h-9 cursor-default items-center gap-1.5 rounded-md border px-2.5 text-xs tabular-nums"
                             role="timer"
                             aria-label={`Next refresh in ${remaining} seconds`}
                         >

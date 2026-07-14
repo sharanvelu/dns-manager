@@ -92,7 +92,9 @@ export function BulkEditDialog({ open, onOpenChange, selectedIds, onDone }: Bulk
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Bulk edit {selectedIds.length} {selectedIds.length === 1 ? 'entry' : 'entries'}</DialogTitle>
+                    <DialogTitle>
+                        Bulk edit {selectedIds.length} {selectedIds.length === 1 ? 'entry' : 'entries'}
+                    </DialogTitle>
                     <DialogDescription>
                         Tick the fields to change; unticked fields keep each entry's current value. Entries that would become invalid or duplicate
                         another entry are skipped and reported.

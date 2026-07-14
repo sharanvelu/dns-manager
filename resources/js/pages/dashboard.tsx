@@ -1,8 +1,3 @@
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
     EmptyActivityIllustration,
     EmptyEntriesIllustration,
@@ -14,6 +9,11 @@ import {
     StatusErrorIcon,
     StatusSyncedIcon,
 } from '@/components/icons';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
@@ -123,12 +123,10 @@ function StatTile({
     return (
         <Card className="flex flex-col gap-1 p-4">
             <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-medium text-muted-foreground">{label}</span>
+                <span className="text-muted-foreground text-xs font-medium">{label}</span>
                 <Icon className={cn('size-4 shrink-0', accentIcon[accent])} />
             </div>
-            <span className={cn('text-2xl font-semibold tracking-tight tabular-nums', accentText[accent])}>
-                {value.toLocaleString()}
-            </span>
+            <span className={cn('text-2xl font-semibold tracking-tight tabular-nums', accentText[accent])}>{value.toLocaleString()}</span>
         </Card>
     );
 }
@@ -137,18 +135,14 @@ function ProvidersHealthyChip({ healthy, total }: { healthy: number; total: numb
     const allHealthy = total > 0 && healthy === total;
 
     return (
-        <div className="inline-flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1 text-xs text-muted-foreground shadow-xs">
+        <div className="bg-card text-muted-foreground inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs shadow-xs">
             <ServerCog className="size-3.5" />
             <span>
                 Providers healthy{' '}
                 <span
                     className={cn(
                         'font-semibold tabular-nums',
-                        allHealthy
-                            ? 'text-emerald-600 dark:text-emerald-400'
-                            : total > 0
-                              ? 'text-amber-600 dark:text-amber-400'
-                              : 'text-foreground',
+                        allHealthy ? 'text-emerald-600 dark:text-emerald-400' : total > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-foreground',
                     )}
                 >
                     {healthy}/{total}
@@ -189,8 +183,8 @@ function HealthBadge({ provider }: { provider: Provider }) {
     }
 
     return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium text-muted-foreground">
-            <span className="size-1.5 rounded-full bg-muted-foreground/40" />
+        <span className="text-muted-foreground inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium">
+            <span className="bg-muted-foreground/40 size-1.5 rounded-full" />
             Not checked
         </span>
     );
@@ -203,14 +197,14 @@ function ProviderCard({ provider }: { provider: Provider }) {
         <Card className={cn('flex flex-col gap-3 p-4', !provider.enabled && 'opacity-60')}>
             <div className="flex items-start justify-between gap-2">
                 <Link href="/providers" className="group flex min-w-0 items-center gap-3">
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-md border bg-muted/40 text-muted-foreground">
+                    <span className="bg-muted/40 text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-md border">
                         <Mark className="size-5" />
                     </span>
                     <span className="min-w-0">
                         <span className="block truncate text-sm font-medium group-hover:underline group-hover:underline-offset-4">
                             {provider.name}
                         </span>
-                        <span className="block text-xs text-muted-foreground">{provider.typeLabel}</span>
+                        <span className="text-muted-foreground block text-xs">{provider.typeLabel}</span>
                     </span>
                 </Link>
                 <div className="flex shrink-0 items-center gap-1.5">
@@ -225,16 +219,12 @@ function ProviderCard({ provider }: { provider: Provider }) {
 
             <Separator />
 
-            <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+            <div className="text-muted-foreground flex items-center justify-between gap-2 text-xs">
                 <span className="tabular-nums">
                     {provider.recordsCount.toLocaleString()} {provider.recordsCount === 1 ? 'record' : 'records'} ·{' '}
                     {provider.syncedCount.toLocaleString()} in sync
-                    {provider.driftedCount > 0 && (
-                        <span className="text-amber-600 dark:text-amber-400"> · {provider.driftedCount} drifted</span>
-                    )}
-                    {provider.errorCount > 0 && (
-                        <span className="text-red-600 dark:text-red-400"> · {provider.errorCount} errored</span>
-                    )}
+                    {provider.driftedCount > 0 && <span className="text-amber-600 dark:text-amber-400"> · {provider.driftedCount} drifted</span>}
+                    {provider.errorCount > 0 && <span className="text-red-600 dark:text-red-400"> · {provider.errorCount} errored</span>}
                 </span>
                 {provider.lastCheckedAt && (
                     <span className="shrink-0" title={new Date(provider.lastCheckedAt).toLocaleString()}>
@@ -255,18 +245,15 @@ function ActivityRow({ item }: { item: ActivityItem }) {
     return (
         <li className="flex items-start gap-3 py-3">
             <StatusIcon
-                className={cn(
-                    'mt-0.5 size-4 shrink-0',
-                    isSuccess ? 'text-emerald-500 dark:text-emerald-400' : 'text-red-500 dark:text-red-400',
-                )}
+                className={cn('mt-0.5 size-4 shrink-0', isSuccess ? 'text-emerald-500 dark:text-emerald-400' : 'text-red-500 dark:text-red-400')}
             />
             <div className="min-w-0 flex-1">
                 <p className="truncate text-sm" title={item.message ?? undefined}>
                     {item.message ?? `${actionLabel} ${isSuccess ? 'completed' : 'failed'}`}
                 </p>
-                {context && <p className="truncate text-xs text-muted-foreground">{context}</p>}
+                {context && <p className="text-muted-foreground truncate text-xs">{context}</p>}
             </div>
-            <span className="shrink-0 text-xs whitespace-nowrap text-muted-foreground" title={new Date(item.createdAt).toLocaleString()}>
+            <span className="text-muted-foreground shrink-0 text-xs whitespace-nowrap" title={new Date(item.createdAt).toLocaleString()}>
                 {timeAgo(item.createdAt)}
             </span>
         </li>
@@ -276,7 +263,7 @@ function ActivityRow({ item }: { item: ActivityItem }) {
 function SectionHeading({ title, action }: { title: string; action?: ReactNode }) {
     return (
         <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm font-medium text-muted-foreground">{title}</h2>
+            <h2 className="text-muted-foreground text-sm font-medium">{title}</h2>
             {action}
         </div>
     );
@@ -293,39 +280,30 @@ export default function Dashboard({ stats, providers, activity }: DashboardProps
                 <div className="flex h-full flex-1 flex-col gap-6 p-4 md:p-6">
                     {/* Stats */}
                     <section className="flex flex-col gap-3">
-                        <SectionHeading title="Overview" action={<ProvidersHealthyChip healthy={stats.providersHealthy} total={stats.providersTotal} />} />
+                        <SectionHeading
+                            title="Overview"
+                            action={<ProvidersHealthyChip healthy={stats.providersHealthy} total={stats.providersTotal} />}
+                        />
                         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                             <StatTile label="Total managed entries" value={stats.totalEntries} icon={Globe} />
-                            <StatTile
-                                label="Fully in sync"
-                                value={stats.inSync}
-                                icon={StatusSyncedIcon}
-                                accent={fullySynced ? 'green' : 'neutral'}
-                            />
+                            <StatTile label="Fully in sync" value={stats.inSync} icon={StatusSyncedIcon} accent={fullySynced ? 'green' : 'neutral'} />
                             <StatTile
                                 label="Drifted"
                                 value={stats.drifted}
                                 icon={StatusDriftedIcon}
                                 accent={stats.drifted > 0 ? 'amber' : 'neutral'}
                             />
-                            <StatTile
-                                label="Errors"
-                                value={stats.errored}
-                                icon={StatusErrorIcon}
-                                accent={stats.errored > 0 ? 'red' : 'neutral'}
-                            />
+                            <StatTile label="Errors" value={stats.errored} icon={StatusErrorIcon} accent={stats.errored > 0 ? 'red' : 'neutral'} />
                         </div>
                     </section>
 
                     {/* No entries yet — only when at least one provider exists */}
                     {hasProviders && stats.totalEntries === 0 && (
                         <Card className="flex flex-col items-center gap-3 border-dashed p-6 text-center sm:flex-row sm:text-left">
-                            <EmptyEntriesIllustration className="size-20 shrink-0 text-muted-foreground" />
+                            <EmptyEntriesIllustration className="text-muted-foreground size-20 shrink-0" />
                             <div className="flex-1">
                                 <p className="text-sm font-medium">No DNS entries yet</p>
-                                <p className="text-sm text-muted-foreground">
-                                    Create your first managed entry and push it to your providers.
-                                </p>
+                                <p className="text-muted-foreground text-sm">Create your first managed entry and push it to your providers.</p>
                             </div>
                             <Button asChild size="sm">
                                 <Link href="/entries">
@@ -345,7 +323,7 @@ export default function Dashboard({ stats, providers, activity }: DashboardProps
                                     hasProviders ? (
                                         <Link
                                             href="/providers"
-                                            className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                                            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs font-medium transition-colors"
                                         >
                                             View all
                                             <ArrowRight className="size-3.5" />
@@ -364,9 +342,8 @@ export default function Dashboard({ stats, providers, activity }: DashboardProps
                                     <EmptyProvidersIllustration className="text-muted-foreground" />
                                     <div>
                                         <p className="text-sm font-medium">No providers connected</p>
-                                        <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-                                            Connect Cloudflare, Pi-hole, or another DNS provider to start managing and
-                                            syncing your records.
+                                        <p className="text-muted-foreground mx-auto mt-1 max-w-sm text-sm">
+                                            Connect Cloudflare, Pi-hole, or another DNS provider to start managing and syncing your records.
                                         </p>
                                     </div>
                                     <Button asChild size="sm">
@@ -394,7 +371,7 @@ export default function Dashboard({ stats, providers, activity }: DashboardProps
                                         <EmptyActivityIllustration className="text-muted-foreground" />
                                         <div>
                                             <p className="text-sm font-medium">No sync activity yet</p>
-                                            <p className="mt-1 text-sm text-muted-foreground">
+                                            <p className="text-muted-foreground mt-1 text-sm">
                                                 Pushes, deletions, and drift checks will show up here.
                                             </p>
                                         </div>

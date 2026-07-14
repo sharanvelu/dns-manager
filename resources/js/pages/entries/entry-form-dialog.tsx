@@ -184,7 +184,7 @@ export function EntryFormDialog({ open, onOpenChange, entry, providers, connecto
                                 placeholder="Auto"
                                 className="tabular-nums"
                             />
-                            <p className="text-xs text-muted-foreground">60–86400 seconds, empty = automatic</p>
+                            <p className="text-muted-foreground text-xs">60–86400 seconds, empty = automatic</p>
                             <InputError message={errors.ttl} />
                         </div>
                     </div>
@@ -215,7 +215,7 @@ export function EntryFormDialog({ open, onOpenChange, entry, providers, connecto
                                 placeholder="10"
                                 className="tabular-nums"
                             />
-                            <p className="text-xs text-muted-foreground">0–65535, lower is preferred</p>
+                            <p className="text-muted-foreground text-xs">0–65535, lower is preferred</p>
                             <InputError message={errors.priority} />
                         </div>
                     )}
@@ -233,7 +233,7 @@ export function EntryFormDialog({ open, onOpenChange, entry, providers, connecto
                                         <Cloud className="size-3.5 text-orange-500 dark:text-orange-400" />
                                         Proxied
                                     </span>
-                                    <span className="text-xs text-muted-foreground">Route traffic through the provider's proxy network.</span>
+                                    <span className="text-muted-foreground text-xs">Route traffic through the provider's proxy network.</span>
                                 </span>
                             </label>
                             <InputError message={errors.proxied} />
@@ -261,7 +261,7 @@ export function EntryFormDialog({ open, onOpenChange, entry, providers, connecto
                     >
                         {targetProviders.length > 0 ? (
                             <>
-                                <p className="text-xs font-medium text-muted-foreground">Sync to providers</p>
+                                <p className="text-muted-foreground text-xs font-medium">Sync to providers</p>
                                 <div className="mt-2 grid gap-2">
                                     {targetProviders.map((provider) => (
                                         <label
@@ -274,7 +274,7 @@ export function EntryFormDialog({ open, onOpenChange, entry, providers, connecto
                                                 checked={data.providers.includes(provider.id)}
                                                 onCheckedChange={(checked) => toggleProvider(provider.id, checked === true)}
                                             />
-                                            <ProviderMark type={provider.type} className="size-3.5 text-muted-foreground" />
+                                            <ProviderMark type={provider.type} className="text-muted-foreground size-3.5" />
                                             {provider.name}
                                         </label>
                                     ))}

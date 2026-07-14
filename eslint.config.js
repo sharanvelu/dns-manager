@@ -38,7 +38,8 @@ export default [
         },
     },
     {
-        ignores: ['vendor', 'node_modules', 'public', 'bootstrap/ssr', 'tailwind.config.js'],
+        // docs-site is a self-contained Next.js project with its own tooling.
+        ignores: ['vendor', 'node_modules', 'public', 'bootstrap/ssr', 'tailwind.config.js', 'docs-site'],
     },
     prettier, // Turn off all rules that might conflict with Prettier
 ];
