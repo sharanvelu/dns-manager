@@ -7,6 +7,7 @@ use App\Connectors\DTOs\ConnectorCapabilities;
 use App\Connectors\DTOs\RemoteRecord;
 use App\Connectors\DTOs\TestResult;
 use App\Connectors\Exceptions\ConnectorException;
+use App\Connectors\Exceptions\RecordNotFoundException;
 use App\Models\DnsEntry;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
@@ -154,6 +155,12 @@ class CloudflareConnector extends AbstractDnsConnector
     public function updateRecord(DnsEntry $entry, string $externalId): string
     {
         $response = $this->http()->put($this->recordsPath().'/'.$externalId, $this->payloadFor($entry));
+
+        // 404 / 81044: the record was deleted out-of-band — signal it so the
+        // sync job can fall back to creating the record fresh.
+        if ($response->status() === 404) {
+            throw new RecordNotFoundException($this->failed($response, 'update record')->getMessage());
+        }
 
         if (! $response->successful()) {
             throw $this->failed($response, 'update record');

@@ -84,7 +84,7 @@ Drift and error chips show the detail in a tooltip on hover; the same events app
 
 **Sync now** (in the row's kebab menu) re-queues a push to the entry's currently assigned providers. Use it to:
 
-- Overwrite drift — the app's database is the source of truth, so re-pushing restores the record at the provider to what the entry says.
+- Overwrite drift — the app's database is the source of truth, so re-pushing restores the record at the provider to what the entry says. If the record was deleted at the provider entirely, the push detects that and recreates it from scratch.
 - Retry after fixing the cause of an error.
 
 ## Bulk actions

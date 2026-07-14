@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Connectors\Exceptions\RecordNotFoundException;
 use App\Enums\SyncStatus;
 use App\Models\DnsEntry;
 use App\Models\Provider;
@@ -41,9 +42,15 @@ class SyncEntryToProvider implements ShouldQueue
 
         $connector = $provider->connector();
 
-        $externalId = $state->external_id
-            ? $connector->updateRecord($entry, $state->external_id)
-            : $connector->createRecord($entry);
+        try {
+            $externalId = $state->external_id
+                ? $connector->updateRecord($entry, $state->external_id)
+                : $connector->createRecord($entry);
+        } catch (RecordNotFoundException) {
+            // The tracked record was deleted at the provider out-of-band
+            // (classic drift) — recreate it instead of failing the push.
+            $externalId = $connector->createRecord($entry);
+        }
 
         $state->update([
             'external_id' => $externalId,

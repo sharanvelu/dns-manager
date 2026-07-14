@@ -150,6 +150,40 @@ test('sync job pushes to cloudflare and stores the external id', function () {
     $this->assertDatabaseHas('sync_logs', ['provider_id' => $provider->id, 'action' => 'push', 'status' => 'success']);
 });
 
+test('sync recreates a tracked record that was deleted at the provider', function () {
+    Http::fake([
+        // The tracked record is gone remotely — Cloudflare 404s the update.
+        'api.cloudflare.com/client/v4/zones/*/dns_records/cf-gone' => Http::response([
+            'success' => false,
+            'errors' => [['code' => 81044, 'message' => 'Record does not exist.']],
+            'result' => null,
+        ], 404),
+        'api.cloudflare.com/client/v4/zones/*/dns_records' => Http::response([
+            'success' => true, 'errors' => [], 'messages' => [],
+            'result' => ['id' => 'cf-recreated'],
+        ]),
+    ]);
+
+    $provider = cloudflareProvider();
+    $entry = DnsEntry::factory()->create();
+    $entry->syncStates()->create([
+        'provider_id' => $provider->id,
+        'sync_status' => SyncStatus::Drifted,
+        'external_id' => 'cf-gone',
+        'last_error' => 'Record no longer exists at the provider.',
+    ]);
+
+    (new SyncEntryToProvider($entry->id, $provider->id))->handle();
+
+    $state = $entry->syncStates()->sole();
+    expect($state->external_id)->toBe('cf-recreated')
+        ->and($state->sync_status)->toBe(SyncStatus::Synced)
+        ->and($state->last_error)->toBeNull();
+
+    Http::assertSentCount(2);
+    $this->assertDatabaseHas('sync_logs', ['provider_id' => $provider->id, 'action' => 'push', 'status' => 'success']);
+});
+
 test('failed sync marks the state as error with the message', function () {
     $provider = cloudflareProvider();
     $entry = DnsEntry::factory()->create();
