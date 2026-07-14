@@ -8,7 +8,7 @@ use App\Models\Provider;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
-class HealthCheckController extends Controller
+class ProviderHealthCheckController extends Controller
 {
     /**
      * Queue health checks for all enabled providers (or one, via provider_id).

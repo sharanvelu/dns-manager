@@ -42,7 +42,7 @@ The feed shows the 15 most recent sync-log events. Every background job writes o
 | `push` | An entry was created or updated at a provider. |
 | `delete` | An entry was removed from a provider. |
 | `drift-check` | A provider's records were compared against the database (result: how many records were checked and how many drifted). |
-| `health-check` | A provider's connectivity was tested with the connector's connection test (same as **Test connection** in the UI). |
+| `provider-health-check` | A provider's connectivity was tested with the connector's connection test (same as **Test connection** in the UI). |
 
 Each event carries a success or error status and a message, plus the provider and entry involved.
 

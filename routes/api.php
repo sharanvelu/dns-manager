@@ -1,7 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\DriftCheckController;
-use App\Http\Controllers\Api\HealthCheckController;
+use App\Http\Controllers\Api\ProviderHealthCheckController;
 use App\Http\Middleware\AuthenticateTriggerToken;
 use Illuminate\Support\Facades\Route;
 
@@ -11,6 +11,6 @@ Route::middleware(AuthenticateTriggerToken::class)->group(function () {
     Route::post('hooks/drift-check', DriftCheckController::class)
         ->name('api.hooks.drift-check');
 
-    Route::post('hooks/health-check', HealthCheckController::class)
-        ->name('api.hooks.health-check');
+    Route::post('hooks/provider-health-check', ProviderHealthCheckController::class)
+        ->name('api.hooks.provider-health-check');
 });

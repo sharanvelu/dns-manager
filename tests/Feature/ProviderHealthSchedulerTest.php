@@ -32,27 +32,27 @@ test('dns:check-provider-health can target a single provider', function () {
     Queue::assertPushed(CheckProviderHealth::class, fn ($job) => $job->providerId === $target->id);
 });
 
-test('the health-check webhook is disabled without a configured token', function () {
+test('the provider-health-check webhook is disabled without a configured token', function () {
     config(['dns.trigger_token' => null]);
 
-    $this->postJson('/api/hooks/health-check')->assertNotFound();
+    $this->postJson('/api/hooks/provider-health-check')->assertNotFound();
 });
 
-test('the health-check webhook rejects a missing or wrong token', function () {
+test('the provider-health-check webhook rejects a missing or wrong token', function () {
     Queue::fake();
     config(['dns.trigger_token' => 'secret-token']);
     Provider::factory()->cloudflare()->create();
 
-    $this->postJson('/api/hooks/health-check')->assertUnauthorized();
+    $this->postJson('/api/hooks/provider-health-check')->assertUnauthorized();
 
     $this->withHeader('Authorization', 'Bearer wrong')
-        ->postJson('/api/hooks/health-check')
+        ->postJson('/api/hooks/provider-health-check')
         ->assertUnauthorized();
 
     Queue::assertNothingPushed();
 });
 
-test('the health-check webhook queues checks for enabled providers', function () {
+test('the provider-health-check webhook queues checks for enabled providers', function () {
     Queue::fake();
     config(['dns.trigger_token' => 'secret-token']);
 
@@ -60,14 +60,14 @@ test('the health-check webhook queues checks for enabled providers', function ()
     Provider::factory()->pihole()->create(['name' => 'Pi', 'enabled' => false]);
 
     $this->withHeader('Authorization', 'Bearer secret-token')
-        ->postJson('/api/hooks/health-check')
+        ->postJson('/api/hooks/provider-health-check')
         ->assertOk()
         ->assertJson(['queued' => 1, 'providers' => ['CF']]);
 
     Queue::assertPushed(CheckProviderHealth::class, fn ($job) => $job->providerId === $cf->id);
 });
 
-test('the health-check webhook can target one provider and needs no session or csrf', function () {
+test('the provider-health-check webhook can target one provider and needs no session or csrf', function () {
     Queue::fake();
     config(['dns.trigger_token' => 'secret-token']);
 
@@ -75,7 +75,7 @@ test('the health-check webhook can target one provider and needs no session or c
     Provider::factory()->pihole()->create();
 
     // Plain POST (no CSRF token, no authenticated user) must work.
-    $this->post('/api/hooks/health-check', ['provider_id' => $target->id], [
+    $this->post('/api/hooks/provider-health-check', ['provider_id' => $target->id], [
         'Authorization' => 'Bearer secret-token',
         'Accept' => 'application/json',
     ])->assertOk()->assertJson(['queued' => 1]);
@@ -106,7 +106,7 @@ test('health check marks the provider healthy when the connection succeeds', fun
 
     $this->assertDatabaseHas('sync_logs', [
         'provider_id' => $provider->id,
-        'action' => 'health-check',
+        'action' => 'provider-health-check',
         'status' => 'success',
     ]);
 });
@@ -123,7 +123,7 @@ test('health check marks the provider unhealthy when the connection fails', func
 
     $this->assertDatabaseHas('sync_logs', [
         'provider_id' => $provider->id,
-        'action' => 'health-check',
+        'action' => 'provider-health-check',
         'status' => 'error',
     ]);
 });

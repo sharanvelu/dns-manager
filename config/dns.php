@@ -30,8 +30,8 @@ return [
     |--------------------------------------------------------------------------
     |
     | Bearer token for the POST /api/hooks/* endpoints (drift-check,
-    | health-check), which queue the same checks as the scheduler. The
-    | endpoints are disabled while this is unset.
+    | provider-health-check), which queue the same checks as the scheduler.
+    | The endpoints are disabled while this is unset.
     |
     */
 

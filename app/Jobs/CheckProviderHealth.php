@@ -38,6 +38,6 @@ class CheckProviderHealth implements ShouldQueue
             'last_checked_at' => now(),
         ]);
 
-        SyncLog::record($provider, null, 'health-check', $result->ok ? 'success' : 'error', $result->message);
+        SyncLog::record($provider, null, 'provider-health-check', $result->ok ? 'success' : 'error', $result->message);
     }
 }

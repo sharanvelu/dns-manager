@@ -98,7 +98,7 @@ Health probes hit Laravel's built-in `/up` endpoint on port 8080. See `k8s/READM
 | `DRIFT_CHECK_CRON` | Cron expression for the built-in drift-check schedule. Defaults to `*/15 * * * *` (every 15 minutes). |
 | `PROVIDER_HEALTH_CHECK_ENABLED` | `false` disables just the built-in provider health-check schedule (drift checks keep running). Defaults to `true`. |
 | `PROVIDER_HEALTH_CHECK_CRON` | Cron expression for the built-in provider health-check schedule. Defaults to `*/5 * * * *` (every 5 minutes). |
-| `HOOKS_TRIGGER_TOKEN` | Bearer token enabling `POST /api/hooks/drift-check` and `POST /api/hooks/health-check` for external automation. The endpoints stay disabled (404) while unset. |
+| `HOOKS_TRIGGER_TOKEN` | Bearer token enabling `POST /api/hooks/drift-check` and `POST /api/hooks/provider-health-check` for external automation. The endpoints stay disabled (404) while unset. |
 
 ## Running roles
 
@@ -122,7 +122,7 @@ curl -X POST https://dns.example.com/api/hooks/drift-check \
   -H "Authorization: Bearer $HOOKS_TRIGGER_TOKEN"
 
 # health-check all enabled providers
-curl -X POST https://dns.example.com/api/hooks/health-check \
+curl -X POST https://dns.example.com/api/hooks/provider-health-check \
   -H "Authorization: Bearer $HOOKS_TRIGGER_TOKEN"
 
 # or target a single provider (works on both endpoints)

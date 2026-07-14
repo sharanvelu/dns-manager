@@ -69,7 +69,7 @@ If you remove a type that existing entries already use on this provider, those r
 
 The result renders inline in the dialog, including the provider's error message on failure.
 
-The same connection test also runs on a schedule (every 5 minutes by default, configurable via `PROVIDER_HEALTH_CHECK_CRON`, disabled with `PROVIDER_HEALTH_CHECK_ENABLED=false`) against every enabled provider and keeps the health badge current between drift checks. It can also be triggered externally via `POST /api/hooks/health-check` — see [Installation](installation) for the webhook setup.
+The same connection test also runs on a schedule (every 5 minutes by default, configurable via `PROVIDER_HEALTH_CHECK_CRON`, disabled with `PROVIDER_HEALTH_CHECK_ENABLED=false`) against every enabled provider and keeps the health badge current between drift checks. It can also be triggered externally via `POST /api/hooks/provider-health-check` — see [Installation](installation) for the webhook setup.
 
 ## Check drift
 

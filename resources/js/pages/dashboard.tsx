@@ -91,6 +91,7 @@ const actionLabels: Record<string, string> = {
     push: 'Push',
     delete: 'Delete',
     'drift-check': 'Drift check',
+    'provider-health-check': 'Health check',
 };
 
 type StatAccent = 'neutral' | 'green' | 'amber' | 'red';
