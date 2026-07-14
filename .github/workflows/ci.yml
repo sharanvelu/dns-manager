@@ -1,0 +1,86 @@
+# Lint + tests, one workflow. Runs on every push to any branch and on
+# pull requests. Image builds live in build.yml and only trigger on
+# pushes to master — which, with branch protection, means merged PRs.
+name: ci
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+permissions:
+  contents: read
+
+# Pushing again before the previous run finishes cancels the superseded
+# run (per ref, so a PR run never cancels its branch-push twin).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: |
+          composer install --no-interaction --no-scripts --no-progress --prefer-dist
+          npm ci
+
+      # Check-only: CI never rewrites code. Run the fixers locally instead
+      # (vendor/bin/pint --dirty, npm run format, npm run lint).
+      - name: Pint (PHP style)
+        run: vendor/bin/pint --test
+
+      - name: Prettier (format check)
+        run: npm run format:check
+
+      - name: ESLint
+        run: npx eslint .
+
+      - name: TypeScript
+        run: npx tsc --noEmit
+
+      - name: Vite Build
+        run: npm run build
+
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+
+      - name: Install Dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Prepare Environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      # Tests run on sqlite :memory: (phpunit.xml) and never hit the
+      # network (Http::preventStrayRequests in TestCase) — no services,
+      # no built assets (TestCase uses withoutVite) needed.
+      - name: Run Tests
+        run: ./vendor/bin/pest
