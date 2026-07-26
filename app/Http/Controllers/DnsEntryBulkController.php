@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Enums\RecordType;
 use App\Enums\SyncStatus;
+use App\Enums\ZoneRole;
 use App\Models\DnsEntry;
+use App\Models\ZoneProvider;
 use App\Services\SyncService;
 use App\Support\DnsEntryRules;
 use Illuminate\Database\Eloquent\Collection;
@@ -36,27 +38,37 @@ class DnsEntryBulkController extends Controller
     }
 
     /**
-     * Replace the provider assignment of each selected entry with the given
-     * selection. Providers that do not manage an entry's record type are
-     * skipped for that entry; deselected providers get remote deletes.
+     * Replace the provider targeting of each selected entry with the given
+     * zone attachments. Ids belonging to a different zone are silently
+     * dropped per entry (mirroring the missing-ids policy); attachments that
+     * do not manage an entry's record type are skipped by the sync engine;
+     * deselected attachments get remote deletes.
      */
     public function providers(Request $request): RedirectResponse
     {
-        $providerIds = $request->validate([
-            'providers' => ['present', 'array'],
-            'providers.*' => ['integer', 'exists:providers,id'],
-        ])['providers'];
+        $zoneProviderIds = $request->validate([
+            'zone_providers' => ['present', 'array'],
+            'zone_providers.*' => ['integer', 'exists:zone_providers,id'],
+        ])['zone_providers'];
 
         $entries = $this->selectedEntries($request);
 
-        $entries->each(function (DnsEntry $entry) use ($providerIds) {
-            $this->sync->syncEntry($entry, $providerIds);
+        $attachmentsByZone = ZoneProvider::query()
+            ->whereIn('dns_zone_id', $entries->pluck('dns_zone_id')->unique())
+            ->get(['id', 'dns_zone_id'])
+            ->groupBy('dns_zone_id')
+            ->map(fn ($group) => $group->pluck('id')->all());
+
+        $entries->each(function (DnsEntry $entry) use ($zoneProviderIds, $attachmentsByZone) {
+            $ownIds = $attachmentsByZone->get($entry->dns_zone_id, []);
+
+            $this->sync->syncEntry($entry, array_values(array_intersect($zoneProviderIds, $ownIds)));
 
             $assigned = $entry->syncStates()
                 ->where('sync_status', '!=', SyncStatus::Deleting)
-                ->with('provider:id,name')
+                ->with('zoneProvider.provider:id,name')
                 ->get()
-                ->map(fn ($state) => $state->provider?->name)
+                ->map(fn ($state) => $state->zoneProvider?->provider?->name)
                 ->filter()
                 ->values()
                 ->all();
@@ -115,7 +127,7 @@ class DnsEntryBulkController extends Controller
 
             $type = RecordType::tryFrom((string) $payload['type']);
 
-            $validator = Validator::make($payload, DnsEntryRules::rules($type));
+            $validator = Validator::make($payload, DnsEntryRules::rules($type, $entry->zone));
 
             if ($validator->fails()) {
                 $invalid++;
@@ -132,6 +144,7 @@ class DnsEntryBulkController extends Controller
 
             $collision = DnsEntry::query()
                 ->whereKeyNot($entry->id)
+                ->where('dns_zone_id', $entry->dns_zone_id)
                 ->where('name', $data['name'])
                 ->where('type', $data['type'])
                 ->where('content', $data['content'])
@@ -192,7 +205,9 @@ class DnsEntryBulkController extends Controller
 
     /**
      * Ids that no longer exist (deleted by another user or a finished remote
-     * delete) are silently dropped rather than failing the whole action.
+     * delete) are silently dropped rather than failing the whole action —
+     * and so are ids in zones where the user cannot manage records (null
+     * from accessibleZoneIds means unrestricted).
      *
      * @return Collection<int, DnsEntry>
      */
@@ -203,6 +218,21 @@ class DnsEntryBulkController extends Controller
             'ids.*' => ['integer'],
         ])['ids'];
 
-        return DnsEntry::query()->whereIn('id', $ids)->get();
+        $user = $request->user();
+
+        // Super Viewer is read-only by construction — accessibleZoneIds()
+        // treats them as unrestricted, so pin everyone but Super Admin to
+        // the zones where they hold an actual record-managing grant.
+        $manageableZoneIds = $user->isSuperAdmin()
+            ? null
+            : $user->zoneRolesMap()
+                ->filter(fn (array $held) => array_intersect($held, [ZoneRole::ZoneAdmin->value, ZoneRole::ZoneDnsManager->value]) !== [])
+                ->keys()
+                ->all();
+
+        return DnsEntry::query()
+            ->whereIn('id', $ids)
+            ->when($manageableZoneIds !== null, fn ($q) => $q->whereIn('dns_zone_id', $manageableZoneIds))
+            ->get();
     }
 }

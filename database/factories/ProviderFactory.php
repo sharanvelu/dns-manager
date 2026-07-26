@@ -19,7 +19,6 @@ class ProviderFactory extends Factory
             'type' => ProviderType::Cloudflare,
             'config' => [
                 'api_token' => fake()->sha256(),
-                'zone_id' => fake()->md5(),
             ],
             'managed_record_types' => ['A', 'AAAA', 'CNAME'],
             'enabled' => true,
@@ -33,7 +32,6 @@ class ProviderFactory extends Factory
             'type' => ProviderType::Cloudflare,
             'config' => [
                 'api_token' => fake()->sha256(),
-                'zone_id' => fake()->md5(),
             ],
         ]);
     }
@@ -48,6 +46,19 @@ class ProviderFactory extends Factory
                 'verify_tls' => false,
             ],
             'managed_record_types' => ['A', 'AAAA', 'CNAME'],
+        ]);
+    }
+
+    public function technitium(): static
+    {
+        return $this->state(fn () => [
+            'type' => ProviderType::Technitium,
+            'config' => [
+                'base_url' => 'https://technitium.internal:53443',
+                'api_token' => fake()->sha256(),
+                'verify_tls' => false,
+            ],
+            'managed_record_types' => ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'SRV', 'NS', 'CAA', 'PTR'],
         ]);
     }
 

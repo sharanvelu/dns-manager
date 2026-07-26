@@ -4,6 +4,7 @@ use App\Connectors\DTOs\RemoteRecord;
 use App\Connectors\Exceptions\ConnectorException;
 use App\Connectors\PiholeConnector;
 use App\Models\DnsEntry;
+use App\Models\DnsZone;
 use App\Models\Provider;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Http\Client\Request;
@@ -13,6 +14,11 @@ use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 
 const PIHOLE_BASE = 'https://pihole.internal';
+
+function piholeZone(string $name = 'example.com'): DnsZone
+{
+    return DnsZone::factory()->create(['name' => $name]);
+}
 
 function piholeProvider(array $config = []): Provider
 {
@@ -76,12 +82,12 @@ function piholeError(string $key, string $message, int $status, ?string $hint = 
     ], $status);
 }
 
-it('creates an A record via an encoded hosts PUT inside one session', function () {
+it('creates an A record via an encoded FQDN hosts PUT inside one session', function () {
     fakePihole();
 
     $connector = new PiholeConnector(piholeProvider());
-    $entry = DnsEntry::factory()->create([
-        'name' => 'host.example.com',
+    $entry = DnsEntry::factory()->for(piholeZone(), 'zone')->create([
+        'name' => 'host',
         'content' => '192.168.1.10',
     ]);
 
@@ -100,12 +106,12 @@ it('creates an A record via an encoded hosts PUT inside one session', function (
         && $request->url() === PIHOLE_BASE.'/api/auth');
 });
 
-it('creates a CNAME with TTL as an encoded name,target,ttl entry', function () {
+it('creates a CNAME with TTL as an encoded fqdn,target,ttl entry', function () {
     fakePihole();
 
     $connector = new PiholeConnector(piholeProvider());
-    $entry = DnsEntry::factory()->cname('target.example.com')->create([
-        'name' => 'alias.example.com',
+    $entry = DnsEntry::factory()->cname('target.example.com')->for(piholeZone(), 'zone')->create([
+        'name' => 'alias',
         'ttl' => 3600,
     ]);
 
@@ -119,8 +125,8 @@ it('omits the TTL from a CNAME entry when none is set', function () {
     fakePihole();
 
     $connector = new PiholeConnector(piholeProvider());
-    $entry = DnsEntry::factory()->cname('target.example.com')->create([
-        'name' => 'alias.example.com',
+    $entry = DnsEntry::factory()->cname('target.example.com')->for(piholeZone(), 'zone')->create([
+        'name' => 'alias',
         'ttl' => null,
     ]);
 
@@ -136,8 +142,8 @@ it('treats a 400 already-exists response as a successful create', function () {
     ]);
 
     $connector = new PiholeConnector(piholeProvider());
-    $entry = DnsEntry::factory()->create([
-        'name' => 'host.example.com',
+    $entry = DnsEntry::factory()->for(piholeZone(), 'zone')->create([
+        'name' => 'host',
         'content' => '192.168.1.10',
     ]);
 
@@ -154,8 +160,8 @@ it('throws on 400 already-exists when adoption is disabled', function () {
     ]);
 
     $connector = new PiholeConnector(piholeProvider(['adopt_existing' => false]));
-    $entry = DnsEntry::factory()->create([
-        'name' => 'host.example.com',
+    $entry = DnsEntry::factory()->for(piholeZone(), 'zone')->create([
+        'name' => 'host',
         'content' => '192.168.1.10',
     ]);
 
@@ -167,8 +173,8 @@ it('updates a record by deleting the old entry then putting the new one in a sin
     fakePihole();
 
     $connector = new PiholeConnector(piholeProvider());
-    $entry = DnsEntry::factory()->create([
-        'name' => 'host.example.com',
+    $entry = DnsEntry::factory()->for(piholeZone(), 'zone')->create([
+        'name' => 'host',
         'content' => '192.168.1.20',
     ]);
 
@@ -316,8 +322,8 @@ it('waits out the resolver-restart cooldown before the session that follows a CN
     fakePihole();
 
     $connector = new PiholeConnector(piholeProvider());
-    $entry = DnsEntry::factory()->cname('target.example.com')->create([
-        'name' => 'alias.example.com',
+    $entry = DnsEntry::factory()->cname('target.example.com')->for(piholeZone(), 'zone')->create([
+        'name' => 'alias',
         'ttl' => null,
     ]);
 
@@ -333,8 +339,8 @@ it('does not pace sessions after hosts-only writes', function () {
     fakePihole();
 
     $connector = new PiholeConnector(piholeProvider());
-    $entry = DnsEntry::factory()->create([
-        'name' => 'host.example.com',
+    $entry = DnsEntry::factory()->for(piholeZone(), 'zone')->create([
+        'name' => 'host',
         'content' => '192.168.1.10',
     ]);
 
@@ -360,8 +366,8 @@ it('runs a CNAME update in one uninterrupted session and paces only the followin
     fakePihole();
 
     $connector = new PiholeConnector(piholeProvider());
-    $entry = DnsEntry::factory()->cname('new-target.example.com')->create([
-        'name' => 'alias.example.com',
+    $entry = DnsEntry::factory()->cname('new-target.example.com')->for(piholeZone(), 'zone')->create([
+        'name' => 'alias',
         'ttl' => null,
     ]);
 

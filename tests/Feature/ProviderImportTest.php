@@ -1,11 +1,13 @@
 <?php
 
-use App\Enums\Role;
 use App\Enums\SyncStatus;
 use App\Jobs\SyncEntryToProvider;
 use App\Models\DnsEntry;
+use App\Models\DnsZone;
 use App\Models\Provider;
 use App\Models\User;
+use App\Models\ZoneProvider;
+use App\Models\ZoneUser;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 
@@ -13,10 +15,18 @@ beforeEach(function () {
     $this->actingAs(User::factory()->create());
     Queue::fake();
 
+    $this->zone = DnsZone::factory()->create(['name' => 'example.com']);
+
     $this->provider = Provider::factory()->cloudflare()->create([
         'name' => 'CF Zone',
-        'config' => ['api_token' => 'tok', 'zone_id' => 'zone-1'],
+        'config' => ['api_token' => 'tok'],
         'managed_record_types' => ['A', 'CNAME'],
+    ]);
+
+    $this->attachment = ZoneProvider::factory()->create([
+        'dns_zone_id' => $this->zone->id,
+        'provider_id' => $this->provider->id,
+        'config' => ['zone_id' => 'zone-1'],
     ]);
 });
 
@@ -39,11 +49,30 @@ function cfRecord(string $id, string $type, string $name, string $content, array
     ], $extra);
 }
 
-test('remote records are listed with local statuses and unmanaged types are hidden', function () {
-    $existing = DnsEntry::factory()->create(['name' => 'exists.example.com', 'type' => 'A', 'content' => '10.0.0.2']);
+function importRecordsUrl(): string
+{
+    return '/zones/'.test()->zone->id.'/providers/'.test()->attachment->id.'/remote-records';
+}
 
-    $managed = DnsEntry::factory()->create(['name' => 'managed.example.com', 'type' => 'A', 'content' => '10.0.0.3']);
-    $managed->syncStates()->create(['provider_id' => $this->provider->id, 'sync_status' => SyncStatus::Synced, 'external_id' => 'cf-3']);
+function importUrl(): string
+{
+    return '/zones/'.test()->zone->id.'/providers/'.test()->attachment->id.'/import';
+}
+
+function zoneEntry(array $attributes): DnsEntry
+{
+    return DnsEntry::factory()->create($attributes + ['dns_zone_id' => test()->zone->id]);
+}
+
+test('remote records are listed relativized with local statuses and unmanaged types are hidden', function () {
+    $existing = zoneEntry(['name' => 'exists', 'type' => 'A', 'content' => '10.0.0.2']);
+
+    $managed = zoneEntry(['name' => 'managed', 'type' => 'A', 'content' => '10.0.0.3']);
+    $managed->syncStates()->create([
+        'zone_provider_id' => $this->attachment->id,
+        'sync_status' => SyncStatus::Synced,
+        'external_id' => 'cf-3',
+    ]);
 
     fakeCloudflareList([
         cfRecord('cf-1', 'A', 'new.example.com', '10.0.0.1'),
@@ -52,42 +81,81 @@ test('remote records are listed with local statuses and unmanaged types are hidd
         cfRecord('cf-4', 'TXT', 'example.com', '"spf"'), // TXT not managed by this provider
     ]);
 
-    $response = $this->getJson("/providers/{$this->provider->id}/remote-records")->assertOk();
+    $response = $this->getJson(importRecordsUrl())->assertOk();
 
     $records = collect($response->json('records'));
 
     expect($records)->toHaveCount(3)
-        ->and($records->firstWhere('name', 'new.example.com')['status'])->toBe('new')
-        ->and($records->firstWhere('name', 'exists.example.com')['status'])->toBe('exists')
-        ->and($records->firstWhere('name', 'managed.example.com')['status'])->toBe('managed')
-        ->and($response->json('unmanagedTypeCount'))->toBe(1);
+        ->and($records->firstWhere('name', 'new')['status'])->toBe('new')
+        ->and($records->firstWhere('name', 'exists')['status'])->toBe('exists')
+        ->and($records->firstWhere('name', 'managed')['status'])->toBe('managed')
+        ->and($response->json('unmanagedTypeCount'))->toBe(1)
+        ->and($response->json('outOfZoneCount'))->toBe(0);
+});
+
+test('records outside the zone are excluded and counted', function () {
+    // Pi-hole is zoneless — its host list spans every zone it serves.
+    $pihole = Provider::factory()->pihole()->create(['managed_record_types' => ['A', 'CNAME']]);
+    $attachment = ZoneProvider::factory()->create([
+        'dns_zone_id' => $this->zone->id,
+        'provider_id' => $pihole->id,
+    ]);
+
+    Http::fake([
+        'pihole.internal/api/auth' => Http::response(['session' => ['valid' => true, 'sid' => 'sid-1', 'csrf' => 'c', 'validity' => 300]]),
+        'pihole.internal/api/config/dns/hosts' => Http::response(['config' => ['dns' => ['hosts' => [
+            '192.168.1.5 nas.example.com',
+            '192.168.1.6 host.other-zone.dev',
+        ]]]]),
+        'pihole.internal/api/config/dns/cnameRecords' => Http::response(['config' => ['dns' => ['cnameRecords' => [
+            'media.example.com,nas.example.com',
+            'alias.other-zone.dev,host.other-zone.dev',
+        ]]]]),
+    ]);
+
+    $response = $this->getJson("/zones/{$this->zone->id}/providers/{$attachment->id}/remote-records")->assertOk();
+
+    expect(collect($response->json('records'))->pluck('name')->all())->toEqualCanonicalizing(['nas', 'media'])
+        ->and($response->json('outOfZoneCount'))->toBe(2);
 });
 
 test('a connector failure surfaces as a 502 with the message', function () {
     Http::fake(['api.cloudflare.com/*' => Http::response(['success' => false, 'errors' => [['code' => 9109, 'message' => 'Invalid access token']], 'result' => null], 401)]);
 
-    $this->getJson("/providers/{$this->provider->id}/remote-records")
+    $this->getJson(importRecordsUrl())
         ->assertStatus(502)
         ->assertJsonPath('message', fn ($message) => str_contains($message, '9109'));
 });
 
-test('importing inserts new entries and links them to the source provider only', function () {
-    Provider::factory()->pihole()->create(['managed_record_types' => ['A', 'CNAME']]);
+test('the import routes are scoped to the attachment\'s zone', function () {
+    $otherZone = DnsZone::factory()->create(['name' => 'other.dev']);
 
-    $this->post("/providers/{$this->provider->id}/import", [
+    $this->getJson("/zones/{$otherZone->id}/providers/{$this->attachment->id}/remote-records")->assertNotFound();
+    $this->post("/zones/{$otherZone->id}/providers/{$this->attachment->id}/import", ['records' => []])->assertNotFound();
+});
+
+test('importing inserts new entries and links them to the source attachment only', function () {
+    // A second attachment on the zone must not gain the record.
+    ZoneProvider::factory()->create([
+        'dns_zone_id' => $this->zone->id,
+        'provider_id' => Provider::factory()->pihole()->create(['managed_record_types' => ['A', 'CNAME']])->id,
+    ]);
+
+    $this->post(importUrl(), [
         'records' => [
-            ['externalId' => 'cf-1', 'type' => 'A', 'name' => 'new.example.com', 'content' => '10.0.0.1', 'ttl' => 300, 'priority' => null, 'proxied' => true],
+            ['externalId' => 'cf-1', 'type' => 'A', 'name' => 'new', 'content' => '10.0.0.1', 'ttl' => 300, 'priority' => null, 'proxied' => true],
         ],
     ])->assertRedirect()->assertSessionHasNoErrors();
 
     $entry = DnsEntry::sole();
-    expect($entry->name)->toBe('new.example.com')
+    expect($entry->name)->toBe('new')
+        ->and($entry->dns_zone_id)->toBe($this->zone->id)
         ->and($entry->ttl)->toBe(300)
         ->and($entry->proxied)->toBeTrue()
         ->and($entry->syncStates()->count())->toBe(1);
 
     $state = $entry->syncStates()->sole();
-    expect($state->provider_id)->toBe($this->provider->id)
+    expect($state->zone_provider_id)->toBe($this->attachment->id)
         ->and($state->external_id)->toBe('cf-1')
         ->and($state->sync_status)->toBe(SyncStatus::Synced);
 
@@ -97,11 +165,10 @@ test('importing inserts new entries and links them to the source provider only',
 });
 
 test('importing an existing entry updates it and links without duplicating', function () {
-    $entry = DnsEntry::factory()->create([
-        'name' => 'exists.example.com', 'type' => 'A', 'content' => '10.0.0.2', 'ttl' => null, 'proxied' => false,
-    ]);
+    $entry = zoneEntry(['name' => 'exists', 'type' => 'A', 'content' => '10.0.0.2', 'ttl' => null, 'proxied' => false]);
 
-    $this->post("/providers/{$this->provider->id}/import", [
+    // A pasted FQDN with trailing dot relativizes to the stored name.
+    $this->post(importUrl(), [
         'records' => [
             ['externalId' => 'cf-2', 'type' => 'A', 'name' => 'EXISTS.example.com.', 'content' => '10.0.0.2', 'ttl' => 3600, 'priority' => null, 'proxied' => true],
         ],
@@ -114,12 +181,17 @@ test('importing an existing entry updates it and links without duplicating', fun
 });
 
 test('re-importing an already-managed record refreshes the pivot instead of duplicating', function () {
-    $entry = DnsEntry::factory()->create(['name' => 'managed.example.com', 'type' => 'A', 'content' => '10.0.0.3']);
-    $entry->syncStates()->create(['provider_id' => $this->provider->id, 'sync_status' => SyncStatus::Drifted, 'external_id' => 'old-id', 'last_error' => 'drift']);
+    $entry = zoneEntry(['name' => 'managed', 'type' => 'A', 'content' => '10.0.0.3']);
+    $entry->syncStates()->create([
+        'zone_provider_id' => $this->attachment->id,
+        'sync_status' => SyncStatus::Drifted,
+        'external_id' => 'old-id',
+        'last_error' => 'drift',
+    ]);
 
-    $this->post("/providers/{$this->provider->id}/import", [
+    $this->post(importUrl(), [
         'records' => [
-            ['externalId' => 'cf-3', 'type' => 'A', 'name' => 'managed.example.com', 'content' => '10.0.0.3', 'ttl' => null, 'priority' => null, 'proxied' => false],
+            ['externalId' => 'cf-3', 'type' => 'A', 'name' => 'managed', 'content' => '10.0.0.3', 'ttl' => null, 'priority' => null, 'proxied' => false],
         ],
     ])->assertRedirect();
 
@@ -130,10 +202,10 @@ test('re-importing an already-managed record refreshes the pivot instead of dupl
 });
 
 test('invalid rows are skipped and reported in the flash message', function () {
-    $this->post("/providers/{$this->provider->id}/import", [
+    $this->post(importUrl(), [
         'records' => [
-            ['externalId' => 'cf-1', 'type' => 'A', 'name' => 'good.example.com', 'content' => '10.0.0.1', 'ttl' => null, 'priority' => null, 'proxied' => false],
-            ['externalId' => 'cf-9', 'type' => 'A', 'name' => 'bad.example.com', 'content' => 'not-an-ip', 'ttl' => null, 'priority' => null, 'proxied' => false],
+            ['externalId' => 'cf-1', 'type' => 'A', 'name' => 'good', 'content' => '10.0.0.1', 'ttl' => null, 'priority' => null, 'proxied' => false],
+            ['externalId' => 'cf-9', 'type' => 'A', 'name' => 'bad', 'content' => 'not-an-ip', 'ttl' => null, 'priority' => null, 'proxied' => false],
         ],
     ])->assertRedirect();
 
@@ -141,9 +213,22 @@ test('invalid rows are skipped and reported in the flash message', function () {
         ->and(session('success'))->toContain('1 skipped as invalid');
 });
 
-test('import requires the manage-entries permission', function () {
-    $this->actingAs(User::factory()->withRoles(Role::ProvidersManager)->create());
+test('import requires record management on the zone', function () {
+    // An attachment-managing grant is not enough, even on the right zone.
+    $providerManager = User::factory()->noRoles()->create();
+    ZoneUser::factory()->providerManager()->create(['user_id' => $providerManager->id, 'dns_zone_id' => $this->zone->id]);
 
-    $this->getJson("/providers/{$this->provider->id}/remote-records")->assertForbidden();
-    $this->post("/providers/{$this->provider->id}/import", ['records' => []])->assertForbidden();
+    $this->actingAs($providerManager);
+
+    $this->getJson(importRecordsUrl())->assertForbidden();
+    $this->post(importUrl(), ['records' => []])->assertForbidden();
+
+    // A zone dns manager passes the gate — the empty payload then fails
+    // validation, not authorization.
+    $dnsManager = User::factory()->noRoles()->create();
+    ZoneUser::factory()->dnsManager()->create(['user_id' => $dnsManager->id, 'dns_zone_id' => $this->zone->id]);
+
+    $this->actingAs($dnsManager);
+
+    $this->post(importUrl(), ['records' => []])->assertSessionHasErrors('records');
 });

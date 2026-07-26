@@ -4,10 +4,13 @@ namespace App\Models;
 
 use App\Enums\RecordType;
 use Database\Factories\DnsEntryFactory;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\Contracts\Activity;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
@@ -25,7 +28,21 @@ class DnsEntry extends Model
             ->dontLogEmptyChanges();
     }
 
+    /**
+     * Stamp the zone onto every entry activity so zone-scoped activity
+     * queries keep working after the entry itself is deleted.
+     * (activitylog v5's replacement for the old tapActivity hook.)
+     */
+    public function beforeActivityLogged(Activity $activity, string $eventName): void
+    {
+        $activity->properties = $activity->properties->merge([
+            'dns_zone_id' => $this->dns_zone_id,
+            'zone' => $this->zone?->name,
+        ]);
+    }
+
     protected $fillable = [
+        'dns_zone_id',
         'name',
         'type',
         'content',
@@ -45,16 +62,30 @@ class DnsEntry extends Model
         ];
     }
 
-    public function providers(): BelongsToMany
+    public function zone(): BelongsTo
     {
-        return $this->belongsToMany(Provider::class, 'dns_entry_provider')
-            ->using(DnsEntryProvider::class)
+        return $this->belongsTo(DnsZone::class, 'dns_zone_id');
+    }
+
+    public function zoneProviders(): BelongsToMany
+    {
+        return $this->belongsToMany(ZoneProvider::class, 'dns_entry_zone_provider')
+            ->using(EntrySyncState::class)
             ->withPivot(['id', 'external_id', 'sync_status', 'last_synced_at', 'last_error'])
             ->withTimestamps();
     }
 
     public function syncStates(): HasMany
     {
-        return $this->hasMany(DnsEntryProvider::class);
+        return $this->hasMany(EntrySyncState::class);
+    }
+
+    /**
+     * The full hostname — `name` is stored relative to the zone ('@', 'www').
+     * Connectors always speak FQDN; eager-load `zone` on hot paths.
+     */
+    protected function fqdn(): Attribute
+    {
+        return Attribute::get(fn (): string => $this->zone->fqdn($this->name));
     }
 }

@@ -1,3 +1,4 @@
+import { FlashToast } from '@/components/flash-toast';
 import { EmptyProvidersIllustration } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
@@ -5,7 +6,6 @@ import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, usePage } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
-import { FlashToast } from './flash-toast';
 import { ProviderCard } from './provider-card';
 import { ProviderFormDialog } from './provider-form-dialog';
 import type { Provider, ProvidersPageProps } from './types';
@@ -19,7 +19,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 type DialogState = { mode: 'create' } | { mode: 'edit'; provider: Provider } | null;
 
-export default function ProvidersIndex({ providers, connectors }: ProvidersPageProps) {
+export default function ProvidersIndex({ providers, connectors, allZones }: ProvidersPageProps) {
     const canManage = usePage<SharedData>().props.auth.can.manageProviders;
     const [dialog, setDialog] = useState<DialogState>(null);
 
@@ -63,6 +63,8 @@ export default function ProvidersIndex({ providers, connectors }: ProvidersPageP
                             <ProviderCard
                                 key={provider.id}
                                 provider={provider}
+                                connectors={connectors}
+                                allZones={allZones}
                                 canManage={canManage}
                                 onEdit={(p) => setDialog({ mode: 'edit', provider: p })}
                             />

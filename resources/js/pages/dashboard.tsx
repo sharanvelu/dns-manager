@@ -2,13 +2,17 @@ import {
     EmptyActivityIllustration,
     EmptyEntriesIllustration,
     EmptyProvidersIllustration,
+    EmptyZonesIllustration,
     ProviderCloudflareMark,
     ProviderGenericMark,
     ProviderPiholeMark,
+    ProviderTechnitiumMark,
     StatusDriftedIcon,
     StatusErrorIcon,
     StatusSyncedIcon,
+    ZoneMark,
 } from '@/components/icons';
+import { StatTile } from '@/components/stat-tile';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -16,9 +20,9 @@ import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
-import { type BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/react';
-import { ArrowRight, Globe, Plus, ServerCog } from 'lucide-react';
+import { type BreadcrumbItem, type SharedData } from '@/types';
+import { Head, Link, usePage } from '@inertiajs/react';
+import { ArrowRight, Globe, Lock, Plus, ServerCog, Users } from 'lucide-react';
 import type { ComponentType, ReactNode, SVGProps } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -29,6 +33,9 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 interface DashboardProps {
+    /** Set when the user has no zone access — stats/zones/activity are omitted. */
+    noAccess?: boolean;
+    isUserAdmin?: boolean;
     stats: {
         totalEntries: number;
         inSync: number;
@@ -40,7 +47,7 @@ interface DashboardProps {
     providers: Array<{
         id: number;
         name: string;
-        type: 'cloudflare' | 'pihole';
+        type: 'cloudflare' | 'pihole' | 'technitium';
         typeLabel: string;
         enabled: boolean;
         healthStatus: 'ok' | 'error' | 'unchecked';
@@ -51,6 +58,15 @@ interface DashboardProps {
         driftedCount: number;
         errorCount: number;
     }>;
+    zones: Array<{
+        id: number;
+        name: string;
+        entriesCount: number;
+        syncedCount: number;
+        driftedCount: number;
+        erroredCount: number;
+        providerTypes: string[];
+    }>;
     activity: Array<{
         id: number;
         action: string;
@@ -58,11 +74,13 @@ interface DashboardProps {
         message: string | null;
         provider: { id: number; name: string } | null;
         entry: { id: number; name: string } | null;
+        zone: { id: number; name: string } | null;
         createdAt: string;
     }>;
 }
 
 type Provider = DashboardProps['providers'][number];
+type Zone = DashboardProps['zones'][number];
 type ActivityItem = DashboardProps['activity'][number];
 
 /** Tiny relative-time formatter — no date library. */
@@ -85,52 +103,22 @@ function timeAgo(iso: string): string {
 const providerMarks: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
     cloudflare: ProviderCloudflareMark,
     pihole: ProviderPiholeMark,
+    technitium: ProviderTechnitiumMark,
+};
+
+const providerTypeLabels: Record<string, string> = {
+    cloudflare: 'Cloudflare',
+    pihole: 'Pi-hole',
+    technitium: 'Technitium',
 };
 
 const actionLabels: Record<string, string> = {
     push: 'Push',
     delete: 'Delete',
+    import: 'Import',
     'drift-check': 'Drift check',
     'provider-health-check': 'Health check',
 };
-
-type StatAccent = 'neutral' | 'green' | 'amber' | 'red';
-
-const accentText: Record<StatAccent, string> = {
-    neutral: 'text-foreground',
-    green: 'text-emerald-600 dark:text-emerald-400',
-    amber: 'text-amber-600 dark:text-amber-400',
-    red: 'text-red-600 dark:text-red-400',
-};
-
-const accentIcon: Record<StatAccent, string> = {
-    neutral: 'text-muted-foreground/70',
-    green: 'text-emerald-500 dark:text-emerald-400',
-    amber: 'text-amber-500 dark:text-amber-400',
-    red: 'text-red-500 dark:text-red-400',
-};
-
-function StatTile({
-    label,
-    value,
-    icon: Icon,
-    accent = 'neutral',
-}: {
-    label: string;
-    value: number;
-    icon: ComponentType<SVGProps<SVGSVGElement>>;
-    accent?: StatAccent;
-}) {
-    return (
-        <Card className="flex flex-col gap-1 p-4">
-            <div className="flex items-center justify-between gap-2">
-                <span className="text-muted-foreground text-xs font-medium">{label}</span>
-                <Icon className={cn('size-4 shrink-0', accentIcon[accent])} />
-            </div>
-            <span className={cn('text-2xl font-semibold tracking-tight tabular-nums', accentText[accent])}>{value.toLocaleString()}</span>
-        </Card>
-    );
-}
 
 function ProvidersHealthyChip({ healthy, total }: { healthy: number; total: number }) {
     const allHealthy = total > 0 && healthy === total;
@@ -237,6 +225,72 @@ function ProviderCard({ provider }: { provider: Provider }) {
     );
 }
 
+function ZoneCard({ zone }: { zone: Zone }) {
+    const allInSync = zone.entriesCount > 0 && zone.syncedCount === zone.entriesCount;
+    const hasStatus = allInSync || zone.driftedCount > 0 || zone.erroredCount > 0;
+
+    return (
+        <Card className="flex flex-col gap-3 p-4">
+            <div className="flex items-start justify-between gap-2">
+                <Link href={`/zones/${zone.id}`} className="group flex min-w-0 items-center gap-3">
+                    <span className="bg-muted/40 text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-md border">
+                        <ZoneMark className="size-5" />
+                    </span>
+                    <span className="min-w-0">
+                        <span className="block truncate font-mono text-sm font-medium group-hover:underline group-hover:underline-offset-4">
+                            {zone.name}
+                        </span>
+                        <span className="text-muted-foreground block text-xs tabular-nums">
+                            {zone.entriesCount.toLocaleString()} {zone.entriesCount === 1 ? 'record' : 'records'}
+                        </span>
+                    </span>
+                </Link>
+                {zone.providerTypes.length > 0 && (
+                    <span className="text-muted-foreground flex shrink-0 items-center gap-1.5">
+                        {zone.providerTypes.map((type) => {
+                            const Mark = providerMarks[type] ?? ProviderGenericMark;
+
+                            return (
+                                <Tooltip key={type}>
+                                    <TooltipTrigger asChild>
+                                        <span className="cursor-default">
+                                            <Mark className="size-4" />
+                                        </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>{providerTypeLabels[type] ?? type}</TooltipContent>
+                                </Tooltip>
+                            );
+                        })}
+                    </span>
+                )}
+            </div>
+
+            {hasStatus && (
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums">
+                    {allInSync && (
+                        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                            <StatusSyncedIcon className="size-3.5" />
+                            All in sync
+                        </span>
+                    )}
+                    {zone.driftedCount > 0 && (
+                        <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                            <StatusDriftedIcon className="size-3.5" />
+                            {zone.driftedCount} drifted
+                        </span>
+                    )}
+                    {zone.erroredCount > 0 && (
+                        <span className="inline-flex items-center gap-1 text-red-600 dark:text-red-400">
+                            <StatusErrorIcon className="size-3.5" />
+                            {zone.erroredCount} {zone.erroredCount === 1 ? 'error' : 'errors'}
+                        </span>
+                    )}
+                </div>
+            )}
+        </Card>
+    );
+}
+
 function ActivityRow({ item }: { item: ActivityItem }) {
     const isSuccess = item.status === 'success';
     const StatusIcon = isSuccess ? StatusSyncedIcon : StatusErrorIcon;
@@ -252,7 +306,13 @@ function ActivityRow({ item }: { item: ActivityItem }) {
                 <p className="truncate text-sm" title={item.message ?? undefined}>
                     {item.message ?? `${actionLabel} ${isSuccess ? 'completed' : 'failed'}`}
                 </p>
-                {context && <p className="text-muted-foreground truncate text-xs">{context}</p>}
+                {(item.zone || context) && (
+                    <p className="text-muted-foreground truncate text-xs">
+                        {item.zone && <span className="font-mono">{item.zone.name}</span>}
+                        {item.zone && context && ' · '}
+                        {context}
+                    </p>
+                )}
             </div>
             <span className="text-muted-foreground shrink-0 text-xs whitespace-nowrap" title={new Date(item.createdAt).toLocaleString()}>
                 {timeAgo(item.createdAt)}
@@ -270,9 +330,41 @@ function SectionHeading({ title, action }: { title: string; action?: ReactNode }
     );
 }
 
-export default function Dashboard({ stats, providers, activity }: DashboardProps) {
+export default function Dashboard({ noAccess, isUserAdmin, stats, providers, zones, activity }: DashboardProps) {
+    const can = usePage<SharedData>().props.auth.can;
+
+    if (noAccess) {
+        const Icon = isUserAdmin ? Users : Lock;
+
+        return (
+            <AppLayout breadcrumbs={breadcrumbs}>
+                <Head title="Dashboard" />
+                <div className="flex h-full flex-1 items-center justify-center p-4 md:p-6">
+                    <Card className="flex w-full max-w-md flex-col items-center gap-4 border-dashed px-6 py-10 text-center">
+                        <Icon className="text-muted-foreground/60 size-8" />
+                        <p className="text-sm font-medium">
+                            {isUserAdmin
+                                ? 'You manage users — head to the Users section.'
+                                : 'No access yet — ask an administrator to grant you access to a zone.'}
+                        </p>
+                        {isUserAdmin && (
+                            <Button asChild size="sm">
+                                <Link href="/users">
+                                    <Users />
+                                    Go to Users
+                                </Link>
+                            </Button>
+                        )}
+                    </Card>
+                </div>
+            </AppLayout>
+        );
+    }
+
     const hasProviders = providers.length > 0;
+    const hasZones = zones.length > 0;
     const fullySynced = stats.totalEntries > 0 && stats.inSync === stats.totalEntries;
+    const showProvidersSection = hasProviders || can.viewProviders;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -298,8 +390,51 @@ export default function Dashboard({ stats, providers, activity }: DashboardProps
                         </div>
                     </section>
 
-                    {/* No entries yet — only when at least one provider exists */}
-                    {hasProviders && stats.totalEntries === 0 && (
+                    {/* Zones */}
+                    <section className="flex flex-col gap-3">
+                        <SectionHeading
+                            title="Zones"
+                            action={
+                                hasZones ? (
+                                    <Link
+                                        href="/zones"
+                                        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs font-medium transition-colors"
+                                    >
+                                        View all
+                                        <ArrowRight className="size-3.5" />
+                                    </Link>
+                                ) : undefined
+                            }
+                        />
+                        {hasZones ? (
+                            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                                {zones.map((zone) => (
+                                    <ZoneCard key={zone.id} zone={zone} />
+                                ))}
+                            </div>
+                        ) : (
+                            <Card className="flex flex-col items-center gap-4 border-dashed px-6 py-10 text-center">
+                                <EmptyZonesIllustration className="text-muted-foreground" />
+                                <div>
+                                    <p className="text-sm font-medium">Create your first zone</p>
+                                    <p className="text-muted-foreground mx-auto mt-1 max-w-sm text-sm">
+                                        Zones group your DNS records by domain and decide which providers they sync to.
+                                    </p>
+                                </div>
+                                {can.createZones && (
+                                    <Button asChild size="sm">
+                                        <Link href="/zones">
+                                            <Plus />
+                                            Create a zone
+                                        </Link>
+                                    </Button>
+                                )}
+                            </Card>
+                        )}
+                    </section>
+
+                    {/* No entries yet — only once a zone and a provider exist */}
+                    {hasZones && hasProviders && stats.totalEntries === 0 && (
                         <Card className="flex flex-col items-center gap-3 border-dashed p-6 text-center sm:flex-row sm:text-left">
                             <EmptyEntriesIllustration className="text-muted-foreground size-20 shrink-0" />
                             <div className="flex-1">
@@ -316,46 +451,48 @@ export default function Dashboard({ stats, providers, activity }: DashboardProps
                     )}
 
                     <div className="grid flex-1 items-start gap-6 lg:grid-cols-3">
-                        {/* Providers */}
-                        <section className="flex flex-col gap-3 lg:col-span-2">
-                            <SectionHeading
-                                title="Providers"
-                                action={
-                                    hasProviders ? (
-                                        <Link
-                                            href="/providers"
-                                            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs font-medium transition-colors"
-                                        >
-                                            View all
-                                            <ArrowRight className="size-3.5" />
-                                        </Link>
-                                    ) : undefined
-                                }
-                            />
-                            {hasProviders ? (
-                                <div className="grid gap-3 xl:grid-cols-2">
-                                    {providers.map((provider) => (
-                                        <ProviderCard key={provider.id} provider={provider} />
-                                    ))}
-                                </div>
-                            ) : (
-                                <Card className="flex flex-col items-center gap-4 border-dashed px-6 py-10 text-center">
-                                    <EmptyProvidersIllustration className="text-muted-foreground" />
-                                    <div>
-                                        <p className="text-sm font-medium">No providers connected</p>
-                                        <p className="text-muted-foreground mx-auto mt-1 max-w-sm text-sm">
-                                            Connect Cloudflare, Pi-hole, or another DNS provider to start managing and syncing your records.
-                                        </p>
+                        {/* Providers — hidden entirely for zone-scoped users without any (they can't connect one). */}
+                        {showProvidersSection && (
+                            <section className="flex flex-col gap-3 lg:col-span-2">
+                                <SectionHeading
+                                    title="Providers"
+                                    action={
+                                        hasProviders ? (
+                                            <Link
+                                                href="/providers"
+                                                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs font-medium transition-colors"
+                                            >
+                                                View all
+                                                <ArrowRight className="size-3.5" />
+                                            </Link>
+                                        ) : undefined
+                                    }
+                                />
+                                {hasProviders ? (
+                                    <div className="grid gap-3 xl:grid-cols-2">
+                                        {providers.map((provider) => (
+                                            <ProviderCard key={provider.id} provider={provider} />
+                                        ))}
                                     </div>
-                                    <Button asChild size="sm">
-                                        <Link href="/providers">
-                                            <Plus />
-                                            Connect a provider
-                                        </Link>
-                                    </Button>
-                                </Card>
-                            )}
-                        </section>
+                                ) : (
+                                    <Card className="flex flex-col items-center gap-4 border-dashed px-6 py-10 text-center">
+                                        <EmptyProvidersIllustration className="text-muted-foreground" />
+                                        <div>
+                                            <p className="text-sm font-medium">No providers connected</p>
+                                            <p className="text-muted-foreground mx-auto mt-1 max-w-sm text-sm">
+                                                Connect Cloudflare, Pi-hole, or another DNS provider to start managing and syncing your records.
+                                            </p>
+                                        </div>
+                                        <Button asChild size="sm">
+                                            <Link href="/providers">
+                                                <Plus />
+                                                Connect a provider
+                                            </Link>
+                                        </Button>
+                                    </Card>
+                                )}
+                            </section>
+                        )}
 
                         {/* Recent activity */}
                         <section className="flex flex-col gap-3">

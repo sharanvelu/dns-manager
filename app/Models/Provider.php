@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
@@ -60,17 +61,26 @@ class Provider extends Model
         ];
     }
 
-    public function entries(): BelongsToMany
+    public function syncStates(): HasManyThrough
     {
-        return $this->belongsToMany(DnsEntry::class, 'dns_entry_provider')
-            ->using(DnsEntryProvider::class)
-            ->withPivot(['id', 'external_id', 'sync_status', 'last_synced_at', 'last_error'])
-            ->withTimestamps();
+        return $this->hasManyThrough(
+            EntrySyncState::class,
+            ZoneProvider::class,
+            'provider_id',
+            'zone_provider_id',
+        );
     }
 
-    public function syncStates(): HasMany
+    public function zoneProviders(): HasMany
     {
-        return $this->hasMany(DnsEntryProvider::class);
+        return $this->hasMany(ZoneProvider::class);
+    }
+
+    public function zones(): BelongsToMany
+    {
+        return $this->belongsToMany(DnsZone::class, 'zone_providers', 'provider_id', 'dns_zone_id')
+            ->withPivot(['id', 'enabled'])
+            ->withTimestamps();
     }
 
     public function syncLogs(): HasMany

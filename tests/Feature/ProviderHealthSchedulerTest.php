@@ -85,9 +85,10 @@ test('the provider-health-check webhook can target one provider and needs no ses
 
 test('health check marks the provider healthy when the connection succeeds', function () {
     Http::fake([
-        'api.cloudflare.com/client/v4/zones/*' => Http::response([
+        'api.cloudflare.com/client/v4/zones*' => Http::response([
             'success' => true, 'errors' => [], 'messages' => [],
-            'result' => ['name' => 'example.com', 'status' => 'active'],
+            'result' => [['id' => 'zone-1', 'name' => 'example.com', 'status' => 'active']],
+            'result_info' => ['total_count' => 1],
         ]),
     ]);
 

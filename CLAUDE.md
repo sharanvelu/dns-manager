@@ -15,7 +15,7 @@ npx tsc --noEmit && npm run build   # frontend checks
 ```
 
 - Laravel 12 + Inertia 2 + React 19 + TS + Tailwind 4; Postgres; Redis queue (predis).
-- Provider credentials: `encrypted:array` cast on `providers.config` — never expose secrets in Inertia props.
+- Secrets: `encrypted:array` cast on `providers.config` (credentials) AND `zone_providers.config` (per-zone settings) — never expose either raw in Inertia props.
 - Tests run on sqlite `:memory:` → keep SQL portable (no `ilike`).
 - Vite preloading is deliberately disabled (nginx 502 via oversized `Link` header) — see AGENTS.md gotchas before touching.
 - User docs live in `docs/content/` and are served by BOTH the in-app `/docs` endpoint (installed version) and `docs-site/` (Next.js, latest version). Behavior changes ⇒ update the matching `docs/content` page.

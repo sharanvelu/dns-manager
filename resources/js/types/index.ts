@@ -3,12 +3,31 @@ import { LucideIcon } from 'lucide-react';
 export interface Auth {
     user: User;
     can: {
-        manageEntries: boolean;
+        createZones: boolean;
         manageProviders: boolean;
+        viewProviders: boolean;
         manageUsers: boolean;
-        viewActivity: boolean;
+        viewUsers: boolean;
+        viewGlobalActivity: boolean;
+        hasZoneAccess: boolean;
     };
 }
+
+/** Per-zone abilities for a single zone page (zones/records, zones/providers, zones/activity, zones/access). */
+export interface ZoneCan {
+    /** False for e.g. a user-admin who may only open the Access tab. */
+    viewZone: boolean;
+    manageRecords: boolean;
+    manageAttachments: boolean;
+    updateZone: boolean;
+    deleteZone: boolean;
+    viewActivity: boolean;
+    viewAccess: boolean;
+    manageAccess: boolean;
+}
+
+/** Per-zone abilities keyed by zone id — the entries pages' map shape. */
+export type ZoneCanMap = Record<number, { manageRecords: boolean; viewActivity: boolean }>;
 
 export interface BreadcrumbItem {
     title: string;
@@ -40,8 +59,4 @@ export interface User {
     email: string;
     avatar_url?: string | null;
     roles: string[];
-    email_verified_at: string | null;
-    created_at: string;
-    updated_at: string;
-    [key: string]: unknown; // This allows for additional properties...
 }

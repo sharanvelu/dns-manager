@@ -5,7 +5,9 @@ use App\Connectors\DTOs\RemoteRecord;
 use App\Connectors\Exceptions\ConnectorException;
 use App\Enums\RecordType;
 use App\Models\DnsEntry;
+use App\Models\DnsZone;
 use App\Models\Provider;
+use App\Models\ZoneProvider;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 
@@ -33,25 +35,30 @@ function cloudflareApiRecord(array $overrides = []): array
 }
 
 beforeEach(function () {
+    $this->zone = DnsZone::factory()->create(['name' => 'example.com']);
+
     $this->provider = Provider::factory()->cloudflare()->create([
-        'config' => [
-            'api_token' => 'test-token',
-            'zone_id' => 'zone-abc-123',
-        ],
+        'config' => ['api_token' => 'test-token'],
     ]);
 
-    $this->connector = new CloudflareConnector($this->provider);
+    $this->zoneProvider = ZoneProvider::factory()->cloudflare('zone-abc-123')->create([
+        'dns_zone_id' => $this->zone->id,
+        'provider_id' => $this->provider->id,
+    ]);
+
+    $this->connector = new CloudflareConnector($this->provider, $this->zoneProvider);
+    $this->zonesUrl = 'https://api.cloudflare.com/client/v4/zones';
     $this->recordsUrl = 'https://api.cloudflare.com/client/v4/zones/zone-abc-123/dns_records';
 });
 
 describe('createRecord', function () {
-    it('posts the correct payload for an A record and returns the id', function () {
+    it('posts the FQDN payload for a relative A record and returns the id', function () {
         Http::fake([
             $this->recordsUrl => Http::response(cloudflareEnvelope(cloudflareApiRecord(['id' => 'rec-created-1']))),
         ]);
 
-        $entry = DnsEntry::factory()->create([
-            'name' => 'www.example.com',
+        $entry = DnsEntry::factory()->for($this->zone, 'zone')->create([
+            'name' => 'www',
             'type' => RecordType::A,
             'content' => '192.0.2.1',
             'ttl' => null,
@@ -72,13 +79,27 @@ describe('createRecord', function () {
         });
     });
 
+    it('expands the apex entry name (@) to the zone FQDN', function () {
+        Http::fake([
+            $this->recordsUrl => Http::response(cloudflareEnvelope(cloudflareApiRecord(['id' => 'rec-apex-1']))),
+        ]);
+
+        $entry = DnsEntry::factory()->apex()->for($this->zone, 'zone')->create([
+            'content' => '192.0.2.9',
+        ]);
+
+        $this->connector->createRecord($entry);
+
+        Http::assertSent(fn (Request $request) => $request['name'] === 'example.com');
+    });
+
     it('sends a top-level priority for MX records, defaulting to 10', function () {
         Http::fake([
             $this->recordsUrl => Http::response(cloudflareEnvelope(cloudflareApiRecord(['id' => 'rec-mx-1', 'type' => 'MX']))),
         ]);
 
-        $entry = DnsEntry::factory()->mx()->create([
-            'name' => 'example.com',
+        $entry = DnsEntry::factory()->mx()->for($this->zone, 'zone')->create([
+            'name' => '@',
             'ttl' => 3600,
             'priority' => null,
         ]);
@@ -87,6 +108,7 @@ describe('createRecord', function () {
 
         Http::assertSent(function (Request $request) {
             return $request['type'] === 'MX'
+                && $request['name'] === 'example.com'
                 && $request['content'] === 'mail.example.com'
                 && $request['priority'] === 10
                 && $request['ttl'] === 3600
@@ -99,8 +121,7 @@ describe('createRecord', function () {
             $this->recordsUrl => Http::response(cloudflareEnvelope(cloudflareApiRecord(['id' => 'rec-txt-1', 'type' => 'TXT']))),
         ]);
 
-        $entry = DnsEntry::factory()->create([
-            'name' => 'example.com',
+        $entry = DnsEntry::factory()->apex()->for($this->zone, 'zone')->create([
             'type' => RecordType::TXT,
             'content' => 'v=spf1 include:_spf.example.com -all',
         ]);
@@ -115,8 +136,7 @@ describe('createRecord', function () {
             $this->recordsUrl => Http::response(cloudflareEnvelope(cloudflareApiRecord(['id' => 'rec-txt-2', 'type' => 'TXT']))),
         ]);
 
-        $entry = DnsEntry::factory()->create([
-            'name' => 'example.com',
+        $entry = DnsEntry::factory()->apex()->for($this->zone, 'zone')->create([
             'type' => RecordType::TXT,
             'content' => '"already-quoted"',
         ]);
@@ -131,8 +151,8 @@ describe('createRecord', function () {
             $this->recordsUrl => Http::response(cloudflareEnvelope(cloudflareApiRecord(['id' => 'rec-srv-1', 'type' => 'SRV']))),
         ]);
 
-        $entry = DnsEntry::factory()->create([
-            'name' => '_sip._tcp.example.com',
+        $entry = DnsEntry::factory()->for($this->zone, 'zone')->create([
+            'name' => '_sip._tcp',
             'type' => RecordType::SRV,
             'content' => '60 5060 sip.example.com',
             'priority' => 5,
@@ -142,6 +162,7 @@ describe('createRecord', function () {
 
         Http::assertSent(function (Request $request) {
             return $request['type'] === 'SRV'
+                && $request['name'] === '_sip._tcp.example.com'
                 && $request['data'] === [
                     'priority' => 5,
                     'weight' => 60,
@@ -155,8 +176,8 @@ describe('createRecord', function () {
     it('throws a ConnectorException for malformed SRV content', function () {
         Http::fake();
 
-        $entry = DnsEntry::factory()->create([
-            'name' => '_sip._tcp.example.com',
+        $entry = DnsEntry::factory()->for($this->zone, 'zone')->create([
+            'name' => '_sip._tcp',
             'type' => RecordType::SRV,
             'content' => 'not-a-valid-srv-content',
         ]);
@@ -172,8 +193,7 @@ describe('createRecord', function () {
             $this->recordsUrl => Http::response(cloudflareEnvelope(cloudflareApiRecord(['id' => 'rec-caa-1', 'type' => 'CAA']))),
         ]);
 
-        $entry = DnsEntry::factory()->create([
-            'name' => 'example.com',
+        $entry = DnsEntry::factory()->apex()->for($this->zone, 'zone')->create([
             'type' => RecordType::CAA,
             'content' => '0 issue "letsencrypt.org"',
         ]);
@@ -198,14 +218,38 @@ describe('createRecord', function () {
             ]), 400),
         ]);
 
-        $entry = DnsEntry::factory()->create();
+        $entry = DnsEntry::factory()->for($this->zone, 'zone')->create(['name' => 'www']);
 
         $provider = Provider::factory()->cloudflare()->create([
-            'config' => ['api_token' => 'test-token', 'zone_id' => 'zone-abc-123', 'adopt_existing' => false],
+            'config' => ['api_token' => 'test-token', 'adopt_existing' => false],
+        ]);
+        $zoneProvider = ZoneProvider::factory()->cloudflare('zone-abc-123')->create([
+            'dns_zone_id' => $this->zone->id,
+            'provider_id' => $provider->id,
         ]);
 
-        expect(fn () => (new CloudflareConnector($provider))->createRecord($entry))
+        expect(fn () => (new CloudflareConnector($provider, $zoneProvider))->createRecord($entry))
             ->toThrow(ConnectorException::class, '[81057] Record already exists.');
+    });
+});
+
+describe('zone context requirement', function () {
+    it('throws a ConnectorException for record operations without a zone attachment', function () {
+        Http::fake();
+
+        $connector = new CloudflareConnector($this->provider);
+        $entry = DnsEntry::factory()->for($this->zone, 'zone')->create(['name' => 'www']);
+
+        expect(fn () => $connector->listRecords())
+            ->toThrow(ConnectorException::class, 'requires a zone attachment')
+            ->and(fn () => $connector->createRecord($entry))
+            ->toThrow(ConnectorException::class, 'requires a zone attachment')
+            ->and(fn () => $connector->updateRecord($entry, 'rec-1'))
+            ->toThrow(ConnectorException::class, 'requires a zone attachment')
+            ->and(fn () => $connector->deleteRecord('rec-1'))
+            ->toThrow(ConnectorException::class, 'requires a zone attachment');
+
+        Http::assertNothingSent();
     });
 });
 
@@ -219,8 +263,8 @@ describe('adopt-on-conflict', function () {
     }
 
     it('adopts an identical existing record and aligns it with the entry', function () {
-        $entry = DnsEntry::factory()->create([
-            'name' => 'www.example.com',
+        $entry = DnsEntry::factory()->for($this->zone, 'zone')->create([
+            'name' => 'www',
             'type' => RecordType::A,
             'content' => '192.0.2.1',
             'ttl' => 3600,
@@ -236,6 +280,10 @@ describe('adopt-on-conflict', function () {
 
         expect($this->connector->createRecord($entry))->toBe('existing-id-1');
 
+        // The candidate lookup filters on the FQDN, not the relative name.
+        Http::assertSent(fn (Request $request) => $request->method() === 'GET'
+            && $request->data()['name'] === 'www.example.com');
+
         // The adopted record gets aligned via PUT (DB wins).
         Http::assertSent(fn (Request $request) => $request->method() === 'PUT'
             && str_ends_with(parse_url($request->url(), PHP_URL_PATH), '/existing-id-1')
@@ -243,7 +291,7 @@ describe('adopt-on-conflict', function () {
     });
 
     it('adopts a single conflicting record without a content match (CNAME retarget)', function () {
-        $entry = DnsEntry::factory()->cname('new-target.example.com')->create(['name' => 'alias.example.com']);
+        $entry = DnsEntry::factory()->cname('new-target.example.com')->for($this->zone, 'zone')->create(['name' => 'alias']);
 
         Http::fake([
             $this->recordsUrl.'/cname-1' => Http::response(cloudflareEnvelope(cloudflareApiRecord(['id' => 'cname-1', 'type' => 'CNAME']))),
@@ -255,11 +303,13 @@ describe('adopt-on-conflict', function () {
 
         expect($this->connector->createRecord($entry))->toBe('cname-1');
 
-        Http::assertSent(fn (Request $request) => $request->method() === 'PUT' && $request['content'] === 'new-target.example.com');
+        Http::assertSent(fn (Request $request) => $request->method() === 'PUT'
+            && $request['name'] === 'alias.example.com'
+            && $request['content'] === 'new-target.example.com');
     });
 
     it('rethrows the original error when no unambiguous record can be adopted', function () {
-        $entry = DnsEntry::factory()->create(['name' => 'multi.example.com', 'content' => '10.9.9.9']);
+        $entry = DnsEntry::factory()->for($this->zone, 'zone')->create(['name' => 'multi', 'content' => '10.9.9.9']);
 
         Http::fake([
             $this->recordsUrl.'?*' => Http::response(cloudflareEnvelope([
@@ -283,7 +333,7 @@ describe('adopt-on-conflict', function () {
             ]), 400),
         ]);
 
-        $entry = DnsEntry::factory()->create();
+        $entry = DnsEntry::factory()->for($this->zone, 'zone')->create(['name' => 'www']);
 
         expect(fn () => $this->connector->createRecord($entry))->toThrow(ConnectorException::class, '[9207]');
 
@@ -292,13 +342,13 @@ describe('adopt-on-conflict', function () {
 });
 
 describe('updateRecord', function () {
-    it('PUTs the full payload to the record id and returns the id', function () {
+    it('PUTs the full FQDN payload to the record id and returns the id', function () {
         Http::fake([
             $this->recordsUrl.'/rec-42' => Http::response(cloudflareEnvelope(cloudflareApiRecord(['id' => 'rec-42']))),
         ]);
 
-        $entry = DnsEntry::factory()->create([
-            'name' => 'app.example.com',
+        $entry = DnsEntry::factory()->for($this->zone, 'zone')->create([
+            'name' => 'app',
             'type' => RecordType::A,
             'content' => '192.0.2.50',
             'ttl' => 300,
@@ -479,27 +529,44 @@ describe('listRecords', function () {
 });
 
 describe('testConnection', function () {
-    it('fetches the zone on success', function () {
+    it('validates the token by listing zones, without any zone context', function () {
         Http::fake([
-            'https://api.cloudflare.com/client/v4/zones/zone-abc-123' => Http::response(
-                cloudflareEnvelope(['id' => 'zone-abc-123', 'name' => 'example.com', 'status' => 'active']),
-            ),
+            $this->zonesUrl.'?*' => Http::response(cloudflareEnvelope(
+                [['id' => 'zone-abc-123', 'name' => 'example.com', 'status' => 'active']],
+                ['result_info' => ['page' => 1, 'per_page' => 1, 'total_pages' => 3, 'count' => 1, 'total_count' => 3]],
+            )),
+        ]);
+
+        $result = (new CloudflareConnector($this->provider))->testConnection();
+
+        expect($result->ok)->toBeTrue()
+            ->and($result->message)->toBe('API token is valid — 3 zones accessible.')
+            ->and($result->details)->toBe(['zones' => 3]);
+
+        Http::assertSent(fn (Request $request) => $request->method() === 'GET'
+            && str_starts_with($request->url(), $this->zonesUrl.'?')
+            && $request->data() == ['per_page' => 1]);
+
+        // Regression guard: /user/tokens/verify rejects account-owned tokens,
+        // so the connection test must go through the zones listing only.
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'tokens/verify'));
+    });
+
+    it('succeeds without a zone count when result_info is absent', function () {
+        Http::fake([
+            $this->zonesUrl.'?*' => Http::response(cloudflareEnvelope([])),
         ]);
 
         $result = $this->connector->testConnection();
 
         expect($result->ok)->toBeTrue()
-            ->and($result->message)->toBe('Connected to zone example.com')
-            ->and($result->details)->toBe(['zone' => 'example.com', 'status' => 'active']);
-
-        // Regression guard: /user/tokens/verify rejects account-owned tokens,
-        // so the connection test must go through the zone endpoint only.
-        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'tokens/verify'));
+            ->and($result->message)->toBe('API token is valid.')
+            ->and($result->details)->toBe([]);
     });
 
     it('fails with the Cloudflare error message when the token is invalid', function () {
         Http::fake([
-            'https://api.cloudflare.com/client/v4/zones/zone-abc-123' => Http::response(cloudflareEnvelope(null, [
+            $this->zonesUrl.'?*' => Http::response(cloudflareEnvelope(null, [
                 'success' => false,
                 'errors' => [['code' => 1000, 'message' => 'Invalid API Token']],
             ]), 401),
@@ -508,21 +575,8 @@ describe('testConnection', function () {
         $result = $this->connector->testConnection();
 
         expect($result->ok)->toBeFalse()
+            ->and($result->message)->toContain('Token check failed')
             ->and($result->message)->toContain('Invalid API Token');
-    });
-
-    it('fails when the zone cannot be fetched', function () {
-        Http::fake([
-            'https://api.cloudflare.com/client/v4/zones/zone-abc-123' => Http::response(cloudflareEnvelope(null, [
-                'success' => false,
-                'errors' => [['code' => 7003, 'message' => 'Could not route to /zones/zone-abc-123']],
-            ]), 404),
-        ]);
-
-        $result = $this->connector->testConnection();
-
-        expect($result->ok)->toBeFalse()
-            ->and($result->message)->toContain('Zone lookup failed');
     });
 });
 
@@ -538,8 +592,13 @@ describe('static metadata', function () {
             ->and($capabilities->supportsPriority)->toBeTrue()
             ->and($capabilities->minTtl)->toBe(60)
             ->and($capabilities->maxTtl)->toBe(86400);
+    });
 
+    it('keeps zone_id out of the credentials schema — it lives in the zone config schema', function () {
         $keys = array_map(fn ($field) => $field->key, CloudflareConnector::configSchema());
-        expect($keys)->toBe(['api_token', 'zone_id', 'adopt_existing']);
+        expect($keys)->toBe(['api_token', 'adopt_existing']);
+
+        $zoneKeys = array_map(fn ($field) => $field->key, CloudflareConnector::zoneConfigSchema());
+        expect($zoneKeys)->toBe(['zone_id']);
     });
 });

@@ -7,14 +7,14 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, Di
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { AttachProviderDialog } from '@/components/zones/attach-provider-dialog';
 import { cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
 import { router, usePage } from '@inertiajs/react';
-import { CircleAlert, CircleCheck, CircleDashed, Download, History, MoreHorizontal, Pencil, Power, RefreshCw, Trash2 } from 'lucide-react';
+import { CircleAlert, CircleCheck, CircleDashed, Globe, History, MoreHorizontal, Pencil, Plus, Power, RefreshCw, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { ImportRecordsDialog } from './import-records-dialog';
 import { providerMark, providerPayload, relativeTime } from './lib';
-import type { Provider } from './types';
+import type { Connector, Provider, ZoneOption } from './types';
 
 function HealthBadge({ provider }: { provider: Provider }) {
     if (provider.healthStatus === 'ok') {
@@ -66,19 +66,29 @@ function HealthBadge({ provider }: { provider: Provider }) {
 
 interface ProviderCardProps {
     provider: Provider;
+    connectors: Connector[];
+    allZones: ZoneOption[];
     canManage: boolean;
     onEdit: (provider: Provider) => void;
 }
 
-export function ProviderCard({ provider, canManage, onEdit }: ProviderCardProps) {
+export function ProviderCard({ provider, connectors, allZones, canManage, onEdit }: ProviderCardProps) {
     const { can } = usePage<SharedData>().props.auth;
-    const canImport = can.manageEntries;
     const [confirmingDelete, setConfirmingDelete] = useState(false);
-    const [importing, setImporting] = useState(false);
+    const [attaching, setAttaching] = useState(false);
     const [viewingActivity, setViewingActivity] = useState(false);
 
     const Mark = providerMark(provider.type);
     const lastChecked = relativeTime(provider.lastCheckedAt);
+
+    const connector = connectors.find((c) => c.type === provider.type);
+    const supportsZones = connector?.capabilities.supportsZones ?? true;
+
+    const attachedZoneIds = new Set(provider.zones.map((zone) => zone.zoneId));
+    /** Zone-supporting: candidates for attachment. Zoneless: zones the provider was opted out of. */
+    const unattachedZones = allZones.filter((zone) => !attachedZoneIds.has(zone.id));
+
+    const canAttach = canManage && supportsZones && unattachedZones.length > 0;
 
     const checkDrift = () => {
         router.post(route('providers.check', provider.id), {}, { preserveScroll: true });
@@ -130,7 +140,7 @@ export function ProviderCard({ provider, canManage, onEdit }: ProviderCardProps)
                                 <Power className="size-4" />
                                 {provider.enabled ? 'Disable' : 'Enable'}
                             </DropdownMenuItem>
-                            {can.viewActivity && (
+                            {can.viewGlobalActivity && (
                                 <DropdownMenuItem onSelect={() => setViewingActivity(true)}>
                                     <History className="size-4" />
                                     Activity
@@ -156,6 +166,7 @@ export function ProviderCard({ provider, canManage, onEdit }: ProviderCardProps)
                         Disabled
                     </Badge>
                 )}
+                <span className="text-muted-foreground ml-auto text-xs">{lastChecked ? `Checked ${lastChecked}` : 'Never checked'}</span>
             </div>
 
             {provider.managedRecordTypes.length > 0 && (
@@ -168,39 +179,74 @@ export function ProviderCard({ provider, canManage, onEdit }: ProviderCardProps)
 
             <Separator className="mt-auto" />
 
-            <div className="text-muted-foreground flex items-center justify-between gap-2 text-xs">
-                <span>
-                    {provider.recordsCount} {provider.recordsCount === 1 ? 'record' : 'records'} · {provider.syncedCount} in sync
-                </span>
-                <span>{lastChecked ? `Checked ${lastChecked}` : 'Never checked'}</span>
+            <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                    <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Zones</span>
+                    <span className="text-muted-foreground text-xs">
+                        {provider.recordsCount} {provider.recordsCount === 1 ? 'record' : 'records'} · {provider.syncedCount} in sync
+                    </span>
+                </div>
+
+                {provider.zones.length === 0 && (!supportsZones ? unattachedZones.length === 0 : true) ? (
+                    <p className="text-muted-foreground text-xs">Not attached to any zone yet.</p>
+                ) : (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        {!supportsZones && (
+                            <Badge variant="secondary" className="gap-1">
+                                <Globe className="size-3" />
+                                All zones
+                            </Badge>
+                        )}
+
+                        {provider.zones.map((zone) => (
+                            <a
+                                key={zone.zoneProviderId}
+                                href={`/zones/${zone.zoneId}`}
+                                className={cn(
+                                    'bg-muted/40 hover:border-muted-foreground/40 hover:bg-accent/50 inline-flex items-center rounded-md border px-2 py-0.5 font-mono text-xs transition-colors',
+                                    !zone.enabled && 'text-muted-foreground opacity-60',
+                                )}
+                            >
+                                {zone.zoneName}
+                            </a>
+                        ))}
+
+                        {!supportsZones &&
+                            unattachedZones.map((zone) => (
+                                <TooltipProvider key={zone.id} delayDuration={150}>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <span className="text-muted-foreground inline-flex cursor-help items-center rounded-md border border-dashed px-2 py-0.5 font-mono text-xs line-through opacity-60">
+                                                {zone.name}
+                                            </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Opted out — re-attach from the zone's page.</TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                            ))}
+                    </div>
+                )}
+
+                {canAttach && (
+                    <Button variant="ghost" size="sm" className="text-muted-foreground -ml-2 h-7" onClick={() => setAttaching(true)}>
+                        <Plus className="size-3.5" />
+                        Attach to zone
+                    </Button>
+                )}
             </div>
 
-            {(canManage || canImport) && (
-                <div className="flex gap-2">
-                    {canManage && (
-                        <>
-                            <Button variant="outline" size="sm" className="flex-1" onClick={() => onEdit(provider)}>
-                                <Pencil className="size-3.5" />
-                                Edit
-                            </Button>
-                            <Button variant="outline" size="sm" className="flex-1" onClick={checkDrift}>
-                                <RefreshCw className="size-3.5" />
-                                Check drift
-                            </Button>
-                        </>
-                    )}
-                    {canImport && (
-                        <Button variant="outline" size="sm" className="flex-1" onClick={() => setImporting(true)}>
-                            <Download className="size-3.5" />
-                            Import
-                        </Button>
-                    )}
-                </div>
+            {canAttach && (
+                <AttachProviderDialog
+                    open={attaching}
+                    onOpenChange={setAttaching}
+                    providers={[{ id: provider.id, name: provider.name, type: provider.type, enabled: provider.enabled }]}
+                    zones={unattachedZones}
+                    connectors={connectors}
+                    fixedProviderId={provider.id}
+                />
             )}
 
-            {canImport && <ImportRecordsDialog provider={provider} open={importing} onOpenChange={setImporting} />}
-
-            {can.viewActivity && (
+            {can.viewGlobalActivity && (
                 <ActivityLogDialog
                     open={viewingActivity}
                     onOpenChange={setViewingActivity}
@@ -214,7 +260,10 @@ export function ProviderCard({ provider, canManage, onEdit }: ProviderCardProps)
                 <DialogContent className="max-w-md">
                     <DialogHeader>
                         <DialogTitle>Delete {provider.name}?</DialogTitle>
-                        <DialogDescription>Records at the provider will NOT be deleted; the app just stops managing them.</DialogDescription>
+                        <DialogDescription>
+                            Records at the provider will NOT be deleted; the app just stops managing them. This detaches it from{' '}
+                            {provider.zones.length} zone{provider.zones.length === 1 ? '' : 's'}.
+                        </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
                         <DialogClose asChild>

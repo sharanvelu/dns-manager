@@ -35,15 +35,29 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $user = $request->user();
+
         return array_merge(parent::share($request), [
             'name' => config('app.name'),
             'auth' => [
-                'user' => $request->user(),
+                // Explicit shape — never serialize the raw model (oidc_sub etc.).
+                'user' => $user ? [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'avatar_url' => $user->avatar_url,
+                    'roles' => $user->roles ?? [],
+                ] : null,
                 'can' => [
-                    'manageEntries' => $request->user()?->canManageEntries() ?? false,
-                    'manageProviders' => $request->user()?->canManageProviders() ?? false,
-                    'manageUsers' => $request->user()?->isSuperAdmin() ?? false,
-                    'viewActivity' => $request->user()?->isSuperAdmin() ?? false,
+                    'createZones' => $user?->can('create-zones') ?? false,
+                    'manageProviders' => $user?->can('manage-providers') ?? false,
+                    'viewProviders' => $user?->can('view-providers') ?? false,
+                    'manageUsers' => $user?->can('manage-users') ?? false,
+                    'viewUsers' => $user?->can('view-users') ?? false,
+                    'viewGlobalActivity' => $user?->can('view-global-activity') ?? false,
+                    'hasZoneAccess' => $user
+                        ? ($user->isSuperAdmin() || $user->isSuperViewer() || $user->hasAnyZoneAccess())
+                        : false,
                 ],
             ],
             'flash' => [

@@ -95,6 +95,7 @@ class PiholeConnector extends AbstractDnsConnector
             supportsProxied: false,
             supportsTtl: false,
             supportsPriority: false,
+            supportsZones: false,
         );
     }
 
@@ -181,11 +182,11 @@ class PiholeConnector extends AbstractDnsConnector
     {
         if ($entry->type === RecordType::CNAME) {
             return $entry->ttl !== null
-                ? "{$entry->name},{$entry->content},{$entry->ttl}"
-                : "{$entry->name},{$entry->content}";
+                ? "{$entry->fqdn},{$entry->content},{$entry->ttl}"
+                : "{$entry->fqdn},{$entry->content}";
         }
 
-        return "{$entry->content} {$entry->name}";
+        return "{$entry->content} {$entry->fqdn}";
     }
 
     protected function configPathFor(string $entryString): string
@@ -218,11 +219,11 @@ class PiholeConnector extends AbstractDnsConnector
         // 400 "already exists" means the desired state is already in place —
         // adopt it, unless the provider is configured not to.
         if ($response->status() === 400 && ! $this->shouldAdoptExisting()) {
-            throw $this->failed($response, "creating {$entry->type->value} record {$entry->name} (a matching record already exists and adoption is disabled)");
+            throw $this->failed($response, "creating {$entry->type->value} record {$entry->fqdn} (a matching record already exists and adoption is disabled)");
         }
 
         if ($response->failed() && $response->status() !== 400) {
-            throw $this->failed($response, "creating {$entry->type->value} record {$entry->name}");
+            throw $this->failed($response, "creating {$entry->type->value} record {$entry->fqdn}");
         }
 
         return $value;

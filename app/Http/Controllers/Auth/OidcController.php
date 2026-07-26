@@ -62,10 +62,11 @@ class OidcController extends Controller
             $user->update($attributes);
         } else {
             // The very first user becomes Super Admin; everyone after
-            // starts read-only until a Super Admin assigns roles.
+            // starts with no access until an admin assigns roles or
+            // grants them access to a zone.
             $attributes['roles'] = User::count() === 0
                 ? [Role::SuperAdmin->value]
-                : [Role::Viewer->value];
+                : [];
 
             $user = User::create($attributes);
         }

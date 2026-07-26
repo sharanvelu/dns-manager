@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Enums\SyncStatus;
-use App\Models\DnsEntryProvider;
+use App\Models\EntrySyncState;
 use App\Models\SyncLog;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -22,26 +22,34 @@ class DeleteEntryFromProvider implements ShouldQueue
 
     public function handle(): void
     {
-        $state = DnsEntryProvider::with(['entry', 'provider'])->find($this->syncStateId);
+        $state = EntrySyncState::with(['entry.zone', 'zoneProvider.provider', 'zoneProvider.zone'])
+            ->find($this->syncStateId);
 
         if (! $state) {
             return;
         }
 
         $entry = $state->entry;
-        $provider = $state->provider;
+        $zoneProvider = $state->zoneProvider;
 
-        if ($provider && $state->external_id) {
-            $provider->connector()->deleteRecord($state->external_id);
+        if ($zoneProvider && $state->external_id) {
+            $zoneProvider->connector()->deleteRecord($state->external_id);
         }
 
         $state->delete();
 
-        SyncLog::record($provider, null, 'delete', 'success', $entry
-            ? "{$entry->type->value} {$entry->name} removed from {$provider?->name}"
-            : 'Record removed');
+        SyncLog::record(
+            $zoneProvider?->provider,
+            null,
+            'delete',
+            'success',
+            $entry && $zoneProvider
+                ? "{$entry->type->value} {$entry->fqdn} removed from {$zoneProvider->label()}"
+                : 'Record removed',
+            zoneId: $entry?->dns_zone_id,
+        );
 
-        // The local entry disappears once the last provider confirms —
+        // The local entry disappears once the last attachment confirms —
         // but only when the entry is being deleted (all states deleting).
         if ($entry && $entry->syncStates()->count() === 0 && $state->sync_status === SyncStatus::Deleting) {
             $entry->delete();
@@ -50,13 +58,13 @@ class DeleteEntryFromProvider implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
-        $state = DnsEntryProvider::with(['entry', 'provider'])->find($this->syncStateId);
+        $state = EntrySyncState::with(['entry', 'zoneProvider.provider'])->find($this->syncStateId);
 
         $state?->update([
             'sync_status' => SyncStatus::Error,
             'last_error' => $exception?->getMessage(),
         ]);
 
-        SyncLog::record($state?->provider, $state?->entry, 'delete', 'error', $exception?->getMessage());
+        SyncLog::record($state?->zoneProvider?->provider, $state?->entry, 'delete', 'error', $exception?->getMessage());
     }
 }

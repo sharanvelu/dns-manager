@@ -10,6 +10,7 @@ final readonly class ConnectorCapabilities
         public bool $supportsPriority = false,
         public ?int $minTtl = null,
         public ?int $maxTtl = null,
+        public bool $supportsZones = true,
     ) {}
 
     public function toArray(): array
@@ -20,6 +21,7 @@ final readonly class ConnectorCapabilities
             'supportsPriority' => $this->supportsPriority,
             'minTtl' => $this->minTtl,
             'maxTtl' => $this->maxTtl,
+            'supportsZones' => $this->supportsZones,
         ];
     }
 }

@@ -5,7 +5,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { Link } from '@inertiajs/react';
+import { type SharedData } from '@/types';
+import { Link, usePage } from '@inertiajs/react';
 import { ChevronRight, LoaderCircle, TriangleAlert } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -25,7 +26,7 @@ interface ActivityItem {
     event: string;
     description: string;
     causer: ActivityCauser | null;
-    subjectType: 'entry' | 'provider' | 'user' | null;
+    subjectType: 'entry' | 'provider' | 'user' | 'zone' | null;
     subjectId: number | null;
     subjectLabel: string | null;
     changes: ActivityChanges | null;
@@ -47,9 +48,11 @@ interface ActivityResponse {
 interface ActivityLogDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    subjectType: 'entry' | 'provider';
+    subjectType: 'entry' | 'provider' | 'zone';
     subjectId: number;
     subjectLabel: string;
+    /** JSON endpoint to fetch from — zone contexts pass `/zones/{id}/activity/data`. */
+    dataUrl?: string;
 }
 
 /** Tiny relative-time formatter for ISO 8601 timestamps ("3m ago", "2d ago"). */
@@ -123,7 +126,7 @@ function ChangeSummary({ changes }: { changes: ActivityChanges }) {
     );
 }
 
-export function ActivityLogDialog({ open, onOpenChange, subjectType, subjectId, subjectLabel }: ActivityLogDialogProps) {
+export function ActivityLogDialog({ open, onOpenChange, subjectType, subjectId, subjectLabel, dataUrl = '/activity/data' }: ActivityLogDialogProps) {
     const [items, setItems] = useState<ActivityItem[]>([]);
     const [meta, setMeta] = useState<ActivityMeta | null>(null);
     const [loading, setLoading] = useState(false);
@@ -141,7 +144,7 @@ export function ActivityLogDialog({ open, onOpenChange, subjectType, subjectId, 
 
             const params = new URLSearchParams({ subject_type: subjectType, subject_id: String(subjectId), page: String(page) });
 
-            fetch(`/settings/activity/data?${params}`, {
+            fetch(`${dataUrl}?${params}`, {
                 headers: { Accept: 'application/json' },
                 credentials: 'same-origin',
             })
@@ -160,7 +163,7 @@ export function ActivityLogDialog({ open, onOpenChange, subjectType, subjectId, 
                     setLoadingMore(false);
                 });
         },
-        [subjectType, subjectId],
+        [subjectType, subjectId, dataUrl],
     );
 
     useEffect(() => {
@@ -171,7 +174,10 @@ export function ActivityLogDialog({ open, onOpenChange, subjectType, subjectId, 
         fetchPage(1, false);
     }, [open, fetchPage]);
 
-    const fullLogUrl = `/settings/activity?subject_type=${subjectType}&subject_id=${subjectId}`;
+    // The full-log page is the GLOBAL trail — hide the link for users who
+    // can only see zone-scoped activity.
+    const canViewGlobalActivity = usePage<SharedData>().props.auth.can.viewGlobalActivity;
+    const fullLogUrl = `/activity?subject_type=${subjectType}&subject_id=${subjectId}`;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -252,15 +258,17 @@ export function ActivityLogDialog({ open, onOpenChange, subjectType, subjectId, 
                     )}
                 </div>
 
-                <DialogFooter className="sm:justify-start">
-                    <Link
-                        href={fullLogUrl}
-                        className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 transition-colors hover:underline"
-                        onClick={() => onOpenChange(false)}
-                    >
-                        Open full activity log
-                    </Link>
-                </DialogFooter>
+                {canViewGlobalActivity && (
+                    <DialogFooter className="sm:justify-start">
+                        <Link
+                            href={fullLogUrl}
+                            className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 transition-colors hover:underline"
+                            onClick={() => onOpenChange(false)}
+                        >
+                            Open full activity log
+                        </Link>
+                    </DialogFooter>
+                )}
             </DialogContent>
         </Dialog>
     );

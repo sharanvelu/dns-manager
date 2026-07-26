@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\RecordType;
 use App\Models\DnsEntry;
+use App\Models\DnsZone;
 use App\Support\DnsEntryRules;
 use Illuminate\Support\Facades\Validator;
 
@@ -19,13 +20,14 @@ class DnsEntryImporter
     public function __construct(private SyncService $sync) {}
 
     /**
-     * Import entries from raw CSV content. Valid rows are created and synced
-     * to all compatible enabled providers; duplicates are skipped; invalid
+     * Import entries into the given zone from raw CSV content. Names are
+     * zone-relative ('@', 'www'). Valid rows are created and synced to the
+     * zone's compatible active attachments; duplicates are skipped; invalid
      * rows are reported with their line number.
      *
      * @return array{imported: int, skipped: int, failed: list<array{line: int, message: string}>}
      */
-    public function import(string $csv): array
+    public function import(string $csv, DnsZone $zone): array
     {
         $rows = $this->parse($csv);
 
@@ -40,9 +42,11 @@ class DnsEntryImporter
                 continue;
             }
 
+            $row['name'] = $this->relativeName($row['name'], $zone);
+
             $validator = Validator::make(
                 $row,
-                DnsEntryRules::rules(RecordType::tryFrom((string) $row['type'])),
+                DnsEntryRules::rules(RecordType::tryFrom((string) $row['type']), $zone),
                 DnsEntryRules::messages(),
             );
 
@@ -55,6 +59,7 @@ class DnsEntryImporter
             $data = $validator->validated();
 
             $exists = DnsEntry::query()
+                ->where('dns_zone_id', $zone->id)
                 ->where('name', $data['name'])
                 ->where('type', $data['type'])
                 ->where('content', $data['content'])
@@ -66,7 +71,7 @@ class DnsEntryImporter
                 continue;
             }
 
-            $entry = DnsEntry::create($data);
+            $entry = DnsEntry::create([...$data, 'dns_zone_id' => $zone->id]);
             $this->sync->syncEntry($entry);
             $imported++;
         }
@@ -81,19 +86,34 @@ class DnsEntryImporter
     }
 
     /**
-     * The downloadable sample file.
+     * The downloadable sample file — names are relative to the target zone.
      */
     public static function sampleCsv(): string
     {
         return implode("\n", [
             implode(',', self::COLUMNS),
-            'app.example.com,A,192.168.1.10,,,true,Web frontend',
-            'nas.example.com,A,192.168.1.20,3600,,false,',
-            'router.example.com,AAAA,2001:db8::1,,,false,',
-            'media.example.com,CNAME,nas.example.com,300,,false,Jellyfin',
-            'example.com,MX,mail.example.com,,10,false,Primary mail',
-            '_dmarc.example.com,TXT,"v=DMARC1; p=none",,,false,',
+            'www,A,192.168.1.10,,,true,Web frontend',
+            'nas,A,192.168.1.20,3600,,false,',
+            'router,AAAA,2001:db8::1,,,false,',
+            'media,CNAME,nas.example.com,300,,false,Jellyfin',
+            '@,MX,mail.example.com,,10,false,Primary mail',
+            '_dmarc,TXT,"v=DMARC1; p=none",,,false,',
         ])."\n";
+    }
+
+    /**
+     * Normalize a CSV name to its zone-relative form — pasted FQDNs under
+     * the zone are relativized, everything else is only lowercased.
+     */
+    private function relativeName(?string $name, DnsZone $zone): ?string
+    {
+        if ($name === null) {
+            return null;
+        }
+
+        $name = strtolower(rtrim($name, '.'));
+
+        return $zone->relativize($name) ?? $name;
     }
 
     /**

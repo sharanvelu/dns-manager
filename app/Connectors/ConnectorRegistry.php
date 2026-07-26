@@ -4,6 +4,7 @@ namespace App\Connectors;
 
 use App\Connectors\Contracts\DnsConnector;
 use App\Models\Provider;
+use App\Models\ZoneProvider;
 use InvalidArgumentException;
 
 class ConnectorRegistry
@@ -17,6 +18,7 @@ class ConnectorRegistry
     protected array $connectors = [
         CloudflareConnector::class,
         PiholeConnector::class,
+        TechnitiumConnector::class,
     ];
 
     /** @var array<string, class-string<DnsConnector>> */
@@ -29,17 +31,21 @@ class ConnectorRegistry
             ->all();
     }
 
-    public function for(Provider $provider): DnsConnector
+    public function for(Provider|ZoneProvider $subject): DnsConnector
     {
-        return $this->make($provider->type->value, $provider);
+        if ($subject instanceof ZoneProvider) {
+            return $this->make($subject->provider->type->value, $subject->provider, $subject);
+        }
+
+        return $this->make($subject->type->value, $subject);
     }
 
-    public function make(string $type, Provider $provider): DnsConnector
+    public function make(string $type, Provider $provider, ?ZoneProvider $zoneProvider = null): DnsConnector
     {
         $class = $this->byType[$type]
             ?? throw new InvalidArgumentException("Unknown DNS connector type [{$type}].");
 
-        return new $class($provider);
+        return new $class($provider, $zoneProvider);
     }
 
     /** @return class-string<DnsConnector> */
@@ -61,6 +67,7 @@ class ConnectorRegistry
                 'displayName' => $class::displayName(),
                 'supportedRecordTypes' => $class::supportedRecordTypes(),
                 'configSchema' => array_map(fn ($f) => $f->toArray(), $class::configSchema()),
+                'zoneConfigSchema' => array_map(fn ($f) => $f->toArray(), $class::zoneConfigSchema()),
                 'capabilities' => $class::capabilities()->toArray(),
             ])
             ->values()

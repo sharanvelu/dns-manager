@@ -5,8 +5,9 @@ namespace App\Http\Controllers;
 use App\Enums\RecordType;
 use App\Enums\SyncStatus;
 use App\Models\DnsEntry;
-use App\Models\Provider;
+use App\Models\DnsZone;
 use App\Models\SyncLog;
+use App\Models\ZoneProvider;
 use App\Support\DnsEntryRules;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -18,38 +19,46 @@ use Throwable;
 class ProviderImportController extends Controller
 {
     /**
-     * Live listing of the provider's remote records, annotated with how each
-     * relates to the local database, for the import-selection dialog.
+     * Live listing of a zone attachment's remote records, annotated with how
+     * each relates to the local database, for the import-selection dialog.
+     * Remote names are relativized to the zone; records outside it are
+     * excluded and counted.
      */
-    public function records(Provider $provider): JsonResponse
+    public function records(DnsZone $zone, ZoneProvider $zoneProvider): JsonResponse
     {
         try {
-            $remote = $provider->connector()->listRecords();
+            $remote = $zoneProvider->connector()->listRecords();
         } catch (Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 502);
         }
 
-        $managedTypes = $provider->managed_record_types ?? [];
+        $managedTypes = $zoneProvider->provider->managed_record_types ?? [];
 
         [$records, $unmanaged] = $remote->partition(
             fn ($record) => in_array($record->type, $managedTypes, true),
         );
 
+        [$records, $outOfZone] = $records
+            ->map(fn ($record) => ['record' => $record, 'name' => $zone->relativize($record->name)])
+            ->partition(fn ($item) => $item['name'] !== null);
+
         $entries = DnsEntry::query()
-            ->whereIn('name', $records->pluck('name')->map(fn ($name) => strtolower(rtrim($name, '.')))->unique())
+            ->where('dns_zone_id', $zone->id)
+            ->whereIn('name', $records->pluck('name')->unique())
             ->get()
             ->keyBy(fn (DnsEntry $entry) => $this->keyFor($entry->name, $entry->type->value, $entry->content));
 
-        $linkedEntryIds = $provider->syncStates()->pluck('dns_entry_id')->flip();
+        $linkedEntryIds = $zoneProvider->syncStates()->pluck('dns_entry_id')->flip();
 
         return response()->json([
-            'records' => $records->map(function ($record) use ($entries, $linkedEntryIds) {
-                $entry = $entries->get($this->keyFor($record->name, $record->type, $record->content));
+            'records' => $records->map(function ($item) use ($entries, $linkedEntryIds) {
+                $record = $item['record'];
+                $entry = $entries->get($this->keyFor($item['name'], $record->type, $record->content));
 
                 return [
                     'externalId' => $record->externalId,
                     'type' => $record->type,
-                    'name' => strtolower(rtrim($record->name, '.')),
+                    'name' => $item['name'],
                     'content' => $record->content,
                     'ttl' => $record->ttl,
                     'priority' => $record->priority,
@@ -62,15 +71,17 @@ class ProviderImportController extends Controller
                 ];
             })->values(),
             'unmanagedTypeCount' => $unmanaged->count(),
+            'outOfZoneCount' => $outOfZone->count(),
         ]);
     }
 
     /**
-     * Import the selected remote records: insert missing entries, update
-     * matching ones, and link them to this provider as already-synced —
-     * never duplicating and never pushing to other providers.
+     * Import the selected remote records into the zone: insert missing
+     * entries, update matching ones, and link them to this attachment as
+     * already-synced — never duplicating and never pushing to other
+     * providers.
      */
-    public function store(Request $request, Provider $provider): RedirectResponse
+    public function store(Request $request, DnsZone $zone, ZoneProvider $zoneProvider): RedirectResponse
     {
         $validated = $request->validate([
             'records' => ['required', 'array', 'min:1', 'max:1000'],
@@ -88,7 +99,8 @@ class ProviderImportController extends Controller
         $failed = 0;
 
         foreach ($validated['records'] as $record) {
-            $record['name'] = strtolower(rtrim($record['name'], '.'));
+            $name = strtolower(rtrim($record['name'], '.'));
+            $record['name'] = $zone->relativize($name) ?? $name;
 
             $data = [
                 'name' => $record['name'],
@@ -99,13 +111,14 @@ class ProviderImportController extends Controller
                 'proxied' => (bool) ($record['proxied'] ?? false),
             ];
 
-            if (Validator::make($data, DnsEntryRules::rules(RecordType::from($record['type'])))->fails()) {
+            if (Validator::make($data, DnsEntryRules::rules(RecordType::from($record['type']), $zone))->fails()) {
                 $failed++;
 
                 continue;
             }
 
             $entry = DnsEntry::query()
+                ->where('dns_zone_id', $zone->id)
                 ->where('name', $data['name'])
                 ->where('type', $data['type'])
                 ->where('content', $data['content'])
@@ -115,14 +128,14 @@ class ProviderImportController extends Controller
                 $entry->update(['ttl' => $data['ttl'], 'priority' => $data['priority'], 'proxied' => $data['proxied']]);
                 $updated++;
             } else {
-                $entry = DnsEntry::create($data);
+                $entry = DnsEntry::create([...$data, 'dns_zone_id' => $zone->id]);
                 $imported++;
             }
 
-            // Link to the source provider only — the record already exists
+            // Link to the source attachment only — the record already exists
             // there, so no push job is needed and no other provider gains it.
             $entry->syncStates()->updateOrCreate(
-                ['provider_id' => $provider->id],
+                ['zone_provider_id' => $zoneProvider->id],
                 [
                     'external_id' => $record['externalId'],
                     'sync_status' => SyncStatus::Synced,
@@ -132,23 +145,24 @@ class ProviderImportController extends Controller
             );
         }
 
-        SyncLog::record($provider, null, 'import', $failed > 0 ? 'error' : 'success', sprintf(
-            'Imported %d new and updated %d existing entr%s from %s%s.',
+        $message = sprintf(
+            'Imported %d new and updated %d existing entr%s from %s',
             $imported,
             $updated,
             $imported + $updated === 1 ? 'y' : 'ies',
-            $provider->name,
-            $failed > 0 ? " ({$failed} skipped as invalid)" : '',
-        ));
+            $zoneProvider->provider->name,
+        );
 
-        return back()->with('success', sprintf(
-            'Imported %d new and updated %d existing entr%s from %s%s.',
-            $imported,
-            $updated,
-            $imported + $updated === 1 ? 'y' : 'ies',
-            $provider->name,
-            $failed > 0 ? " — {$failed} skipped as invalid" : '',
-        ));
+        SyncLog::record(
+            $zoneProvider->provider,
+            null,
+            'import',
+            $failed > 0 ? 'error' : 'success',
+            $message.($failed > 0 ? " ({$failed} skipped as invalid)" : '').'.',
+            $zone->id,
+        );
+
+        return back()->with('success', $message.($failed > 0 ? " — {$failed} skipped as invalid" : '').'.');
     }
 
     private function keyFor(string $name, string $type, string $content): string

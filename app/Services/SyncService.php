@@ -6,48 +6,56 @@ use App\Enums\SyncStatus;
 use App\Jobs\DeleteEntryFromProvider;
 use App\Jobs\SyncEntryToProvider;
 use App\Models\DnsEntry;
-use App\Models\Provider;
+use App\Models\EntrySyncState;
+use App\Models\ZoneProvider;
 
 class SyncService
 {
     /**
-     * Push an entry to its selected providers.
+     * Push an entry to its zone's provider attachments.
      *
-     * $providerIds is the explicit selection from the entry form. When null
-     * (manual re-sync, API create without a selection) the entry's existing
-     * provider assignment is reused — or, for a brand-new entry with no
-     * assignment yet, every compatible enabled provider (the default).
-     * Providers that used to hold the entry but no longer apply (type change,
-     * deselection, provider reconfiguration) get a remote delete.
+     * $zoneProviderIds is the explicit attachment selection from the entry
+     * form. When null (manual re-sync, API create without a selection) the
+     * entry's existing attachment assignment is reused — or, for a brand-new
+     * entry with no assignment yet, every compatible active attachment of
+     * its zone (the default). A manual re-sync of an existing entry that is
+     * deliberately assigned nowhere stays a no-op. Attachments that used to
+     * hold the entry but no longer apply (type change, deselection,
+     * reconfiguration) get a remote delete.
      */
-    public function syncEntry(DnsEntry $entry, ?array $providerIds = null): void
+    public function syncEntry(DnsEntry $entry, ?array $zoneProviderIds = null): void
     {
-        $targets = Provider::query()
-            ->where('enabled', true)
-            ->get()
-            ->filter(fn (Provider $provider) => $provider->managesType($entry->type->value));
+        $entry->loadMissing('zone');
 
-        if ($providerIds === null) {
+        $candidates = $entry->zone->zoneProviders()
+            ->with(['provider', 'zone'])
+            ->get()
+            ->filter(fn (ZoneProvider $attachment) => $attachment->managesType($entry->type->value));
+
+        if ($zoneProviderIds === null) {
             $assigned = $entry->syncStates()
                 ->where('sync_status', '!=', SyncStatus::Deleting)
-                ->pluck('provider_id');
+                ->pluck('zone_provider_id');
 
-            if ($assigned->isNotEmpty()) {
-                $targets = $targets->whereIn('id', $assigned);
-            }
+            $targets = match (true) {
+                $assigned->isNotEmpty() => $candidates->whereIn('id', $assigned),
+                $entry->wasRecentlyCreated => $candidates,
+                default => $candidates->whereIn('id', []),
+            };
         } else {
-            $targets = $targets->whereIn('id', $providerIds);
+            $targets = $candidates->whereIn('id', $zoneProviderIds);
         }
 
-        // Remove from providers that no longer apply. States belonging to
-        // disabled providers are left untouched ("paused"), so temporarily
-        // disabling a provider never deletes its remote records.
+        // Remove from attachments that no longer apply. States belonging to
+        // inactive attachments (attachment or provider disabled) are left
+        // untouched ("paused"), so temporarily disabling never deletes the
+        // remote records.
         $entry->syncStates()
-            ->whereNotIn('provider_id', $targets->pluck('id'))
-            ->with('provider')
+            ->whereNotIn('zone_provider_id', $targets->pluck('id'))
+            ->with('zoneProvider.provider')
             ->get()
-            ->each(function ($state) {
-                if ($state->provider && ! $state->provider->enabled) {
+            ->each(function (EntrySyncState $state) {
+                if ($state->zoneProvider && ! $state->zoneProvider->isActive()) {
                     return;
                 }
 
@@ -59,25 +67,31 @@ class SyncService
                 }
             });
 
-        foreach ($targets as $provider) {
+        foreach ($targets as $attachment) {
             $entry->syncStates()->updateOrCreate(
-                ['provider_id' => $provider->id],
+                ['zone_provider_id' => $attachment->id],
                 ['sync_status' => SyncStatus::Pending, 'last_error' => null],
             );
 
-            SyncEntryToProvider::dispatch($entry->id, $provider->id);
+            SyncEntryToProvider::dispatch($entry->id, $attachment->id);
         }
     }
 
     /**
      * Delete an entry everywhere. Remote deletions happen in queued jobs;
-     * the local row disappears once every provider has confirmed.
+     * the local row disappears once every attachment has confirmed. Records
+     * held by inactive attachments (attachment or provider disabled) are
+     * left in place — the paused invariant: deletes are never queued
+     * against a disabled provider, whose connector may be unreachable.
      */
     public function deleteEntry(DnsEntry $entry): void
     {
-        $states = $entry->syncStates()->get();
+        $states = $entry->syncStates()->with('zoneProvider.provider')->get();
 
-        $pendingRemote = $states->filter(fn ($state) => $state->external_id !== null);
+        $pendingRemote = $states->filter(
+            fn (EntrySyncState $state) => $state->external_id !== null
+                && $state->zoneProvider?->isActive(),
+        );
 
         $states->diff($pendingRemote)->each->delete();
 
