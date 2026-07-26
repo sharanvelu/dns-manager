@@ -30,6 +30,7 @@ npm run build             # Vite production build
 php artisan migrate       # run migrations (Postgres in dev/prod)
 php artisan dns:check-drift [--provider=ID]   # queue drift checks (what the schedule runs)
 php artisan dns:check-provider-health [--provider=ID]  # queue provider connectivity health checks
+php artisan dns:flush-activities [--days=N] [--force]  # wipe the audit trail (manual only, never scheduled)
 docker build -t dns-manager:dev .   # production image (web+worker+scheduler roles)
 ```
 

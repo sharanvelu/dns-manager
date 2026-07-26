@@ -62,3 +62,15 @@ Every record type offers an **Activity** item that opens a dialog with its histo
 ## Retention
 
 Activities are kept for **365 days** by default (`clean_after_days` in `config/activitylog.php`). Pruning is not automatic — run `php artisan activitylog:clean` (for example from a cron job) to delete records older than the retention window. Setting `ACTIVITYLOG_ENABLED=false` disables audit logging entirely.
+
+## Flushing the log
+
+To wipe the audit trail on demand, run the app's flush command (it is never scheduled — flushing is always an explicit decision):
+
+```sh
+php artisan dns:flush-activities            # everything, asks for confirmation
+php artisan dns:flush-activities --days=90  # only records older than 90 days
+php artisan dns:flush-activities --force    # skip the confirmation prompt
+```
+
+The command reports how many records it deleted. This permanently erases audit history — who changed what is unrecoverable afterwards — and does not touch the [dashboard's sync activity feed](dashboard#recent-activity), which is a separate log of background jobs.

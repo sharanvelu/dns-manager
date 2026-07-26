@@ -54,18 +54,7 @@ class SyncService
             ->whereNotIn('zone_provider_id', $targets->pluck('id'))
             ->with('zoneProvider.provider')
             ->get()
-            ->each(function (EntrySyncState $state) {
-                if ($state->zoneProvider && ! $state->zoneProvider->isActive()) {
-                    return;
-                }
-
-                if ($state->external_id) {
-                    $state->update(['sync_status' => SyncStatus::Deleting]);
-                    DeleteEntryFromProvider::dispatch($state->id);
-                } else {
-                    $state->delete();
-                }
-            });
+            ->each(fn (EntrySyncState $state) => $this->removeState($state));
 
         foreach ($targets as $attachment) {
             $entry->syncStates()->updateOrCreate(
@@ -74,6 +63,64 @@ class SyncService
             );
 
             SyncEntryToProvider::dispatch($entry->id, $attachment->id);
+        }
+    }
+
+    /**
+     * Add attachments to an entry's assignment without touching the rest of
+     * it. Only attachments of the entry's own zone that manage its record
+     * type apply; already-assigned ones are simply re-pushed.
+     */
+    public function attachEntry(DnsEntry $entry, array $zoneProviderIds): void
+    {
+        $entry->loadMissing('zone');
+
+        $targets = $entry->zone->zoneProviders()
+            ->with(['provider', 'zone'])
+            ->whereIn('id', $zoneProviderIds)
+            ->get()
+            ->filter(fn (ZoneProvider $attachment) => $attachment->managesType($entry->type->value));
+
+        foreach ($targets as $attachment) {
+            $entry->syncStates()->updateOrCreate(
+                ['zone_provider_id' => $attachment->id],
+                ['sync_status' => SyncStatus::Pending, 'last_error' => null],
+            );
+
+            SyncEntryToProvider::dispatch($entry->id, $attachment->id);
+        }
+    }
+
+    /**
+     * Remove specific attachments from an entry's assignment, leaving every
+     * other assignment untouched (no re-push, unlike a replace). Paused
+     * attachments keep their records AND their assignment — the paused
+     * invariant: deletes are never queued against a disabled provider.
+     */
+    public function detachEntry(DnsEntry $entry, array $zoneProviderIds): void
+    {
+        $entry->syncStates()
+            ->whereIn('zone_provider_id', $zoneProviderIds)
+            ->with('zoneProvider.provider')
+            ->get()
+            ->each(fn (EntrySyncState $state) => $this->removeState($state));
+    }
+
+    /**
+     * Unassign one attachment: queue a remote delete when a record exists
+     * there, drop the bare state otherwise — and never touch paused ones.
+     */
+    private function removeState(EntrySyncState $state): void
+    {
+        if ($state->zoneProvider && ! $state->zoneProvider->isActive()) {
+            return;
+        }
+
+        if ($state->external_id) {
+            $state->update(['sync_status' => SyncStatus::Deleting]);
+            DeleteEntryFromProvider::dispatch($state->id);
+        } else {
+            $state->delete();
         }
     }
 

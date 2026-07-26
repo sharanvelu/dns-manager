@@ -118,6 +118,110 @@ test('bulk provider selection silently drops attachments from other zones per en
     Queue::assertNotPushed(DeleteEntryFromProvider::class);
 });
 
+test('bulk attach adds providers without touching existing assignments', function () {
+    $pihole = piholeAttachment($this->zone);
+
+    $entry = bulkEntry($this->cfAttachment, ['name' => 'keepme']);
+
+    $this->post('/entries/bulk/providers', ['ids' => [$entry->id], 'zone_providers' => [$pihole->id], 'mode' => 'attach'])
+        ->assertRedirect()
+        ->assertSessionHas('success', fn ($message) => str_contains($message, 'Attaching'));
+
+    // Cloudflare stays exactly as it was — no re-push, no delete.
+    expect($entry->syncStates()->where('zone_provider_id', $this->cfAttachment->id)->sole()->sync_status)->toBe(SyncStatus::Synced)
+        ->and($entry->syncStates()->where('zone_provider_id', $pihole->id)->sole()->sync_status)->toBe(SyncStatus::Pending);
+
+    Queue::assertNotPushed(DeleteEntryFromProvider::class);
+    Queue::assertPushed(SyncEntryToProvider::class, 1);
+    Queue::assertPushed(SyncEntryToProvider::class, fn ($job) => $job->zoneProviderId === $pihole->id);
+});
+
+test('bulk attach skips attachments that do not manage the entry type', function () {
+    $pihole = piholeAttachment($this->zone);
+
+    $mx = bulkEntry($this->cfAttachment, ['name' => 'mail', 'type' => 'MX', 'content' => 'mx.example.com', 'priority' => 10]);
+
+    $this->post('/entries/bulk/providers', ['ids' => [$mx->id], 'zone_providers' => [$pihole->id], 'mode' => 'attach'])
+        ->assertRedirect();
+
+    expect($mx->syncStates()->pluck('zone_provider_id')->all())->toBe([$this->cfAttachment->id]);
+    Queue::assertNotPushed(SyncEntryToProvider::class);
+});
+
+test('bulk detach removes only the selected providers and re-pushes nothing', function () {
+    $pihole = piholeAttachment($this->zone);
+
+    $entry = bulkEntry($this->cfAttachment, ['name' => 'trim']);
+    $entry->syncStates()->create([
+        'zone_provider_id' => $pihole->id,
+        'sync_status' => SyncStatus::Synced,
+        'external_id' => "pi-{$entry->id}",
+    ]);
+
+    $this->post('/entries/bulk/providers', ['ids' => [$entry->id], 'zone_providers' => [$pihole->id], 'mode' => 'detach'])
+        ->assertRedirect()
+        ->assertSessionHas('success', fn ($message) => str_contains($message, 'Detaching'));
+
+    expect($entry->syncStates()->where('zone_provider_id', $pihole->id)->sole()->sync_status)->toBe(SyncStatus::Deleting)
+        ->and($entry->syncStates()->where('zone_provider_id', $this->cfAttachment->id)->sole()->sync_status)->toBe(SyncStatus::Synced);
+
+    Queue::assertPushed(DeleteEntryFromProvider::class, 1);
+    Queue::assertNotPushed(SyncEntryToProvider::class);
+});
+
+test('bulk detach drops never-pushed assignments immediately', function () {
+    $pihole = piholeAttachment($this->zone);
+
+    $entry = bulkEntry($this->cfAttachment, ['name' => 'local']);
+    $entry->syncStates()->create([
+        'zone_provider_id' => $pihole->id,
+        'sync_status' => SyncStatus::Pending,
+        'external_id' => null,
+    ]);
+
+    $this->post('/entries/bulk/providers', ['ids' => [$entry->id], 'zone_providers' => [$pihole->id], 'mode' => 'detach'])
+        ->assertRedirect();
+
+    expect($entry->syncStates()->where('zone_provider_id', $pihole->id)->exists())->toBeFalse();
+    Queue::assertNotPushed(DeleteEntryFromProvider::class);
+});
+
+test('bulk detach leaves paused attachments untouched', function () {
+    $pihole = piholeAttachment($this->zone);
+    $pihole->update(['enabled' => false]);
+
+    $entry = bulkEntry($this->cfAttachment, ['name' => 'paused']);
+    $entry->syncStates()->create([
+        'zone_provider_id' => $pihole->id,
+        'sync_status' => SyncStatus::Synced,
+        'external_id' => "pi-{$entry->id}",
+    ]);
+
+    $this->post('/entries/bulk/providers', ['ids' => [$entry->id], 'zone_providers' => [$pihole->id], 'mode' => 'detach'])
+        ->assertRedirect();
+
+    expect($entry->syncStates()->where('zone_provider_id', $pihole->id)->sole()->sync_status)->toBe(SyncStatus::Synced);
+    Queue::assertNotPushed(DeleteEntryFromProvider::class);
+});
+
+test('bulk attach and detach require at least one provider', function () {
+    $entry = bulkEntry($this->cfAttachment, ['name' => 'noop']);
+
+    foreach (['attach', 'detach'] as $mode) {
+        $this->post('/entries/bulk/providers', ['ids' => [$entry->id], 'zone_providers' => [], 'mode' => $mode])
+            ->assertSessionHasErrors('zone_providers');
+    }
+
+    expect($entry->syncStates()->sole()->sync_status)->toBe(SyncStatus::Synced);
+});
+
+test('bulk providers rejects an unknown mode', function () {
+    $entry = bulkEntry($this->cfAttachment, ['name' => 'nope']);
+
+    $this->post('/entries/bulk/providers', ['ids' => [$entry->id], 'zone_providers' => [], 'mode' => 'merge'])
+        ->assertSessionHasErrors('mode');
+});
+
 test('bulk edit applies the ticked fields to every entry and re-syncs', function () {
     $first = bulkEntry($this->cfAttachment, ['name' => 'a', 'ttl' => null]);
     $second = bulkEntry($this->cfAttachment, ['name' => 'b', 'content' => '10.0.0.2', 'ttl' => 120]);
