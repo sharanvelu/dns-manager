@@ -38,18 +38,28 @@ class DnsEntryBulkController extends Controller
     }
 
     /**
-     * Replace the provider targeting of each selected entry with the given
-     * zone attachments. Ids belonging to a different zone are silently
-     * dropped per entry (mirroring the missing-ids policy); attachments that
-     * do not manage an entry's record type are skipped by the sync engine;
-     * deselected attachments get remote deletes.
+     * Change the provider targeting of each selected entry. Three modes:
+     * `replace` (default) makes the given zone attachments the entire
+     * assignment — deselected attachments get remote deletes; `attach` adds
+     * them to each entry's assignment, leaving the rest untouched; `detach`
+     * removes exactly them, leaving the rest untouched. Ids belonging to a
+     * different zone are silently dropped per entry (mirroring the
+     * missing-ids policy); attachments that do not manage an entry's record
+     * type are skipped by the sync engine; paused attachments always keep
+     * their records.
      */
     public function providers(Request $request): RedirectResponse
     {
-        $zoneProviderIds = $request->validate([
-            'zone_providers' => ['present', 'array'],
+        $validated = $request->validate([
+            'mode' => ['sometimes', Rule::in(['replace', 'attach', 'detach'])],
+            // Attaching or detaching nothing is a no-op the UI should never
+            // send; only a replace may be empty (= make local-only).
+            'zone_providers' => ['present', 'array', ...in_array($request->input('mode'), ['attach', 'detach'], true) ? ['min:1'] : []],
             'zone_providers.*' => ['integer', 'exists:zone_providers,id'],
-        ])['zone_providers'];
+        ]);
+
+        $mode = $validated['mode'] ?? 'replace';
+        $zoneProviderIds = $validated['zone_providers'];
 
         $entries = $this->selectedEntries($request);
 
@@ -59,10 +69,14 @@ class DnsEntryBulkController extends Controller
             ->groupBy('dns_zone_id')
             ->map(fn ($group) => $group->pluck('id')->all());
 
-        $entries->each(function (DnsEntry $entry) use ($zoneProviderIds, $attachmentsByZone) {
-            $ownIds = $attachmentsByZone->get($entry->dns_zone_id, []);
+        $entries->each(function (DnsEntry $entry) use ($mode, $zoneProviderIds, $attachmentsByZone) {
+            $ownIds = array_values(array_intersect($zoneProviderIds, $attachmentsByZone->get($entry->dns_zone_id, [])));
 
-            $this->sync->syncEntry($entry, array_values(array_intersect($zoneProviderIds, $ownIds)));
+            match ($mode) {
+                'attach' => $this->sync->attachEntry($entry, $ownIds),
+                'detach' => $this->sync->detachEntry($entry, $ownIds),
+                default => $this->sync->syncEntry($entry, $ownIds),
+            };
 
             $assigned = $entry->syncStates()
                 ->where('sync_status', '!=', SyncStatus::Deleting)
@@ -81,7 +95,11 @@ class DnsEntryBulkController extends Controller
         });
 
         return back()->with('success', sprintf(
-            'Retargeting %d %s — records sync to the selected providers and are removed from deselected ones.',
+            match ($mode) {
+                'attach' => 'Attaching %d %s to the selected providers — records are being pushed.',
+                'detach' => 'Detaching %d %s from the selected providers — their records are being removed.',
+                default => 'Retargeting %d %s — records sync to the selected providers and are removed from deselected ones.',
+            },
             $entries->count(),
             Str::plural('entry', $entries->count()),
         ));

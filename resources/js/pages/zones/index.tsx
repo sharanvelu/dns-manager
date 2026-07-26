@@ -5,6 +5,7 @@ import {
     ProviderCloudflareMark,
     ProviderGenericMark,
     ProviderPiholeMark,
+    ProviderTechnitiumMark,
     StatusDriftedIcon,
     StatusErrorIcon,
     StatusSyncedIcon,
@@ -34,6 +35,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 const providerMarks: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
     cloudflare: ProviderCloudflareMark,
     pihole: ProviderPiholeMark,
+    technitium: ProviderTechnitiumMark,
 };
 
 function StatusRollup({ zone }: { zone: ZoneListItem }) {
