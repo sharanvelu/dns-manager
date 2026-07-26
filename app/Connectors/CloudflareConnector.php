@@ -49,17 +49,25 @@ class CloudflareConnector extends AbstractDnsConnector
                 help: 'API token with Zone.DNS Edit and Zone Read permissions.',
             ),
             new ConfigField(
-                key: 'zone_id',
-                label: 'Zone ID',
-                help: 'Found on the zone Overview page in the Cloudflare dashboard.',
-            ),
-            new ConfigField(
                 key: 'adopt_existing',
                 label: 'Adopt existing records',
                 type: 'boolean',
                 required: false,
                 help: 'When a record you create already exists at Cloudflare, adopt and manage it (aligning TTL/proxy to your entry) instead of failing.',
                 default: true,
+            ),
+        ];
+    }
+
+    public static function zoneConfigSchema(): array
+    {
+        return [
+            new ConfigField(
+                key: 'zone_id',
+                label: 'Zone ID',
+                type: 'text',
+                required: true,
+                help: 'Auto-discovered from the zone name; override if needed.',
             ),
         ];
     }
@@ -78,23 +86,77 @@ class CloudflareConnector extends AbstractDnsConnector
     public function testConnection(): TestResult
     {
         try {
-            // A zone lookup validates both the token and the zone ID in one
-            // call. Deliberately NOT /user/tokens/verify: that endpoint
-            // rejects account-owned tokens even when they are fully valid
-            // for zone operations.
+            // Listing zones validates the token without needing any zone
+            // context — it works for account-owned AND zone-scoped tokens.
+            // Deliberately NOT /user/tokens/verify: that endpoint rejects
+            // account-owned tokens even when they are fully valid for zone
+            // operations.
+            $response = $this->http()->get('/zones', ['per_page' => 1]);
+
+            if (! $response->successful() || $response->json('success') !== true) {
+                return TestResult::failure('Token check failed: '.$this->errorMessageFrom($response));
+            }
+
+            $zoneCount = $response->json('result_info.total_count');
+
+            if (is_int($zoneCount)) {
+                return TestResult::success(
+                    sprintf('API token is valid — %d zone%s accessible.', $zoneCount, $zoneCount === 1 ? '' : 's'),
+                    ['zones' => $zoneCount],
+                );
+            }
+
+            return TestResult::success('API token is valid.');
+        } catch (ConnectionException $e) {
+            return TestResult::failure('Could not reach Cloudflare: '.$e->getMessage());
+        }
+    }
+
+    public function testZone(): TestResult
+    {
+        $this->requireZoneContext();
+
+        try {
             $zone = $this->http()->get('/zones/'.$this->config('zone_id'));
 
             if (! $zone->successful() || $zone->json('success') !== true) {
                 return TestResult::failure('Zone lookup failed: '.$this->errorMessageFrom($zone));
             }
 
-            return TestResult::success('Connected to zone '.$zone->json('result.name'), [
-                'zone' => $zone->json('result.name'),
+            $remoteName = (string) $zone->json('result.name');
+            $localName = $this->zone()->name;
+
+            if (strcasecmp($remoteName, $localName) !== 0) {
+                return TestResult::failure("Zone ID belongs to {$remoteName} — expected {$localName}");
+            }
+
+            return TestResult::success('Connected to zone '.$remoteName, [
+                'zone' => $remoteName,
                 'status' => $zone->json('result.status'),
             ]);
         } catch (ConnectionException $e) {
             return TestResult::failure('Could not reach Cloudflare: '.$e->getMessage());
         }
+    }
+
+    public function discoverZoneConfig(string $zoneName): ?array
+    {
+        try {
+            $response = $this->http()->get('/zones', [
+                'name' => $zoneName,
+                'per_page' => 1,
+            ]);
+        } catch (ConnectionException) {
+            return null;
+        }
+
+        if (! $response->successful() || $response->json('success') !== true) {
+            return null;
+        }
+
+        $zoneId = $response->json('result.0.id');
+
+        return $zoneId !== null ? ['zone_id' => (string) $zoneId] : null;
     }
 
     public function listRecords(): Collection
@@ -210,8 +272,14 @@ class CloudflareConnector extends AbstractDnsConnector
             }, throw: false);
     }
 
+    /**
+     * Every record operation goes through here — zone_id lives in the
+     * attachment config, so zone-less use must fail loudly.
+     */
     protected function recordsPath(): string
     {
+        $this->requireZoneContext();
+
         return '/zones/'.$this->config('zone_id').'/dns_records';
     }
 
@@ -237,7 +305,7 @@ class CloudflareConnector extends AbstractDnsConnector
     {
         $response = $this->http()->get($this->recordsPath(), [
             'type' => $entry->type->value,
-            'name' => $entry->name,
+            'name' => $entry->fqdn,
             'per_page' => 100,
         ]);
 
@@ -265,7 +333,7 @@ class CloudflareConnector extends AbstractDnsConnector
 
         $payload = [
             'type' => $type,
-            'name' => $entry->name,
+            'name' => $entry->fqdn,
             'content' => $entry->content,
             // Cloudflare uses ttl 1 for "auto"; proxied records always use it.
             'ttl' => $entry->proxied ? 1 : ($entry->ttl ?? 1),

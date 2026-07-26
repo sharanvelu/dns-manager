@@ -5,27 +5,24 @@ namespace App\Enums;
 enum Role: string
 {
     case SuperAdmin = 'super-admin';
-    case DnsManager = 'dns-manager';
-    case ProvidersManager = 'providers-manager';
-    case Viewer = 'viewer';
+    case SuperViewer = 'super-viewer';
+    case UserAdmin = 'user-admin';
 
     public function label(): string
     {
         return match ($this) {
             self::SuperAdmin => 'Super Admin',
-            self::DnsManager => 'DNS Manager',
-            self::ProvidersManager => 'Providers Manager',
-            self::Viewer => 'Viewer',
+            self::SuperViewer => 'Super Viewer',
+            self::UserAdmin => 'User Admin',
         };
     }
 
     public function description(): string
     {
         return match ($this) {
-            self::SuperAdmin => 'Full access, including user and role management.',
-            self::DnsManager => 'Create, edit, sync, import, and delete DNS entries.',
-            self::ProvidersManager => 'Configure, test, and manage providers.',
-            self::Viewer => 'Read-only access to the dashboard, entries, and providers.',
+            self::SuperAdmin => 'Full access to everything, including all zones and user management.',
+            self::SuperViewer => 'Read-only access to everything — zones, records, providers, users, and activity.',
+            self::UserAdmin => 'Manage users, their global roles, and zone access — nothing else.',
         };
     }
 

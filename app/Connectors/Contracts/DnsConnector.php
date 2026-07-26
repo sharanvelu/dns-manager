@@ -38,12 +38,34 @@ interface DnsConnector
      */
     public static function configSchema(): array;
 
+    /**
+     * Declarative description of the per-zone settings this connector
+     * needs when a provider is attached to a DNS zone. Zoneless
+     * connectors (Pi-hole, ...) return an empty list.
+     *
+     * @return list<ConfigField>
+     */
+    public static function zoneConfigSchema(): array;
+
     public static function capabilities(): ConnectorCapabilities;
 
     /**
      * Verify the stored config by talking to the real provider.
      */
     public function testConnection(): TestResult;
+
+    /**
+     * Validate the zone attachment against the real provider — requires
+     * the connector to have been built with a ZoneProvider context.
+     */
+    public function testZone(): TestResult;
+
+    /**
+     * Auto-fill the per-zone config by looking up $zoneName at the remote
+     * API. Returns null when the zone cannot be found or the connector
+     * does not support discovery.
+     */
+    public function discoverZoneConfig(string $zoneName): ?array;
 
     /**
      * All records currently present at the provider (only types the

@@ -5,9 +5,12 @@ namespace App\Http\Controllers;
 use App\Connectors\ConnectorRegistry;
 use App\Http\Requests\DnsEntryRequest;
 use App\Models\DnsEntry;
-use App\Models\Provider;
+use App\Models\DnsZone;
 use App\Services\DnsEntryImporter;
 use App\Services\SyncService;
+use App\Support\EntryPresenter;
+use App\Support\EntryQuery;
+use App\Support\ZonePermissions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -18,96 +21,52 @@ class DnsEntryController extends Controller
 {
     public function __construct(private SyncService $sync) {}
 
-    /** Sortable columns: request key => database column. */
-    private const SORTABLE = [
-        'name' => 'name',
-        'type' => 'type',
-        'content' => 'content',
-        'ttl' => 'ttl',
-        'updated' => 'updated_at',
-    ];
-
     public function index(Request $request, ConnectorRegistry $registry): Response
     {
-        $filters = $request->only(['search', 'type', 'provider', 'status']);
+        ['entries' => $entries, 'filters' => $filters] = EntryQuery::build($request);
 
-        // Datatables-style server-side sorting: unknown values fall back to
-        // the defaults instead of erroring.
-        $sort = (string) $request->query('sort', 'name');
-        $sort = array_key_exists($sort, self::SORTABLE) ? $sort : 'name';
-        $direction = $request->query('direction') === 'desc' ? 'desc' : 'asc';
-        $filters['sort'] = $sort;
-        $filters['direction'] = $direction;
+        $user = $request->user();
+        $zoneIds = $user->accessibleZoneIds();
 
-        $entries = DnsEntry::query()
-            ->with(['syncStates.provider:id,name,type'])
-            ->when($filters['search'] ?? null, function ($q, $search) {
-                $term = '%'.mb_strtolower($search).'%';
-
-                $q->where(fn ($q) => $q
-                    ->whereRaw('LOWER(name) LIKE ?', [$term])
-                    ->orWhereRaw('LOWER(content) LIKE ?', [$term]));
-            })
-            ->when($filters['type'] ?? null, fn ($q, $type) => $q->where('type', $type))
-            ->when($filters['provider'] ?? null, fn ($q, $provider) => $q->whereHas(
-                'syncStates', fn ($q) => $q->where('provider_id', $provider),
-            ))
-            ->when($filters['status'] ?? null, fn ($q, $status) => $q->whereHas(
-                'syncStates', fn ($q) => $q->where('sync_status', $status),
-            ))
-            ->tap(fn ($q) => $this->applySort($q, $sort, $direction))
-            ->paginate(25)
-            ->withQueryString()
-            ->through(fn (DnsEntry $entry) => $this->presentEntry($entry));
+        $zones = DnsZone::query()
+            ->when($zoneIds !== null, fn ($q) => $q->whereIn('id', $zoneIds))
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
         return Inertia::render('entries/index', [
-            'entries' => $entries,
+            'entries' => $entries->through(fn (DnsEntry $entry) => EntryPresenter::entry($entry)),
             'filters' => $filters,
-            'providers' => $this->presentProviders(),
+            'zones' => $zones->map(fn (DnsZone $zone) => ['id' => $zone->id, 'name' => $zone->name]),
+            'zoneAttachments' => EntryPresenter::zoneAttachments($zoneIds),
             'connectors' => $registry->descriptors(),
+            'zoneCan' => ZonePermissions::mapFor($user, $zones),
         ]);
-    }
-
-    private function applySort($query, string $sort, string $direction): void
-    {
-        $column = self::SORTABLE[$sort];
-
-        // Null TTL means "automatic" — keep those rows last either way
-        // (portable across Postgres and the sqlite test DB).
-        if ($column === 'ttl') {
-            $query->orderByRaw('(ttl IS NULL) ASC');
-        }
-
-        $query->orderBy($column, $direction);
-
-        // Stable tiebreaks so pagination never shows duplicates.
-        if ($column !== 'name') {
-            $query->orderBy('name');
-        }
-
-        $query->orderBy('id');
     }
 
     public function store(DnsEntryRequest $request): RedirectResponse
     {
-        $entry = DnsEntry::create($request->safe()->except('providers'));
+        $entry = DnsEntry::create($request->safe()->except('zone_providers'));
 
-        $this->sync->syncEntry($entry, $request->validated('providers'));
+        $this->sync->syncEntry($entry, $request->validated('zone_providers'));
 
-        return back()->with('success', "Entry {$entry->name} created — syncing to providers.");
+        return back()->with('success', "Entry {$entry->fqdn} created — syncing to providers.");
     }
 
     public function update(DnsEntryRequest $request, DnsEntry $entry): RedirectResponse
     {
-        $entry->update($request->safe()->except('providers'));
+        $entry->update($request->safe()->except('zone_providers'));
 
-        $this->sync->syncEntry($entry, $request->validated('providers'));
+        $this->sync->syncEntry($entry, $request->validated('zone_providers'));
 
-        return back()->with('success', "Entry {$entry->name} updated — syncing to providers.");
+        return back()->with('success', "Entry {$entry->fqdn} updated — syncing to providers.");
     }
 
     public function destroy(DnsEntry $entry): RedirectResponse
     {
+        $this->authorize('manageRecords', $entry->zone);
+
+        $fqdn = $entry->fqdn;
+
         $this->sync->deleteEntry($entry);
 
         // Deferred deletions (queued provider jobs remove the row later)
@@ -117,24 +76,31 @@ class DnsEntryController extends Controller
             activity('entries')->performedOn($entry)->event('delete-requested')->log('delete-requested');
         }
 
-        return back()->with('success', "Entry {$entry->name} is being removed from all providers.");
+        return back()->with('success', "Entry {$fqdn} is being removed from all providers.");
     }
 
     public function sync(DnsEntry $entry): RedirectResponse
     {
+        $this->authorize('manageRecords', $entry->zone);
+
         $this->sync->syncEntry($entry);
 
-        return back()->with('success', "Re-syncing {$entry->name} to all providers.");
+        return back()->with('success', "Re-syncing {$entry->fqdn} to all providers.");
     }
 
     public function import(Request $request, DnsEntryImporter $importer): RedirectResponse
     {
-        $request->validate([
+        $validated = $request->validate([
             'file' => ['required', 'file', 'mimes:csv,txt', 'max:1024'],
+            'dns_zone_id' => ['required', 'integer', 'exists:dns_zones,id'],
         ]);
 
+        $zone = DnsZone::findOrFail($validated['dns_zone_id']);
+
+        $this->authorize('manageRecords', $zone);
+
         try {
-            $result = $importer->import($request->file('file')->get());
+            $result = $importer->import($request->file('file')->get(), $zone);
         } catch (\InvalidArgumentException $e) {
             return back()->withErrors(['file' => $e->getMessage()]);
         }
@@ -149,42 +115,5 @@ class DnsEntryController extends Controller
             'dns-entries-sample.csv',
             ['Content-Type' => 'text/csv'],
         );
-    }
-
-    private function presentEntry(DnsEntry $entry): array
-    {
-        return [
-            'id' => $entry->id,
-            'name' => $entry->name,
-            'type' => $entry->type->value,
-            'content' => $entry->content,
-            'ttl' => $entry->ttl,
-            'priority' => $entry->priority,
-            'proxied' => $entry->proxied,
-            'comment' => $entry->comment,
-            'updatedAt' => $entry->updated_at->toIso8601String(),
-            'syncStates' => $entry->syncStates->map(fn ($state) => [
-                'id' => $state->id,
-                'provider' => $state->provider?->only(['id', 'name']) + ['type' => $state->provider?->type->value],
-                'status' => $state->sync_status->value,
-                'lastSyncedAt' => $state->last_synced_at?->toIso8601String(),
-                'lastError' => $state->last_error,
-            ])->values(),
-        ];
-    }
-
-    private function presentProviders(): array
-    {
-        return Provider::query()
-            ->orderBy('name')
-            ->get()
-            ->map(fn (Provider $provider) => [
-                'id' => $provider->id,
-                'name' => $provider->name,
-                'type' => $provider->type->value,
-                'enabled' => $provider->enabled,
-                'managedRecordTypes' => $provider->managed_record_types ?? [],
-            ])
-            ->all();
     }
 }

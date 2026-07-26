@@ -1,28 +1,43 @@
 <?php
 
-use App\Enums\Role;
 use App\Enums\SyncStatus;
 use App\Jobs\DeleteEntryFromProvider;
 use App\Jobs\SyncEntryToProvider;
 use App\Models\DnsEntry;
+use App\Models\DnsZone;
 use App\Models\Provider;
 use App\Models\User;
+use App\Models\ZoneProvider;
+use App\Models\ZoneUser;
 use Illuminate\Support\Facades\Queue;
 
 beforeEach(function () {
     $this->actingAs(User::factory()->create());
     Queue::fake();
 
+    $this->zone = DnsZone::factory()->create(['name' => 'example.com']);
+
     $this->cloudflare = Provider::factory()->cloudflare()->create([
         'managed_record_types' => ['A', 'AAAA', 'CNAME', 'MX', 'TXT'],
     ]);
+
+    $this->cfAttachment = ZoneProvider::factory()->create([
+        'dns_zone_id' => $this->zone->id,
+        'provider_id' => $this->cloudflare->id,
+        'config' => ['zone_id' => 'cf-zone-1'],
+    ]);
 });
 
-function bulkEntry(Provider $provider, array $attributes = []): DnsEntry
+function bulkEntry(ZoneProvider $attachment, array $attributes = []): DnsEntry
 {
-    $entry = DnsEntry::factory()->create($attributes + ['type' => 'A', 'content' => '10.0.0.1']);
+    $entry = DnsEntry::factory()->create($attributes + [
+        'dns_zone_id' => $attachment->dns_zone_id,
+        'type' => 'A',
+        'content' => '10.0.0.1',
+    ]);
+
     $entry->syncStates()->create([
-        'provider_id' => $provider->id,
+        'zone_provider_id' => $attachment->id,
         'sync_status' => SyncStatus::Synced,
         'external_id' => "ext-{$entry->id}",
     ]);
@@ -30,9 +45,17 @@ function bulkEntry(Provider $provider, array $attributes = []): DnsEntry
     return $entry;
 }
 
+function piholeAttachment(DnsZone $zone): ZoneProvider
+{
+    return ZoneProvider::factory()->create([
+        'dns_zone_id' => $zone->id,
+        'provider_id' => Provider::factory()->pihole()->create(['managed_record_types' => ['A', 'CNAME']])->id,
+    ]);
+}
+
 test('bulk sync re-queues a push for each entry to its assigned providers', function () {
-    $first = bulkEntry($this->cloudflare, ['name' => 'a.example.com']);
-    $second = bulkEntry($this->cloudflare, ['name' => 'b.example.com', 'content' => '10.0.0.2']);
+    $first = bulkEntry($this->cfAttachment, ['name' => 'a']);
+    $second = bulkEntry($this->cfAttachment, ['name' => 'b', 'content' => '10.0.0.2']);
 
     $this->post('/entries/bulk/sync', ['ids' => [$first->id, $second->id, 999999]])
         ->assertRedirect()
@@ -42,38 +65,62 @@ test('bulk sync re-queues a push for each entry to its assigned providers', func
     expect($first->syncStates()->sole()->sync_status)->toBe(SyncStatus::Pending);
 });
 
-test('bulk provider selection retargets entries, removing them from deselected providers', function () {
-    $pihole = Provider::factory()->pihole()->create(['managed_record_types' => ['A', 'CNAME']]);
+test('bulk provider selection retargets entries, removing them from deselected attachments', function () {
+    $pihole = piholeAttachment($this->zone);
 
-    $entry = bulkEntry($this->cloudflare, ['name' => 'move.example.com']);
+    $entry = bulkEntry($this->cfAttachment, ['name' => 'move']);
 
-    $this->post('/entries/bulk/providers', ['ids' => [$entry->id], 'providers' => [$pihole->id]])
+    $this->post('/entries/bulk/providers', ['ids' => [$entry->id], 'zone_providers' => [$pihole->id]])
         ->assertRedirect()
         ->assertSessionHasNoErrors();
 
-    expect($entry->syncStates()->where('provider_id', $this->cloudflare->id)->sole()->sync_status)->toBe(SyncStatus::Deleting)
-        ->and($entry->syncStates()->where('provider_id', $pihole->id)->sole()->sync_status)->toBe(SyncStatus::Pending);
+    expect($entry->syncStates()->where('zone_provider_id', $this->cfAttachment->id)->sole()->sync_status)->toBe(SyncStatus::Deleting)
+        ->and($entry->syncStates()->where('zone_provider_id', $pihole->id)->sole()->sync_status)->toBe(SyncStatus::Pending);
 
     Queue::assertPushed(DeleteEntryFromProvider::class, 1);
-    Queue::assertPushed(SyncEntryToProvider::class, fn ($job) => $job->providerId === $pihole->id);
+    Queue::assertPushed(SyncEntryToProvider::class, fn ($job) => $job->zoneProviderId === $pihole->id);
 });
 
-test('bulk provider selection skips providers that do not manage an entry type', function () {
-    $pihole = Provider::factory()->pihole()->create(['managed_record_types' => ['A', 'CNAME']]);
+test('bulk provider selection skips attachments that do not manage an entry type', function () {
+    $pihole = piholeAttachment($this->zone);
 
-    $mx = bulkEntry($this->cloudflare, ['name' => 'mail.example.com', 'type' => 'MX', 'content' => 'mx.example.com', 'priority' => 10]);
+    $mx = bulkEntry($this->cfAttachment, ['name' => 'mail', 'type' => 'MX', 'content' => 'mx.example.com', 'priority' => 10]);
 
-    $this->post('/entries/bulk/providers', ['ids' => [$mx->id], 'providers' => [$this->cloudflare->id, $pihole->id]])
+    $this->post('/entries/bulk/providers', ['ids' => [$mx->id], 'zone_providers' => [$this->cfAttachment->id, $pihole->id]])
         ->assertRedirect();
 
     // Pi-hole cannot hold an MX record, so only Cloudflare is (re)assigned.
-    expect($mx->syncStates()->pluck('provider_id')->all())->toBe([$this->cloudflare->id]);
+    expect($mx->syncStates()->pluck('zone_provider_id')->all())->toBe([$this->cfAttachment->id]);
     Queue::assertPushed(SyncEntryToProvider::class, 1);
 });
 
+test('bulk provider selection silently drops attachments from other zones per entry', function () {
+    $otherZone = DnsZone::factory()->create(['name' => 'other.dev']);
+    $otherAttachment = ZoneProvider::factory()->create([
+        'dns_zone_id' => $otherZone->id,
+        'provider_id' => $this->cloudflare->id,
+        'config' => ['zone_id' => 'cf-zone-2'],
+    ]);
+
+    $entry = bulkEntry($this->cfAttachment, ['name' => 'here']);
+    $otherEntry = bulkEntry($otherAttachment, ['name' => 'there']);
+
+    // Both zones' attachments submitted for both entries — each entry keeps
+    // only its own zone's attachment.
+    $this->post('/entries/bulk/providers', [
+        'ids' => [$entry->id, $otherEntry->id],
+        'zone_providers' => [$this->cfAttachment->id, $otherAttachment->id],
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect($entry->syncStates()->pluck('zone_provider_id')->all())->toBe([$this->cfAttachment->id])
+        ->and($otherEntry->syncStates()->pluck('zone_provider_id')->all())->toBe([$otherAttachment->id]);
+
+    Queue::assertNotPushed(DeleteEntryFromProvider::class);
+});
+
 test('bulk edit applies the ticked fields to every entry and re-syncs', function () {
-    $first = bulkEntry($this->cloudflare, ['name' => 'a.example.com', 'ttl' => null]);
-    $second = bulkEntry($this->cloudflare, ['name' => 'b.example.com', 'content' => '10.0.0.2', 'ttl' => 120]);
+    $first = bulkEntry($this->cfAttachment, ['name' => 'a', 'ttl' => null]);
+    $second = bulkEntry($this->cfAttachment, ['name' => 'b', 'content' => '10.0.0.2', 'ttl' => 120]);
 
     $this->patch('/entries/bulk', [
         'ids' => [$first->id, $second->id],
@@ -90,8 +137,8 @@ test('bulk edit applies the ticked fields to every entry and re-syncs', function
 });
 
 test('bulk edit skips entries that would become invalid and reports them', function () {
-    $ip = bulkEntry($this->cloudflare, ['name' => 'ok.example.com']);
-    $host = bulkEntry($this->cloudflare, ['name' => 'cname.example.com', 'type' => 'CNAME', 'content' => 'target.example.com']);
+    $ip = bulkEntry($this->cfAttachment, ['name' => 'ok']);
+    $host = bulkEntry($this->cfAttachment, ['name' => 'alias', 'type' => 'CNAME', 'content' => 'target.example.com']);
 
     // Changing everything to type A: the CNAME's hostname content is not an IPv4.
     $this->patch('/entries/bulk', [
@@ -102,9 +149,9 @@ test('bulk edit skips entries that would become invalid and reports them', funct
     expect($host->refresh()->type->value)->toBe('CNAME');
 });
 
-test('bulk edit skips changes that would duplicate another entry', function () {
-    bulkEntry($this->cloudflare, ['name' => 'dup.example.com', 'content' => '10.0.0.9']);
-    $entry = bulkEntry($this->cloudflare, ['name' => 'dup.example.com', 'content' => '10.0.0.1']);
+test('bulk edit skips changes that would duplicate another entry in the same zone', function () {
+    bulkEntry($this->cfAttachment, ['name' => 'dup', 'content' => '10.0.0.9']);
+    $entry = bulkEntry($this->cfAttachment, ['name' => 'dup', 'content' => '10.0.0.1']);
 
     $this->patch('/entries/bulk', [
         'ids' => [$entry->id],
@@ -114,8 +161,27 @@ test('bulk edit skips changes that would duplicate another entry', function () {
     expect($entry->refresh()->content)->toBe('10.0.0.1');
 });
 
+test('an identical record in a different zone is not a duplicate', function () {
+    $otherZone = DnsZone::factory()->create(['name' => 'other.dev']);
+    $otherAttachment = ZoneProvider::factory()->create([
+        'dns_zone_id' => $otherZone->id,
+        'provider_id' => $this->cloudflare->id,
+        'config' => ['zone_id' => 'cf-zone-2'],
+    ]);
+
+    bulkEntry($otherAttachment, ['name' => 'dup', 'content' => '10.0.0.9']);
+    $entry = bulkEntry($this->cfAttachment, ['name' => 'dup', 'content' => '10.0.0.1']);
+
+    $this->patch('/entries/bulk', [
+        'ids' => [$entry->id],
+        'set' => ['content' => '10.0.0.9'],
+    ])->assertRedirect()->assertSessionHas('success', fn ($message) => str_contains($message, 'Updated 1 entry'));
+
+    expect($entry->refresh()->content)->toBe('10.0.0.9');
+});
+
 test('bulk edit clears the priority when the type change drops it', function () {
-    $mx = bulkEntry($this->cloudflare, ['name' => 'mail.example.com', 'type' => 'MX', 'content' => 'mx.example.com', 'priority' => 10]);
+    $mx = bulkEntry($this->cfAttachment, ['name' => 'mail', 'type' => 'MX', 'content' => 'mx.example.com', 'priority' => 10]);
 
     $this->patch('/entries/bulk', [
         'ids' => [$mx->id],
@@ -127,7 +193,7 @@ test('bulk edit clears the priority when the type change drops it', function () 
 });
 
 test('bulk edit requires at least one field', function () {
-    $entry = bulkEntry($this->cloudflare);
+    $entry = bulkEntry($this->cfAttachment);
 
     $this->from('/entries')
         ->patch('/entries/bulk', ['ids' => [$entry->id], 'set' => []])
@@ -136,8 +202,10 @@ test('bulk edit requires at least one field', function () {
 });
 
 test('bulk delete removes entries from their providers', function () {
-    $pushed = bulkEntry($this->cloudflare, ['name' => 'a.example.com']);
-    $localOnly = DnsEntry::factory()->create(['name' => 'local.example.com', 'type' => 'A', 'content' => '10.0.0.5']);
+    $pushed = bulkEntry($this->cfAttachment, ['name' => 'a']);
+    $localOnly = DnsEntry::factory()->create([
+        'dns_zone_id' => $this->zone->id, 'name' => 'local', 'type' => 'A', 'content' => '10.0.0.5',
+    ]);
 
     $this->delete('/entries/bulk', ['ids' => [$pushed->id, $localOnly->id]])
         ->assertRedirect()
@@ -149,13 +217,53 @@ test('bulk delete removes entries from their providers', function () {
     Queue::assertPushed(DeleteEntryFromProvider::class, 1);
 });
 
-test('bulk actions require the manage-entries permission', function () {
-    $this->actingAs(User::factory()->withRoles(Role::ProvidersManager)->create());
+test('bulk selections shrink to the zones where the user manages records', function () {
+    $otherZone = DnsZone::factory()->create(['name' => 'other.dev']);
+    $otherAttachment = ZoneProvider::factory()->create([
+        'dns_zone_id' => $otherZone->id,
+        'provider_id' => $this->cloudflare->id,
+        'config' => ['zone_id' => 'cf-zone-2'],
+    ]);
 
-    $entry = DnsEntry::factory()->create(['type' => 'A', 'content' => '10.0.0.1']);
+    $granted = bulkEntry($this->cfAttachment, ['name' => 'granted']);
+    $ungranted = bulkEntry($otherAttachment, ['name' => 'ungranted']);
 
-    $this->post('/entries/bulk/sync', ['ids' => [$entry->id]])->assertForbidden();
-    $this->post('/entries/bulk/providers', ['ids' => [$entry->id], 'providers' => []])->assertForbidden();
-    $this->patch('/entries/bulk', ['ids' => [$entry->id], 'set' => ['ttl' => 300]])->assertForbidden();
-    $this->delete('/entries/bulk', ['ids' => [$entry->id]])->assertForbidden();
+    $user = User::factory()->noRoles()->create();
+    ZoneUser::factory()->dnsManager()->create(['user_id' => $user->id, 'dns_zone_id' => $this->zone->id]);
+
+    $this->actingAs($user);
+
+    // A selection spanning both zones only ever touches the granted one.
+    $this->patch('/entries/bulk', [
+        'ids' => [$granted->id, $ungranted->id],
+        'set' => ['ttl' => 3600],
+    ])->assertRedirect()->assertSessionHas('success', fn ($message) => str_contains($message, 'Updated 1 entry'));
+
+    expect($granted->refresh()->ttl)->toBe(3600)
+        ->and($ungranted->refresh()->ttl)->toBeNull();
+
+    $this->post('/entries/bulk/sync', ['ids' => [$granted->id, $ungranted->id]])
+        ->assertRedirect()
+        ->assertSessionHas('success', fn ($message) => str_contains($message, '1 entry'));
+
+    $this->delete('/entries/bulk', ['ids' => [$granted->id, $ungranted->id]])->assertRedirect();
+
+    expect($granted->syncStates()->sole()->sync_status)->toBe(SyncStatus::Deleting)
+        ->and($ungranted->syncStates()->sole()->sync_status)->not->toBe(SyncStatus::Deleting);
+});
+
+test('super viewer bulk selections shrink to nothing and mutate nothing', function () {
+    $entry = bulkEntry($this->cfAttachment, ['name' => 'untouchable']);
+
+    $this->actingAs(User::factory()->superViewer()->create());
+
+    $this->post('/entries/bulk/sync', ['ids' => [$entry->id]])
+        ->assertRedirect()
+        ->assertSessionHas('success', fn ($message) => str_contains($message, '0 entries'));
+    $this->patch('/entries/bulk', ['ids' => [$entry->id], 'set' => ['ttl' => 3600]])->assertRedirect();
+    $this->delete('/entries/bulk', ['ids' => [$entry->id]])->assertRedirect();
+
+    expect(DnsEntry::whereKey($entry->id)->exists())->toBeTrue()
+        ->and($entry->refresh()->ttl)->toBeNull()
+        ->and($entry->syncStates()->sole()->sync_status)->toBe(SyncStatus::Synced);
 });

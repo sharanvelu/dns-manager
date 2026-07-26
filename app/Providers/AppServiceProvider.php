@@ -3,8 +3,11 @@
 namespace App\Providers;
 
 use App\Models\DnsEntry;
+use App\Models\DnsZone;
 use App\Models\Provider as DnsProvider;
 use App\Models\User;
+use App\Models\ZoneUser;
+use App\Policies\DnsZonePolicy;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
@@ -39,10 +42,19 @@ class AppServiceProvider extends ServiceProvider
             $event->extendSocialite('oidc', Provider::class);
         });
 
-        Gate::define('manage-entries', fn (User $user) => $user->canManageEntries());
-        Gate::define('manage-providers', fn (User $user) => $user->canManageProviders());
-        Gate::define('manage-users', fn (User $user) => $user->isSuperAdmin());
-        Gate::define('view-activity', fn (User $user) => $user->isSuperAdmin());
+        // Super Admin passes every ability; everything else is deny-by-default.
+        // Super Viewer is read-only by construction: no mutating gate or
+        // policy ability ever returns true for them.
+        Gate::before(fn (User $user) => $user->isSuperAdmin() ? true : null);
+
+        Gate::policy(DnsZone::class, DnsZonePolicy::class);
+
+        Gate::define('create-zones', fn (User $user) => false);
+        Gate::define('manage-providers', fn (User $user) => false);
+        Gate::define('view-providers', fn (User $user) => $user->isSuperViewer());
+        Gate::define('manage-users', fn (User $user) => $user->isUserAdmin());
+        Gate::define('view-users', fn (User $user) => $user->isUserAdmin() || $user->isSuperViewer());
+        Gate::define('view-global-activity', fn (User $user) => $user->isSuperViewer());
 
         // Short aliases stored in activity_log.subject_type / causer_type —
         // keeps the audit trail readable and the filter values stable.
@@ -50,6 +62,8 @@ class AppServiceProvider extends ServiceProvider
             'entry' => DnsEntry::class,
             'provider' => DnsProvider::class,
             'user' => User::class,
+            'zone' => DnsZone::class,
+            'zone-grant' => ZoneUser::class,
         ]);
     }
 }

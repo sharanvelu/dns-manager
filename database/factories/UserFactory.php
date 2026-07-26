@@ -51,8 +51,18 @@ class UserFactory extends Factory
         return $this->state(fn () => ['roles' => array_column($roles, 'value')]);
     }
 
-    public function viewer(): static
+    public function superViewer(): static
     {
-        return $this->withRoles(Role::Viewer);
+        return $this->withRoles(Role::SuperViewer);
+    }
+
+    public function userAdmin(): static
+    {
+        return $this->withRoles(Role::UserAdmin);
+    }
+
+    public function noRoles(): static
+    {
+        return $this->state(fn () => ['roles' => []]);
     }
 }

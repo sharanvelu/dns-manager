@@ -1,4 +1,5 @@
-import { ProviderCloudflareMark, ProviderGenericMark, ProviderPiholeMark } from '@/components/icons';
+import { defaultConfigFor } from '@/components/config-fields';
+import { ProviderCloudflareMark, ProviderGenericMark, ProviderPiholeMark, ProviderTechnitiumMark } from '@/components/icons';
 import type { FormDataConvertible } from '@inertiajs/core';
 import type { ComponentType, SVGProps } from 'react';
 import type { Connector, Provider } from './types';
@@ -10,6 +11,8 @@ export function providerMark(type: string): ComponentType<SVGProps<SVGSVGElement
             return ProviderCloudflareMark;
         case 'pihole':
             return ProviderPiholeMark;
+        case 'technitium':
+            return ProviderTechnitiumMark;
         default:
             return ProviderGenericMark;
     }
@@ -46,17 +49,7 @@ export function relativeTime(iso: string | null): string | null {
 
 /** Build the default (empty) config for a connector from its schema defaults. */
 export function defaultConfig(connector: Connector | undefined): Record<string, FormDataConvertible> {
-    const config: Record<string, FormDataConvertible> = {};
-
-    for (const field of connector?.configSchema ?? []) {
-        if (field.type === 'boolean') {
-            config[field.key] = typeof field.default === 'boolean' ? field.default : false;
-        } else {
-            config[field.key] = typeof field.default === 'string' ? field.default : '';
-        }
-    }
-
-    return config;
+    return defaultConfigFor(connector?.configSchema ?? []);
 }
 
 /** The full update payload for a provider as it exists today (secrets blank → kept server-side). */

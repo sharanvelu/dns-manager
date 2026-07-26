@@ -26,7 +26,7 @@ final readonly class RemoteRecord
      */
     public function matches(DnsEntry $entry, ConnectorCapabilities $capabilities): bool
     {
-        if (strcasecmp(rtrim($this->name, '.'), rtrim($entry->name, '.')) !== 0) {
+        if (strcasecmp(rtrim($this->name, '.'), rtrim($entry->fqdn, '.')) !== 0) {
             return false;
         }
 

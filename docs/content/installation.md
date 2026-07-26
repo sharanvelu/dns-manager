@@ -140,7 +140,7 @@ On Kubernetes there is a third option: the optional `cronjob.yaml` manifest runs
 
 Open the app and click the sign-in button. There is no registration step: users are auto-provisioned on first OIDC login, matched by OIDC subject and then by email. Avatars come from Gravatar (falling back to initials).
 
-The **first user to sign in becomes the Super Admin**. Everyone after that starts as a read-only Viewer until the Super Admin assigns roles under Settings → Users — see [Users & Roles](users).
+The **first user to sign in becomes the Super Admin**. Everyone after that starts with **no access** until an administrator assigns global roles or grants zone access under Settings → Users — see [Users & Access](users).
 
 ## Upgrading
 
@@ -152,4 +152,4 @@ Documentation for the exact version you are running is always available on your 
 
 ## Next steps
 
-Connect your first provider on the [Providers](providers) page, then create records on the [DNS Entries](dns-entries) page.
+Connect your first provider on the [Providers](providers) page, create a zone for your domain and attach the provider to it on the [Zones](zones) page, then create records on the [DNS Entries](dns-entries) page.

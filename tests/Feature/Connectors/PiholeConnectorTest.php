@@ -4,13 +4,21 @@ use App\Connectors\DTOs\RemoteRecord;
 use App\Connectors\Exceptions\ConnectorException;
 use App\Connectors\PiholeConnector;
 use App\Models\DnsEntry;
+use App\Models\DnsZone;
 use App\Models\Provider;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 
 const PIHOLE_BASE = 'https://pihole.internal';
+
+function piholeZone(string $name = 'example.com'): DnsZone
+{
+    return DnsZone::factory()->create(['name' => $name]);
+}
 
 function piholeProvider(array $config = []): Provider
 {
@@ -74,12 +82,12 @@ function piholeError(string $key, string $message, int $status, ?string $hint = 
     ], $status);
 }
 
-it('creates an A record via an encoded hosts PUT inside one session', function () {
+it('creates an A record via an encoded FQDN hosts PUT inside one session', function () {
     fakePihole();
 
     $connector = new PiholeConnector(piholeProvider());
-    $entry = DnsEntry::factory()->create([
-        'name' => 'host.example.com',
+    $entry = DnsEntry::factory()->for(piholeZone(), 'zone')->create([
+        'name' => 'host',
         'content' => '192.168.1.10',
     ]);
 
@@ -98,12 +106,12 @@ it('creates an A record via an encoded hosts PUT inside one session', function (
         && $request->url() === PIHOLE_BASE.'/api/auth');
 });
 
-it('creates a CNAME with TTL as an encoded name,target,ttl entry', function () {
+it('creates a CNAME with TTL as an encoded fqdn,target,ttl entry', function () {
     fakePihole();
 
     $connector = new PiholeConnector(piholeProvider());
-    $entry = DnsEntry::factory()->cname('target.example.com')->create([
-        'name' => 'alias.example.com',
+    $entry = DnsEntry::factory()->cname('target.example.com')->for(piholeZone(), 'zone')->create([
+        'name' => 'alias',
         'ttl' => 3600,
     ]);
 
@@ -117,8 +125,8 @@ it('omits the TTL from a CNAME entry when none is set', function () {
     fakePihole();
 
     $connector = new PiholeConnector(piholeProvider());
-    $entry = DnsEntry::factory()->cname('target.example.com')->create([
-        'name' => 'alias.example.com',
+    $entry = DnsEntry::factory()->cname('target.example.com')->for(piholeZone(), 'zone')->create([
+        'name' => 'alias',
         'ttl' => null,
     ]);
 
@@ -134,8 +142,8 @@ it('treats a 400 already-exists response as a successful create', function () {
     ]);
 
     $connector = new PiholeConnector(piholeProvider());
-    $entry = DnsEntry::factory()->create([
-        'name' => 'host.example.com',
+    $entry = DnsEntry::factory()->for(piholeZone(), 'zone')->create([
+        'name' => 'host',
         'content' => '192.168.1.10',
     ]);
 
@@ -152,8 +160,8 @@ it('throws on 400 already-exists when adoption is disabled', function () {
     ]);
 
     $connector = new PiholeConnector(piholeProvider(['adopt_existing' => false]));
-    $entry = DnsEntry::factory()->create([
-        'name' => 'host.example.com',
+    $entry = DnsEntry::factory()->for(piholeZone(), 'zone')->create([
+        'name' => 'host',
         'content' => '192.168.1.10',
     ]);
 
@@ -165,8 +173,8 @@ it('updates a record by deleting the old entry then putting the new one in a sin
     fakePihole();
 
     $connector = new PiholeConnector(piholeProvider());
-    $entry = DnsEntry::factory()->create([
-        'name' => 'host.example.com',
+    $entry = DnsEntry::factory()->for(piholeZone(), 'zone')->create([
+        'name' => 'host',
         'content' => '192.168.1.20',
     ]);
 
@@ -309,6 +317,80 @@ it('throws a ConnectorException when the session is reported invalid despite a 2
 
     $connector->createRecord($entry);
 })->throws(ConnectorException::class);
+
+it('waits out the resolver-restart cooldown before the session that follows a CNAME write', function () {
+    fakePihole();
+
+    $connector = new PiholeConnector(piholeProvider());
+    $entry = DnsEntry::factory()->cname('target.example.com')->for(piholeZone(), 'zone')->create([
+        'name' => 'alias',
+        'ttl' => null,
+    ]);
+
+    $connector->createRecord($entry);
+    Sleep::assertNeverSlept();
+
+    // The next session must give FTL time to restart before authenticating.
+    $connector->listRecords();
+    Sleep::assertSleptTimes(1);
+});
+
+it('does not pace sessions after hosts-only writes', function () {
+    fakePihole();
+
+    $connector = new PiholeConnector(piholeProvider());
+    $entry = DnsEntry::factory()->for(piholeZone(), 'zone')->create([
+        'name' => 'host',
+        'content' => '192.168.1.10',
+    ]);
+
+    $connector->createRecord($entry);
+    $connector->listRecords();
+
+    Sleep::assertNeverSlept();
+});
+
+it('paces the next session after deleting a CNAME record', function () {
+    fakePihole();
+
+    $connector = new PiholeConnector(piholeProvider());
+
+    $connector->deleteRecord('alias.example.com,target.example.com');
+    Sleep::assertNeverSlept();
+
+    $connector->deleteRecord('192.168.1.10 host.example.com');
+    Sleep::assertSleptTimes(1);
+});
+
+it('runs a CNAME update in one uninterrupted session and paces only the following one', function () {
+    fakePihole();
+
+    $connector = new PiholeConnector(piholeProvider());
+    $entry = DnsEntry::factory()->cname('new-target.example.com')->for(piholeZone(), 'zone')->create([
+        'name' => 'alias',
+        'ttl' => null,
+    ]);
+
+    // Delete-old + put-new happen back-to-back — no sleep inside the update.
+    $connector->updateRecord($entry, 'alias.example.com,old-target.example.com');
+    Sleep::assertNeverSlept();
+
+    $connector->testConnection();
+    Sleep::assertSleptTimes(1);
+});
+
+it('releases the per-provider session lock even when the operation fails', function () {
+    fakePihole([
+        'POST /api/auth' => piholeError('unauthorized', 'Unauthorized', 401),
+    ]);
+
+    $provider = piholeProvider();
+    $connector = new PiholeConnector($provider);
+
+    expect(fn () => $connector->listRecords())->toThrow(ConnectorException::class);
+
+    expect(Cache::lock("pihole-session:{$provider->id}", 5)->get())->toBeTrue();
+});
 
 it('operates normally with TLS verification disabled', function () {
     fakePihole();

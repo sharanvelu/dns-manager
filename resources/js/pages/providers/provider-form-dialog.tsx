@@ -1,3 +1,4 @@
+import { ConfigFieldInput } from '@/components/config-fields';
 import { RecordTypeBadge } from '@/components/icons';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,7 @@ import { useForm } from '@inertiajs/react';
 import { CircleAlert, CircleCheck, LoaderCircle, Plug } from 'lucide-react';
 import { FormEventHandler, useState } from 'react';
 import { defaultConfig, providerMark } from './lib';
-import type { ConfigField, Connector, Provider, TestResult } from './types';
+import type { Connector, Provider, TestResult } from './types';
 
 type TestState = { status: 'idle' } | { status: 'loading' } | { status: 'done'; result: TestResult };
 
@@ -175,54 +176,6 @@ export function ProviderFormDialog({ connectors, provider, onClose }: ProviderFo
         }
     };
 
-    const renderConfigField = (field: ConfigField) => {
-        const error = fieldErrors[`config.${field.key}`];
-        const value = data.config[field.key];
-
-        if (field.type === 'boolean') {
-            return (
-                <div key={field.key} className="space-y-1.5">
-                    <div className="flex items-center gap-2">
-                        <Checkbox
-                            id={`config-${field.key}`}
-                            checked={value === true}
-                            onCheckedChange={(checked) => setConfigValue(field.key, checked === true)}
-                        />
-                        <Label htmlFor={`config-${field.key}`} className="cursor-pointer">
-                            {field.label}
-                            {field.required && <span className="ml-0.5 text-red-500">*</span>}
-                        </Label>
-                    </div>
-                    {field.help && <p className="text-muted-foreground text-xs">{field.help}</p>}
-                    <InputError message={error} />
-                </div>
-            );
-        }
-
-        const isSecret = field.secret;
-        const secretPlaceholder = editing && isSecret ? '•••••••• (unchanged — leave blank to keep)' : undefined;
-
-        return (
-            <div key={field.key} className="space-y-1.5">
-                <Label htmlFor={`config-${field.key}`}>
-                    {field.label}
-                    {field.required && <span className="ml-0.5 text-red-500">*</span>}
-                </Label>
-                <Input
-                    id={`config-${field.key}`}
-                    type={field.type === 'password' ? 'password' : 'text'}
-                    inputMode={field.type === 'url' ? 'url' : undefined}
-                    autoComplete="off"
-                    value={typeof value === 'string' ? value : ''}
-                    placeholder={secretPlaceholder ?? (field.type === 'url' ? 'https://…' : undefined)}
-                    onChange={(event) => setConfigValue(field.key, event.target.value)}
-                />
-                {field.help && <p className="text-muted-foreground text-xs">{field.help}</p>}
-                <InputError message={error} />
-            </div>
-        );
-    };
-
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
@@ -275,7 +228,16 @@ export function ProviderFormDialog({ connectors, provider, onClose }: ProviderFo
                             <Separator />
                             <div className="space-y-4">
                                 <p className="text-sm font-medium">Connection</p>
-                                {connector.configSchema.map(renderConfigField)}
+                                {connector.configSchema.map((field) => (
+                                    <ConfigFieldInput
+                                        key={field.key}
+                                        field={field}
+                                        value={data.config[field.key] as string | boolean | undefined}
+                                        error={fieldErrors[`config.${field.key}`]}
+                                        editing={editing}
+                                        onChange={setConfigValue}
+                                    />
+                                ))}
                             </div>
                         </>
                     )}

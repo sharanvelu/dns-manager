@@ -5,8 +5,9 @@ namespace App\Jobs;
 use App\Connectors\Exceptions\RecordNotFoundException;
 use App\Enums\SyncStatus;
 use App\Models\DnsEntry;
-use App\Models\Provider;
+use App\Models\EntrySyncState;
 use App\Models\SyncLog;
+use App\Models\ZoneProvider;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Throwable;
@@ -22,25 +23,25 @@ class SyncEntryToProvider implements ShouldQueue
 
     public function __construct(
         public int $entryId,
-        public int $providerId,
+        public int $zoneProviderId,
     ) {}
 
     public function handle(): void
     {
-        $entry = DnsEntry::find($this->entryId);
-        $provider = Provider::find($this->providerId);
+        $entry = DnsEntry::with('zone')->find($this->entryId);
+        $zoneProvider = ZoneProvider::with(['provider', 'zone'])->find($this->zoneProviderId);
 
-        if (! $entry || ! $provider || ! $provider->enabled) {
+        if (! $entry || ! $zoneProvider || ! $zoneProvider->isActive()) {
             return;
         }
 
-        $state = $entry->syncStates()->where('provider_id', $provider->id)->first();
+        $state = $entry->syncStates()->where('zone_provider_id', $zoneProvider->id)->first();
 
         if (! $state || $state->sync_status === SyncStatus::Deleting) {
             return;
         }
 
-        $connector = $provider->connector();
+        $connector = $zoneProvider->connector();
 
         try {
             $externalId = $state->external_id
@@ -59,19 +60,22 @@ class SyncEntryToProvider implements ShouldQueue
             'last_error' => null,
         ]);
 
-        SyncLog::record($provider, $entry, 'push', 'success', "{$entry->type->value} {$entry->name} synced");
+        SyncLog::record($zoneProvider->provider, $entry, 'push', 'success', "{$entry->type->value} {$entry->fqdn} synced to {$zoneProvider->label()}");
     }
 
     public function failed(?Throwable $exception): void
     {
         $entry = DnsEntry::find($this->entryId);
-        $provider = Provider::find($this->providerId);
+        $zoneProvider = ZoneProvider::with('provider')->find($this->zoneProviderId);
 
-        $entry?->syncStates()->where('provider_id', $this->providerId)->update([
-            'sync_status' => SyncStatus::Error,
-            'last_error' => $exception?->getMessage(),
-        ]);
+        EntrySyncState::query()
+            ->where('dns_entry_id', $this->entryId)
+            ->where('zone_provider_id', $this->zoneProviderId)
+            ->update([
+                'sync_status' => SyncStatus::Error,
+                'last_error' => $exception?->getMessage(),
+            ]);
 
-        SyncLog::record($provider, $entry, 'push', 'error', $exception?->getMessage());
+        SyncLog::record($zoneProvider?->provider, $entry, 'push', 'error', $exception?->getMessage());
     }
 }

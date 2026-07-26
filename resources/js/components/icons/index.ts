@@ -1,10 +1,14 @@
 // Brand / logo
 export { DnsLogo } from './dns-logo';
 
+// Zone mark
+export { ZoneMark } from './zone-mark';
+
 // Provider marks (original abstract artwork — not official logos)
 export { ProviderCloudflareMark } from './provider-cloudflare';
 export { ProviderGenericMark } from './provider-generic';
 export { ProviderPiholeMark } from './provider-pihole';
+export { ProviderTechnitiumMark } from './provider-technitium';
 
 // Record-type badge
 export { RecordTypeBadge, type RecordTypeBadgeProps } from './record-type-badge';
@@ -20,3 +24,4 @@ export { StatusSyncedIcon } from './status-synced';
 export { EmptyActivityIllustration } from './empty-activity';
 export { EmptyEntriesIllustration } from './empty-entries';
 export { EmptyProvidersIllustration } from './empty-providers';
+export { EmptyZonesIllustration } from './empty-zones';

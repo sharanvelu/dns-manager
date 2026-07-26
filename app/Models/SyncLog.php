@@ -9,6 +9,7 @@ class SyncLog extends Model
 {
     protected $fillable = [
         'provider_id',
+        'dns_zone_id',
         'dns_entry_id',
         'action',
         'status',
@@ -20,15 +21,21 @@ class SyncLog extends Model
         return $this->belongsTo(Provider::class);
     }
 
+    public function zone(): BelongsTo
+    {
+        return $this->belongsTo(DnsZone::class, 'dns_zone_id');
+    }
+
     public function entry(): BelongsTo
     {
         return $this->belongsTo(DnsEntry::class, 'dns_entry_id');
     }
 
-    public static function record(?Provider $provider, ?DnsEntry $entry, string $action, string $status, ?string $message = null): self
+    public static function record(?Provider $provider, ?DnsEntry $entry, string $action, string $status, ?string $message = null, ?int $zoneId = null): self
     {
         return self::create([
             'provider_id' => $provider?->id,
+            'dns_zone_id' => $zoneId ?? $entry?->dns_zone_id,
             'dns_entry_id' => $entry?->id,
             'action' => $action,
             'status' => $status,

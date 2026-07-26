@@ -7,7 +7,10 @@ use App\Enums\HealthStatus;
 use App\Enums\SyncStatus;
 use App\Http\Requests\ProviderRequest;
 use App\Jobs\CheckProviderDrift;
+use App\Jobs\CheckProviderHealth;
+use App\Models\DnsZone;
 use App\Models\Provider;
+use App\Services\ZoneAttachmentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,9 +26,11 @@ class ProviderController extends Controller
     {
         $providers = Provider::query()
             ->withCount([
+                // Sync states across ALL of the provider's zone attachments.
                 'syncStates as records_count',
                 'syncStates as synced_count' => fn ($q) => $q->where('sync_status', SyncStatus::Synced),
             ])
+            ->with(['zoneProviders.zone:id,name'])
             ->orderBy('name')
             ->get()
             ->map(fn (Provider $provider) => [
@@ -40,6 +45,15 @@ class ProviderController extends Controller
                 'managedRecordTypes' => $provider->managed_record_types ?? [],
                 'recordsCount' => $provider->records_count,
                 'syncedCount' => $provider->synced_count,
+                'zones' => $provider->zoneProviders
+                    ->sortBy(fn ($attachment) => $attachment->zone?->name)
+                    ->map(fn ($attachment) => [
+                        'zoneProviderId' => $attachment->id,
+                        'zoneId' => $attachment->dns_zone_id,
+                        'zoneName' => $attachment->zone?->name,
+                        'enabled' => $attachment->enabled,
+                    ])
+                    ->values(),
                 // Config keys minus secrets, so the edit form can prefill.
                 'config' => $this->publicConfig($provider),
             ]);
@@ -47,10 +61,16 @@ class ProviderController extends Controller
         return Inertia::render('providers/index', [
             'providers' => $providers,
             'connectors' => $this->registry->descriptors(),
+            // Every zone (id + name) so the UI can compute unattached zones
+            // for the attach dialog and opted-out zones for zoneless providers.
+            'allZones' => DnsZone::query()
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (DnsZone $zone) => ['id' => $zone->id, 'name' => $zone->name]),
         ]);
     }
 
-    public function store(ProviderRequest $request): RedirectResponse
+    public function store(ProviderRequest $request, ZoneAttachmentService $attachments): RedirectResponse
     {
         $data = $request->validated();
 
@@ -59,7 +79,11 @@ class ProviderController extends Controller
             'health_status' => HealthStatus::Unchecked,
         ]);
 
-        CheckProviderDrift::dispatch($provider->id);
+        $attachments->attachToAllZones($provider);
+
+        // A fresh provider has no synced records to drift-check — verify
+        // connectivity instead.
+        CheckProviderHealth::dispatch($provider->id);
 
         return back()->with('success', "Provider {$provider->name} added.");
     }

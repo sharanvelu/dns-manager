@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Enums\RecordType;
 use App\Models\DnsEntry;
+use App\Models\DnsZone;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -14,7 +15,8 @@ class DnsEntryFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->unique()->domainWord().'.example.com',
+            'dns_zone_id' => DnsZone::factory(),
+            'name' => fake()->unique()->domainWord(),
             'type' => RecordType::A,
             'content' => fake()->ipv4(),
             'ttl' => null,
@@ -22,6 +24,11 @@ class DnsEntryFactory extends Factory
             'proxied' => false,
             'comment' => null,
         ];
+    }
+
+    public function apex(): static
+    {
+        return $this->state(fn () => ['name' => '@']);
     }
 
     public function cname(string $target = 'target.example.com'): static

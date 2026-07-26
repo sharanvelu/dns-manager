@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Enums\SyncStatus;
 use App\Models\DnsEntry;
+use App\Models\DnsZone;
 use App\Models\Provider;
 use App\Models\SyncLog;
 use App\Models\User;
@@ -23,8 +24,13 @@ class DatabaseSeeder extends Seeder
             'oidc_sub' => 'seed-dev-user',
         ]);
 
+        $zone = DnsZone::factory()->create([
+            'name' => 'example.com',
+            'description' => 'Primary homelab zone',
+        ]);
+
         $cloudflare = Provider::factory()->cloudflare()->create([
-            'name' => 'Cloudflare — example.com',
+            'name' => 'Cloudflare — main account',
             'managed_record_types' => ['A', 'AAAA', 'CNAME', 'MX', 'TXT'],
             'health_status' => 'ok',
             'last_checked_at' => now()->subMinutes(7),
@@ -37,35 +43,46 @@ class DatabaseSeeder extends Seeder
             'last_checked_at' => now()->subMinutes(7),
         ]);
 
+        $cloudflareAttachment = $zone->zoneProviders()->create([
+            'provider_id' => $cloudflare->id,
+            'config' => ['zone_id' => 'seed-cf-zone'],
+        ]);
+
+        $piholeAttachment = $zone->zoneProviders()->create([
+            'provider_id' => $pihole->id,
+        ]);
+
         $entries = [
-            ['name' => 'home.example.com', 'type' => 'A', 'content' => '192.168.1.10'],
-            ['name' => 'nas.example.com', 'type' => 'A', 'content' => '192.168.1.20'],
-            ['name' => 'media.example.com', 'type' => 'CNAME', 'content' => 'nas.example.com'],
-            ['name' => 'example.com', 'type' => 'MX', 'content' => 'mail.example.com', 'priority' => 10],
+            ['name' => 'home', 'type' => 'A', 'content' => '192.168.1.10'],
+            ['name' => 'nas', 'type' => 'A', 'content' => '192.168.1.20'],
+            ['name' => 'media', 'type' => 'CNAME', 'content' => 'nas.example.com'],
+            ['name' => '@', 'type' => 'MX', 'content' => 'mail.example.com', 'priority' => 10],
         ];
 
         foreach ($entries as $i => $attributes) {
-            $entry = DnsEntry::factory()->create($attributes);
+            $entry = DnsEntry::factory()->for($zone, 'zone')->create($attributes);
 
-            foreach ([$cloudflare, $pihole] as $provider) {
-                if (! in_array($entry->type->value, $provider->managed_record_types, true)) {
+            foreach ([$cloudflareAttachment, $piholeAttachment] as $attachment) {
+                if (! $attachment->provider->managesType($entry->type->value)) {
                     continue;
                 }
 
+                $drifted = $i === 1 && $attachment->is($piholeAttachment);
+
                 $entry->syncStates()->create([
-                    'provider_id' => $provider->id,
-                    'external_id' => $provider->type->value === 'cloudflare'
+                    'zone_provider_id' => $attachment->id,
+                    'external_id' => $attachment->is($cloudflareAttachment)
                         ? 'cf-seed-'.$i
-                        : "{$entry->content} {$entry->name}",
-                    'sync_status' => $i === 1 && $provider->is($pihole) ? SyncStatus::Drifted : SyncStatus::Synced,
+                        : "{$entry->content} {$entry->fqdn}",
+                    'sync_status' => $drifted ? SyncStatus::Drifted : SyncStatus::Synced,
                     'last_synced_at' => now()->subMinutes(30),
-                    'last_error' => $i === 1 && $provider->is($pihole) ? 'Remote record differs from the managed entry.' : null,
+                    'last_error' => $drifted ? 'Remote record differs from the managed entry.' : null,
                 ]);
 
-                SyncLog::record($provider, $entry, 'push', 'success', "{$entry->type->value} {$entry->name} synced");
+                SyncLog::record($attachment->provider, $entry, 'push', 'success', "{$entry->type->value} {$entry->fqdn} synced to {$attachment->label()}");
             }
         }
 
-        SyncLog::record($pihole, null, 'drift-check', 'success', 'Checked 3 record(s), 1 drifted');
+        SyncLog::record($pihole, null, 'drift-check', 'success', 'Checked 3 record(s), 1 drifted', zoneId: $zone->id);
     }
 }
