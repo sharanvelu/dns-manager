@@ -35,6 +35,8 @@ To create the token in the Cloudflare dashboard: profile icon → **My Profile**
 
 Requires Pi-hole v6 (the REST API generation). The app authenticates per operation and releases its session immediately afterwards, so it stays well under Pi-hole's concurrent-session cap.
 
+Pi-hole restarts its DNS resolver after every CNAME change, which takes its API offline for a few seconds. The app accounts for this: operations against a Pi-hole run one at a time, and after each CNAME change the next operation waits a few seconds for the resolver to come back. A bulk sync that touches many CNAME records therefore completes gradually — entries flip to **Synced** one by one rather than failing while Pi-hole restarts.
+
 ## Adopting existing records
 
 What happens when you create an entry that **already exists at the provider** is controlled per provider by the **Adopt existing records** toggle:

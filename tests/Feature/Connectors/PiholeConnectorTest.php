@@ -7,7 +7,9 @@ use App\Models\DnsEntry;
 use App\Models\Provider;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 
 const PIHOLE_BASE = 'https://pihole.internal';
@@ -309,6 +311,80 @@ it('throws a ConnectorException when the session is reported invalid despite a 2
 
     $connector->createRecord($entry);
 })->throws(ConnectorException::class);
+
+it('waits out the resolver-restart cooldown before the session that follows a CNAME write', function () {
+    fakePihole();
+
+    $connector = new PiholeConnector(piholeProvider());
+    $entry = DnsEntry::factory()->cname('target.example.com')->create([
+        'name' => 'alias.example.com',
+        'ttl' => null,
+    ]);
+
+    $connector->createRecord($entry);
+    Sleep::assertNeverSlept();
+
+    // The next session must give FTL time to restart before authenticating.
+    $connector->listRecords();
+    Sleep::assertSleptTimes(1);
+});
+
+it('does not pace sessions after hosts-only writes', function () {
+    fakePihole();
+
+    $connector = new PiholeConnector(piholeProvider());
+    $entry = DnsEntry::factory()->create([
+        'name' => 'host.example.com',
+        'content' => '192.168.1.10',
+    ]);
+
+    $connector->createRecord($entry);
+    $connector->listRecords();
+
+    Sleep::assertNeverSlept();
+});
+
+it('paces the next session after deleting a CNAME record', function () {
+    fakePihole();
+
+    $connector = new PiholeConnector(piholeProvider());
+
+    $connector->deleteRecord('alias.example.com,target.example.com');
+    Sleep::assertNeverSlept();
+
+    $connector->deleteRecord('192.168.1.10 host.example.com');
+    Sleep::assertSleptTimes(1);
+});
+
+it('runs a CNAME update in one uninterrupted session and paces only the following one', function () {
+    fakePihole();
+
+    $connector = new PiholeConnector(piholeProvider());
+    $entry = DnsEntry::factory()->cname('new-target.example.com')->create([
+        'name' => 'alias.example.com',
+        'ttl' => null,
+    ]);
+
+    // Delete-old + put-new happen back-to-back — no sleep inside the update.
+    $connector->updateRecord($entry, 'alias.example.com,old-target.example.com');
+    Sleep::assertNeverSlept();
+
+    $connector->testConnection();
+    Sleep::assertSleptTimes(1);
+});
+
+it('releases the per-provider session lock even when the operation fails', function () {
+    fakePihole([
+        'POST /api/auth' => piholeError('unauthorized', 'Unauthorized', 401),
+    ]);
+
+    $provider = piholeProvider();
+    $connector = new PiholeConnector($provider);
+
+    expect(fn () => $connector->listRecords())->toThrow(ConnectorException::class);
+
+    expect(Cache::lock("pihole-session:{$provider->id}", 5)->get())->toBeTrue();
+});
 
 it('operates normally with TLS verification disabled', function () {
     fakePihole();

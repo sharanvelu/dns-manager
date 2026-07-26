@@ -9,15 +9,34 @@ use App\Connectors\DTOs\TestResult;
 use App\Connectors\Exceptions\ConnectorException;
 use App\Enums\RecordType;
 use App\Models\DnsEntry;
+use Carbon\CarbonInterface;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 use Throwable;
 
 class PiholeConnector extends AbstractDnsConnector
 {
+    /**
+     * Pi-hole restarts FTL's embedded resolver after every CNAME config
+     * write, which takes the whole REST API down for a few seconds. The
+     * session that follows a CNAME write waits this long first.
+     */
+    protected const CNAME_RESTART_COOLDOWN_SECONDS = 5;
+
+    protected const SESSION_LOCK_SECONDS = 60;
+
+    protected const SESSION_LOCK_WAIT_SECONDS = 30;
+
+    protected const CNAME_CONFIG_PATH = '/api/config/dns/cnameRecords';
+
+    private bool $wroteCnameConfig = false;
+
     public static function type(): string
     {
         return 'pihole';
@@ -172,14 +191,27 @@ class PiholeConnector extends AbstractDnsConnector
     protected function configPathFor(string $entryString): string
     {
         return str_contains($entryString, ',')
-            ? '/api/config/dns/cnameRecords'
+            ? self::CNAME_CONFIG_PATH
             : '/api/config/dns/hosts';
+    }
+
+    /**
+     * Flag before the request goes out: even a write that errors mid-flight
+     * may have been applied, and an extra cooldown is harmless.
+     */
+    protected function touchingConfigPath(string $path): void
+    {
+        if ($path === self::CNAME_CONFIG_PATH) {
+            $this->wroteCnameConfig = true;
+        }
     }
 
     protected function putEntry(string $sid, DnsEntry $entry): string
     {
         $value = $this->entryString($entry);
         $path = $this->configPathFor($value);
+
+        $this->touchingConfigPath($path);
 
         $response = $this->http($sid)->put($path.'/'.rawurlencode($value));
 
@@ -204,6 +236,8 @@ class PiholeConnector extends AbstractDnsConnector
     protected function deleteEntry(string $sid, string $externalId): void
     {
         $path = $this->configPathFor($externalId);
+
+        $this->touchingConfigPath($path);
 
         $response = $this->http($sid)->delete($path.'/'.rawurlencode($externalId));
 
@@ -256,6 +290,10 @@ class PiholeConnector extends AbstractDnsConnector
      * Run $callback inside a single authenticated Pi-hole session, always
      * releasing the session afterwards (Pi-hole caps concurrent sessions).
      *
+     * Sessions are serialized per provider and pace themselves after CNAME
+     * writes: each write restarts the resolver and takes the API down, so
+     * an unthrottled bulk push fails on every entry after the first.
+     *
      * @template TReturn
      *
      * @param  callable(string): TReturn  $callback
@@ -263,13 +301,53 @@ class PiholeConnector extends AbstractDnsConnector
      */
     protected function withSession(callable $callback): mixed
     {
-        $sid = $this->authenticate();
+        $lock = Cache::lock("pihole-session:{$this->provider->id}", self::SESSION_LOCK_SECONDS);
 
         try {
-            return $callback($sid);
-        } finally {
-            $this->logout($sid);
+            $lock->block(self::SESSION_LOCK_WAIT_SECONDS);
+        } catch (LockTimeoutException) {
+            throw new ConnectorException('Pi-hole is still applying earlier changes — the operation was not started. It will be retried automatically.');
         }
+
+        try {
+            $this->awaitRestartCooldown();
+
+            $sid = $this->authenticate();
+
+            try {
+                return $callback($sid);
+            } finally {
+                $this->logout($sid);
+            }
+        } finally {
+            if ($this->wroteCnameConfig) {
+                $this->stampRestartCooldown();
+                $this->wroteCnameConfig = false;
+            }
+
+            $lock->release();
+        }
+    }
+
+    private function awaitRestartCooldown(): void
+    {
+        $until = Cache::get($this->restartCooldownKey());
+
+        if ($until instanceof CarbonInterface && $until->isFuture()) {
+            Sleep::until($until);
+        }
+    }
+
+    private function stampRestartCooldown(): void
+    {
+        $until = now()->addSeconds(self::CNAME_RESTART_COOLDOWN_SECONDS);
+
+        Cache::put($this->restartCooldownKey(), $until, $until);
+    }
+
+    private function restartCooldownKey(): string
+    {
+        return "pihole-restart-cooldown:{$this->provider->id}";
     }
 
     private function authenticate(): string
