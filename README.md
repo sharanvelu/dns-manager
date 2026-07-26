@@ -44,6 +44,7 @@ Run tests with `./vendor/bin/pest`, format with `./vendor/bin/pint`.
 | `OIDC_REDIRECT_URI` | Defaults to `${APP_URL}/auth/callback` |
 | `OIDC_PROVIDER_LABEL` | Sign-in button label, e.g. `Sentrix` → "Sign in with Sentrix" |
 | `QUEUE_CONNECTION` | `redis` in production |
+| `ACTIVITY_LOGS_RETENTION_DAYS` | Optional — auto-delete audit-trail activities older than N days (daily schedule; unset keeps them forever) |
 
 ## Architecture
 

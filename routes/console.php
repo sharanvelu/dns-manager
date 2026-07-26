@@ -20,3 +20,13 @@ if (config('dns.scheduler_enabled')) {
             ->onOneServer();
     }
 }
+
+// Automatic audit-trail retention: ACTIVITY_LOGS_RETENTION_DAYS=N deletes
+// activities older than N days once a day. Setting the variable is the
+// opt-in, so this registers regardless of SCHEDULER_ENABLED (which exists
+// for externally-triggered drift/health checks — retention has no webhook).
+if (($days = (int) config('dns.activity_logs_retention_days')) >= 1) {
+    Schedule::command("dns:flush-activities --days={$days} --force")
+        ->daily()
+        ->onOneServer();
+}

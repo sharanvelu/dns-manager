@@ -98,6 +98,7 @@ Health probes hit Laravel's built-in `/up` endpoint on port 8080. See `k8s/READM
 | `DRIFT_CHECK_CRON` | Cron expression for the built-in drift-check schedule. Defaults to `*/15 * * * *` (every 15 minutes). |
 | `PROVIDER_HEALTH_CHECK_ENABLED` | `false` disables just the built-in provider health-check schedule (drift checks keep running). Defaults to `true`. |
 | `PROVIDER_HEALTH_CHECK_CRON` | Cron expression for the built-in provider health-check schedule. Defaults to `*/5 * * * *` (every 5 minutes). |
+| `ACTIVITY_LOGS_RETENTION_DAYS` | When set to a positive number, [audit-trail activities](activity-log#retention) older than that many days are deleted automatically once a day (registered even when `SCHEDULER_ENABLED=false`). Unset by default — activities are kept forever. |
 | `HOOKS_TRIGGER_TOKEN` | Bearer token enabling `POST /api/hooks/drift-check` and `POST /api/hooks/provider-health-check` for external automation. The endpoints stay disabled (404) while unset. |
 
 ## Running roles

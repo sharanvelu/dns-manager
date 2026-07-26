@@ -26,6 +26,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Activity Log Retention
+    |--------------------------------------------------------------------------
+    |
+    | When set to a positive number of days, a daily schedule runs
+    | `dns:flush-activities --days=N --force` to delete audit-trail
+    | activities older than the window. Unset (the default) keeps
+    | activities forever — flush manually if needed. Registered
+    | independently of SCHEDULER_ENABLED: setting the variable is the
+    | opt-in.
+    |
+    */
+
+    'activity_logs_retention_days' => env('ACTIVITY_LOGS_RETENTION_DAYS'),
+
+    /*
+    |--------------------------------------------------------------------------
     | External Trigger Token
     |--------------------------------------------------------------------------
     |
