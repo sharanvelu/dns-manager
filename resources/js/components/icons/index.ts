@@ -4,7 +4,7 @@ export { DnsLogo } from './dns-logo';
 // Zone mark
 export { ZoneMark } from './zone-mark';
 
-// Provider marks (original abstract artwork — not official logos)
+// Provider marks (official brand logos in brand colors; generic is original artwork)
 export { ProviderCloudflareMark } from './provider-cloudflare';
 export { ProviderGenericMark } from './provider-generic';
 export { ProviderPiholeMark } from './provider-pihole';

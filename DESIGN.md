@@ -11,10 +11,10 @@ UI/UX conventions for DNS Manager. Keep in sync with the code — see the sync r
 
 ## Iconography (`resources/js/components/icons/`)
 
-Original SVG artwork only — never trademarked provider logos. All icons: `SVGProps<SVGSVGElement>`, `currentColor`, rounded caps, `strokeWidth 1.5`, legible at 16px.
+App icons are original SVG artwork (`SVGProps<SVGSVGElement>`, `currentColor`, rounded caps, `strokeWidth 1.5`, legible at 16px). **Exception — provider marks are the real brand logos** (user decision, 2026-07-26): identifying third-party services, rendered as filled paths in their official brand colors so they stay recognizable and dim correctly via `opacity-*`.
 
 - `DnsLogo` — app mark (hexagon + resolving route-dots); also `public/favicon.svg`.
-- Provider marks: `ProviderCloudflareMark` (abstract cloud+edge), `ProviderPiholeMark` (shield/funnel), `ProviderGenericMark` (server node — fallback and future connectors).
+- Provider marks: `ProviderCloudflareMark` (official two-tone orange cloud, Simple Icons path split per segment), `ProviderPiholeMark` (official glyph, brand red `#96060C`, brighter tint in dark mode via `currentColor` + text-color classes), `ProviderTechnitiumMark` (brand-blue `#6699FF` maze traced from the official 48×48 logo), `ProviderGenericMark` (original server-node artwork — fallback and future connectors).
 - `ZoneMark` — the zone glyph, used in zone cards, zone headers, and dashboard zone tiles.
 - Status glyphs: `StatusSyncedIcon` / `StatusPendingIcon` / `StatusDriftedIcon` / `StatusErrorIcon` / `StatusDeletingIcon`.
 - Empty states: `EmptyEntriesIllustration`, `EmptyProvidersIllustration`, `EmptyZonesIllustration`, `EmptyActivityIllustration` (160×120, low-opacity layered strokes).

@@ -49,7 +49,7 @@ resources/js/components/entries/   # shared EntriesView + dialogs — serves /en
 resources/js/components/activity/  # shared ActivityTable — serves settings activity AND zone activity via baseUrl
 resources/js/components/zones/     # zone dialogs (form/delete/attach/detach/attachment-config/import-records); zone-tabs.tsx header lives one level up
 resources/js/components/users/     # GrantDialog — shared zone-access grant/edit dialog (user detail page AND zone Access tab); nav-group.tsx (collapsible sidebar group) lives one level up
-resources/js/components/icons/     # custom SVG icon set (original artwork, currentColor)
+resources/js/components/icons/     # custom SVG icon set (original artwork; provider marks are real brand logos — see DESIGN.md)
 docs/content/            # user documentation source (markdown + frontmatter) — single source
 docs-site/               # standalone Next.js docs site (latest-version docs; deployed via Vercel, not Docker)
 k8s/                     # Kubernetes manifests; docker/ holds nginx/fpm/supervisor configs
