@@ -1,8 +1,8 @@
 # DNS Manager
 
-Manage DNS entries across multiple providers from one place. Entries created here are automatically pushed to every enabled provider that supports the record type, and a scheduled drift check flags records that were changed or removed behind the app's back. Every user action — entry, provider, user/role, and sign-in changes — is recorded in a built-in audit trail (Settings → Activity log, Super Admin only) with field-level diffs; provider credentials are never logged.
+Manage DNS entries across multiple providers from one place. Records live in **DNS zones** with zone-relative names; a provider's credentials are entered once and **attached** to any number of zones, entries are pushed to the attachments you select, and a scheduled drift check flags records that were changed or removed behind the app's back. Access is role-based per zone (Super Admin/Viewer, User Admin globally; Zone Admin, DNS Manager, Viewer, and Provider Manager per zone). Every user action — zone, entry, provider, user/grant, and sign-in changes — is recorded in a built-in audit trail with field-level diffs; provider credentials are never logged.
 
-**Providers in v1:** Cloudflare (public DNS, 9 record types) and Pi-hole v6 (local DNS: A / AAAA / CNAME). The connector architecture is designed for adding Technitium, Unbound, and others later.
+**Providers:** Cloudflare (public DNS, 9 record types), Pi-hole v6 (local DNS: A / AAAA / CNAME — zoneless, auto-attaches to every zone), and Technitium DNS Server (self-hosted authoritative DNS, 9 record types). The connector architecture is designed for adding Unbound and others later.
 
 ## Documentation
 
@@ -54,19 +54,23 @@ app/
 │   ├── DTOs/               # ConfigField, RemoteRecord, TestResult, capabilities
 │   ├── CloudflareConnector.php
 │   ├── PiholeConnector.php
+│   ├── TechnitiumConnector.php
 │   └── ConnectorRegistry.php        # register new connectors here
 ├── Jobs/                   # SyncEntryToProvider, DeleteEntryFromProvider, CheckProviderDrift, CheckProviderHealth
-├── Services/SyncService.php # decides which providers receive which entries
-└── Http/Controllers/       # Dashboard, DnsEntry, Provider controllers
+├── Services/               # SyncService (which attachments receive which entries), ZoneAttachmentService
+├── Policies/DnsZonePolicy.php       # per-zone role checks
+└── Http/Controllers/       # Dashboard, Zone, ZoneProvider, DnsEntry, Provider, User controllers
 ```
 
-- A connector declares the record types it **can** manage (`supportedRecordTypes`) and the settings it needs (`configSchema`, rendered dynamically by the Providers UI).
+Three levels connect an entry to a provider: a **Provider** holds account credentials, a **zone attachment** (`zone_providers`) carries the zone-specific settings (e.g. the Cloudflare zone ID — auto-discovered), and each **entry** targets a subset of its zone's attachments, with sync state tracked per attachment.
+
+- A connector declares the record types it **can** manage (`supportedRecordTypes`), the credentials it needs (`configSchema`), and its per-zone attachment settings (`zoneConfigSchema`) — both forms are rendered dynamically by the UI.
 - A provider (a configured connector instance) narrows that to the types it **does** manage — chosen in the UI, stored as `managed_record_types`.
-- Saving an entry queues a push to every enabled provider managing that type. The scheduler dispatches a drift check for each provider every 15 minutes and a connectivity health check every 5 minutes.
+- Saving an entry queues a push to its selected attachments (all compatible ones by default). The scheduler dispatches a drift check for each provider every 15 minutes and a connectivity health check every 5 minutes.
 
 ### Adding a connector
 
-1. Create `app/Connectors/FooConnector.php` extending `AbstractDnsConnector`.
+1. Create `app/Connectors/FooConnector.php` extending `AbstractDnsConnector` (implement `zoneConfigSchema()`/`testZone()`/`discoverZoneConfig()` for zoned providers, or mark it zoneless to auto-attach everywhere).
 2. Add a case to `App\Enums\ProviderType`.
 3. Register the class in `ConnectorRegistry::$connectors`.
 4. The Providers UI picks it up automatically from the registry descriptors.

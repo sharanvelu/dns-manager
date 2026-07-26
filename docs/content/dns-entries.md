@@ -84,7 +84,7 @@ Each provider chip on an entry row shows one of five states — sync state is tr
 | **Error** | The last push or delete failed. Hover the chip for the provider's error message (e.g. an invalid token or an API rejection). |
 | **Deleting** | A remote delete is queued or in flight for this provider. |
 
-Drift and error chips show the detail in a tooltip on hover; the same events appear in the [Dashboard](dashboard) activity feed and on the zone's Providers tab.
+Drift and error chips show the detail in a tooltip on hover; the same events appear in the [Dashboard](dashboard) activity feed.
 
 ## Sync now
 

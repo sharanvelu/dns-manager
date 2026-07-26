@@ -27,7 +27,7 @@ Because an entry can be drifted on one provider and errored on another, the Drif
 
 ## Zone cards
 
-Each [zone](zones) you can access gets a card showing its record count, one small icon per attached provider type, and a status rollup: **All in sync** when every record is fully synced, plus *N drifted* and *N errors* counts when something is off. Click a card to open the zone's dashboard. Until you create your first zone, this section walks you there instead.
+Each [zone](zones) you can access gets a card showing its record count, one small icon per attached provider type, and a status rollup: **All in sync** when every record is fully synced, plus *N drifted* and *N errors* counts when something is off. Click a card to open the zone's Records tab. Until you create your first zone, this section walks you there instead.
 
 ## Provider cards
 
@@ -54,7 +54,7 @@ The feed shows the 15 most recent sync-log events. Every background job writes o
 | `drift-check` | A provider's records were compared against the database (result: how many records were checked and how many drifted). |
 | `provider-health-check` | A provider's connectivity was tested with the connector's connection test (same as **Test connection** in the UI). |
 
-Each event carries a success or error status and a message, plus the zone, provider, and entry involved. The same feed, filtered to one zone, appears on that zone's [Providers tab](zones#the-zone-page).
+Each event carries a success or error status and a message, plus the zone, provider, and entry involved.
 
 This feed tracks background sync jobs, not user actions — for the audit trail of who changed what, see the [Activity Log](activity-log).
 
