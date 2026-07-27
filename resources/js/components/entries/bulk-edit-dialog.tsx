@@ -90,7 +90,7 @@ export function BulkEditDialog({ open, onOpenChange, selectedIds, onDone }: Bulk
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>
                         Bulk edit {selectedIds.length} {selectedIds.length === 1 ? 'entry' : 'entries'}
