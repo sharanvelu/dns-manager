@@ -1,0 +1,55 @@
+# Grouped weekly dependency updates. Minor+patch bumps arrive as ONE PR
+# per ecosystem; majors get individual PRs. The chore(deps) commit prefix
+# keeps PR titles Conventional-Commits-valid so the pr-title gate passes
+# and dependabot-auto-merge.yml can auto-merge patch/minor once the
+# required checks are green.
+version: 2
+
+updates:
+  - package-ecosystem: composer
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "chore(deps)"
+    open-pull-requests-limit: 10
+    groups:
+      composer-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "chore(deps)"
+    open-pull-requests-limit: 10
+    groups:
+      npm-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "chore(deps)"
+    open-pull-requests-limit: 10
+    groups:
+      actions-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch

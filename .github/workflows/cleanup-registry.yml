@@ -1,0 +1,40 @@
+# GHCR garbage collection: every master merge pushes a multi-arch sha-*
+# image, and the digest-based build flow leaves untagged manifests behind
+# over time. This deletes untagged image versions weekly.
+# Requires a GHCR_CLEANUP_TOKEN secret (classic PAT with read:packages +
+# delete:packages) — the job no-ops with a notice when it is absent.
+name: cleanup-registry
+
+on:
+  schedule:
+    - cron: "0 2 * * 0"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: cleanup-registry
+  cancel-in-progress: false
+
+jobs:
+  untagged:
+    name: Delete Untagged Images
+    if: github.repository_owner == 'sharanvelu'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TOKEN: ${{ secrets.GHCR_CLEANUP_TOKEN }}
+    steps:
+      - name: Skip notice
+        if: env.TOKEN == ''
+        run: echo "::notice::GHCR_CLEANUP_TOKEN not set — skipping registry cleanup."
+
+      - name: Clean untagged package versions
+        if: env.TOKEN != ''
+        uses: stumpylog/image-cleaner-action/untagged@4fe057d991d63b8f6d5d22c40f17c1bca2226537 # v0.12.0
+        with:
+          token: ${{ env.TOKEN }}
+          owner: ${{ github.repository_owner }}
+          is_org: "false"
+          package_name: dns-manager
+          do_delete: "true"

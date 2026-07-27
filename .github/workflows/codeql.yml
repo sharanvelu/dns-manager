@@ -1,0 +1,79 @@
+# Security scanning. CodeQL covers the TypeScript/React frontend and the
+# GitHub Actions workflows (CodeQL has no PHP support); Semgrep covers the
+# PHP side. Findings land in the Security → Code scanning tab via SARIF;
+# neither job blocks PRs on findings — they surface alerts.
+name: codeql
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: codeql-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    if: github.event_name != 'schedule' || github.repository_owner == 'sharanvelu'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        language:
+          - javascript-typescript
+          - actions
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  semgrep:
+    name: Semgrep (PHP)
+    if: (github.event_name != 'schedule' || github.repository_owner == 'sharanvelu') && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: semgrep/semgrep:1.171.0
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Semgrep scan
+        run: semgrep scan --config auto --sarif --output semgrep.sarif .
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep

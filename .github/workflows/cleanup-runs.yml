@@ -1,0 +1,64 @@
+# Actions-history hygiene: deletes cancelled/skipped workflow runs and
+# completed runs older than 30 days, so the Actions tab stays usable.
+name: cleanup-runs
+
+on:
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: cleanup-runs
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: Prune Workflow Runs
+    if: github.repository_owner == 'sharanvelu'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: write
+    steps:
+      - name: Delete stale runs
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+            let deleted = 0;
+
+            const remove = async (run) => {
+              try {
+                await github.rest.actions.deleteWorkflowRun({ owner, repo, run_id: run.id });
+                deleted++;
+              } catch (e) {
+                core.info(`Could not delete run ${run.id}: ${e.message}`);
+              }
+            };
+
+            // Cancelled and skipped runs carry no useful history.
+            for (const status of ['cancelled', 'skipped']) {
+              const runs = await github.paginate(
+                github.rest.actions.listWorkflowRunsForRepo,
+                { owner, repo, status, per_page: 100 },
+              );
+              for (const run of runs) await remove(run);
+            }
+
+            // Completed runs older than the cutoff (page cap keeps the
+            // job bounded on the first ever execution).
+            for (let page = 1; page <= 10; page++) {
+              const { data } = await github.rest.actions.listWorkflowRunsForRepo(
+                { owner, repo, status: 'completed', per_page: 100, page },
+              );
+              if (data.workflow_runs.length === 0) break;
+              const old = data.workflow_runs.filter(
+                (run) => new Date(run.created_at).getTime() < cutoff,
+              );
+              for (const run of old) await remove(run);
+            }
+
+            core.notice(`Deleted ${deleted} workflow runs.`);

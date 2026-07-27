@@ -1,7 +1,10 @@
-# Static-analysis gate: runs on every PR targeting master.
-# PHP: PHPStan (via Larastan) at level 5; pre-existing debt lives in
-# phpstan-baseline.neon so only new violations fail.
+# Static-analysis gate: changes → work → gate. "Static Analysis Gate" is
+# the required check.
+# PHP: PHPStan (via Larastan) level 5; pre-existing debt lives in
+#   phpstan-baseline.neon so only new violations fail.
 # JS: TypeScript compiler in --noEmit mode over the whole frontend.
+# Workflows: actionlint (YAML/expression lint) + zizmor (security audit)
+#   run only when .github/** changes.
 name: static-code-analyze
 
 on:
@@ -10,29 +13,70 @@ on:
       - master
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
-  group: static-code-analyze-${{ github.ref }}
+  group: static-code-analyze-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+    outputs:
+      php: ${{ github.event_name != 'pull_request' && 'true' || steps.filter.outputs.php }}
+      js: ${{ github.event_name != 'pull_request' && 'true' || steps.filter.outputs.js }}
+      workflows: ${{ github.event_name != 'pull_request' && 'true' || steps.filter.outputs.workflows }}
+    steps:
+      - name: Filter changed paths
+        id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+        with:
+          filters: |
+            php:
+              - '**.php'
+              - 'composer.json'
+              - 'composer.lock'
+              - 'phpstan.neon'
+              - 'phpstan-baseline.neon'
+              - '.github/workflows/static-code-analyze.yml'
+              - '.github/actions/setup/**'
+            js:
+              - 'resources/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'tsconfig.json'
+              - 'vite.config.js'
+              - 'vitest.config.ts'
+              - '.github/workflows/static-code-analyze.yml'
+              - '.github/actions/setup/**'
+            workflows:
+              - '.github/workflows/**'
+              - '.github/actions/**'
+              - '.github/dependabot.yml'
+
   php:
     name: PHP Static Analysis
+    needs: changes
+    if: needs.changes.outputs.php == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          php-version: '8.4'
-          tools: composer:v2
+          persist-credentials: false
 
-      - name: Install Dependencies
-        run: composer install --no-interaction --no-progress --prefer-dist
+      - name: Setup
+        uses: ./.github/actions/setup
+        with:
+          node: 'false'
 
       # Larastan boots the framework, so it needs a valid app key.
       - name: Prepare Environment
@@ -45,30 +89,61 @@ jobs:
 
   js:
     name: JS Static Analysis
+    needs: changes
+    if: needs.changes.outputs.js == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          php-version: '8.4'
-          tools: composer:v2
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
+          persist-credentials: false
 
       # tsc needs vendor/ too: tsconfig maps ziggy-js to
       # vendor/tightenco/ziggy (Ziggy's JS ships in the composer package,
       # not npm), so type-checking fails with TS2307 without it.
-      - name: Install Dependencies
-        run: |
-          composer install --no-interaction --no-scripts --no-progress --prefer-dist
-          npm ci
+      - name: Setup
+        uses: ./.github/actions/setup
+        with:
+          composer-options: '--no-scripts'
 
       - name: TypeScript (tsc --noEmit)
         run: npm run analyze
+
+  workflows:
+    name: Workflow Lint
+    needs: changes
+    if: needs.changes.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: actionlint
+        uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7 # v2.2.0
+        with:
+          fail-on-error: true
+
+      - name: zizmor (workflow security audit)
+        uses: zizmorcore/zizmor-action@6fc4b006235f201fdab3722e17240ab420d580e5 # v0.6.1
+
+  gate:
+    name: Static Analysis Gate
+    needs: [changes, php, js, workflows]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail if any needed job failed or was cancelled
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
+      - name: All good
+        run: echo "All analysis jobs succeeded or were skipped as not relevant."

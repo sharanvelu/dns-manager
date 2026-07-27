@@ -1,0 +1,56 @@
+# Shared toolchain bootstrap used by every CI workflow — one place to bump
+# PHP/Node versions and caching so the workflows can't drift apart.
+name: Setup
+description: PHP + Node toolchain setup with dependency install and caching.
+
+inputs:
+  php:
+    description: Set up PHP and install composer dependencies ('true'/'false')
+    default: 'true'
+  node:
+    description: Set up Node and install npm dependencies ('true'/'false')
+    default: 'true'
+  coverage:
+    description: PHP coverage driver ('none' or 'pcov')
+    default: 'none'
+  composer-options:
+    description: Extra flags appended to composer install (e.g. '--no-scripts')
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Setup PHP
+      if: inputs.php == 'true'
+      uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+      with:
+        php-version: '8.4'
+        tools: composer:v2
+        coverage: ${{ inputs.coverage }}
+
+    - name: Cache Composer downloads
+      if: inputs.php == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/composer
+        key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+        restore-keys: composer-${{ runner.os }}-
+
+    - name: Install PHP dependencies
+      if: inputs.php == 'true'
+      shell: bash
+      env:
+        COMPOSER_OPTIONS: ${{ inputs.composer-options }}
+      run: composer install --no-interaction --no-progress --prefer-dist $COMPOSER_OPTIONS
+
+    - name: Setup Node
+      if: inputs.node == 'true'
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: '22'
+        cache: 'npm'
+
+    - name: Install JS dependencies
+      if: inputs.node == 'true'
+      shell: bash
+      run: npm ci
