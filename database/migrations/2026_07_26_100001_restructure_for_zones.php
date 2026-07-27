@@ -1,10 +1,12 @@
 <?php
 
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Crypt;
+declare(strict_types = 1);
+
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Database\Migrations\Migration;
 
 /**
  * Zones overhaul (v2.0.0): entries move under DNS zones with zone-relative
@@ -15,8 +17,7 @@ use Illuminate\Support\Facades\Schema;
  * zone attachment). Shipped migrations are never edited, so both fresh and
  * existing installs converge here.
  */
-return new class extends Migration
-{
+return new class () extends Migration {
     public function up(): void
     {
         Schema::dropIfExists('sync_logs');

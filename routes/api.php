@@ -1,9 +1,11 @@
 <?php
 
+declare(strict_types = 1);
+
+use Illuminate\Support\Facades\Route;
+use App\Http\Middleware\AuthenticateTriggerToken;
 use App\Http\Controllers\Api\DriftCheckController;
 use App\Http\Controllers\Api\ProviderHealthCheckController;
-use App\Http\Middleware\AuthenticateTriggerToken;
-use Illuminate\Support\Facades\Route;
 
 // External automation hooks (N8N, cron, CI). Guarded by a static bearer
 // token (HOOKS_TRIGGER_TOKEN); disabled while the token is unset.

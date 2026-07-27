@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types = 1);
+
 use Illuminate\Support\Facades\Schedule;
 
 // The built-in schedules. Timing comes from DRIFT_CHECK_CRON and

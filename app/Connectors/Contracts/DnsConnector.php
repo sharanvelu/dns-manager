@@ -1,13 +1,15 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Connectors\Contracts;
 
-use App\Connectors\DTOs\ConfigField;
-use App\Connectors\DTOs\ConnectorCapabilities;
-use App\Connectors\DTOs\RemoteRecord;
-use App\Connectors\DTOs\TestResult;
 use App\Models\DnsEntry;
 use Illuminate\Support\Collection;
+use App\Connectors\DTOs\TestResult;
+use App\Connectors\DTOs\ConfigField;
+use App\Connectors\DTOs\RemoteRecord;
+use App\Connectors\DTOs\ConnectorCapabilities;
 
 interface DnsConnector
 {

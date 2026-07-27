@@ -1,11 +1,12 @@
 <?php
 
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
+declare(strict_types = 1);
 
-return new class extends Migration
-{
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Database\Migrations\Migration;
+
+return new class () extends Migration {
     /**
      * Field-level drift diff recorded by the drift check: a list of
      * {field, tracked, actual} objects (null while not drifted, or when

@@ -1,7 +1,8 @@
 <?php
 
-return [
+declare(strict_types = 1);
 
+return [
     /*
     |--------------------------------------------------------------------------
     | Built-in Scheduler
@@ -52,5 +53,4 @@ return [
     */
 
     'trigger_token' => env('HOOKS_TRIGGER_TOKEN'),
-
 ];

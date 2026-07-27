@@ -1,25 +1,29 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Http\Controllers;
 
-use App\Connectors\ConnectorRegistry;
-use App\Http\Requests\DnsEntryRequest;
-use App\Models\DnsEntry;
-use App\Models\DnsZone;
-use App\Services\DnsEntryImporter;
-use App\Services\SyncService;
-use App\Support\EntryPresenter;
-use App\Support\EntryQuery;
-use App\Support\ZonePermissions;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Models\DnsZone;
+use App\Models\DnsEntry;
+use App\Support\EntryQuery;
+use Illuminate\Http\Request;
+use App\Services\SyncService;
+use App\Support\EntryPresenter;
+use App\Support\ZonePermissions;
+use App\Services\DnsEntryImporter;
+use App\Connectors\ConnectorRegistry;
+use Illuminate\Http\RedirectResponse;
+use App\Http\Requests\DnsEntryRequest;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DnsEntryController extends Controller
 {
-    public function __construct(private SyncService $sync) {}
+    public function __construct(private SyncService $sync)
+    {
+    }
 
     public function index(Request $request, ConnectorRegistry $registry): Response
     {

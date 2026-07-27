@@ -1,13 +1,15 @@
 <?php
 
-use App\Enums\SyncStatus;
-use App\Jobs\SyncEntryToProvider;
-use App\Models\DnsEntry;
-use App\Models\DnsZone;
-use App\Models\Provider;
+declare(strict_types = 1);
+
 use App\Models\User;
-use App\Models\ZoneProvider;
+use App\Models\DnsZone;
+use App\Models\DnsEntry;
+use App\Models\Provider;
 use App\Models\ZoneUser;
+use App\Enums\SyncStatus;
+use App\Models\ZoneProvider;
+use App\Jobs\SyncEntryToProvider;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 
@@ -51,12 +53,12 @@ function cfRecord(string $id, string $type, string $name, string $content, array
 
 function importRecordsUrl(): string
 {
-    return '/zones/'.test()->zone->id.'/providers/'.test()->attachment->id.'/remote-records';
+    return '/zones/' . test()->zone->id . '/providers/' . test()->attachment->id . '/remote-records';
 }
 
 function importUrl(): string
 {
-    return '/zones/'.test()->zone->id.'/providers/'.test()->attachment->id.'/import';
+    return '/zones/' . test()->zone->id . '/providers/' . test()->attachment->id . '/import';
 }
 
 function zoneEntry(array $attributes): DnsEntry

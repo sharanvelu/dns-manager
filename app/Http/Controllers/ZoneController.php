@@ -1,32 +1,36 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Http\Controllers;
 
-use App\Connectors\ConnectorRegistry;
-use App\Enums\SyncStatus;
-use App\Http\Requests\ZoneRequest;
-use App\Jobs\SyncEntryToProvider;
-use App\Models\DnsEntry;
-use App\Models\DnsZone;
-use App\Models\EntrySyncState;
-use App\Models\Provider;
-use App\Models\ZoneProvider;
-use App\Services\SyncService;
-use App\Services\ZoneAttachmentService;
-use App\Support\ActivityQuery;
-use App\Support\EntryPresenter;
-use App\Support\EntryQuery;
-use App\Support\ZonePermissions;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Models\DnsZone;
+use App\Models\DnsEntry;
+use App\Models\Provider;
+use App\Enums\SyncStatus;
+use App\Support\EntryQuery;
+use App\Models\ZoneProvider;
+use Illuminate\Http\Request;
+use App\Services\SyncService;
+use App\Models\EntrySyncState;
+use App\Support\ActivityQuery;
+use App\Support\EntryPresenter;
+use App\Support\ZonePermissions;
+use App\Jobs\SyncEntryToProvider;
+use Illuminate\Http\JsonResponse;
+use App\Http\Requests\ZoneRequest;
+use Illuminate\Support\Collection;
+use App\Connectors\ConnectorRegistry;
+use Illuminate\Http\RedirectResponse;
+use App\Services\ZoneAttachmentService;
 
 class ZoneController extends Controller
 {
-    public function __construct(private ConnectorRegistry $registry) {}
+    public function __construct(private ConnectorRegistry $registry)
+    {
+    }
 
     public function index(Request $request): Response
     {
@@ -247,7 +251,7 @@ class ZoneController extends Controller
 
         $count = $entries->count();
 
-        return back()->with('success', "Queued sync for {$count} record".($count === 1 ? '' : 's')." in {$zone->name}.");
+        return back()->with('success', "Queued sync for {$count} record" . ($count === 1 ? '' : 's') . " in {$zone->name}.");
     }
 
     /**
@@ -277,7 +281,7 @@ class ZoneController extends Controller
             return back()->with('success', "No drifted records to sync in {$zone->name}.");
         }
 
-        return back()->with('success', "Queued sync for {$count} drifted record".($count === 1 ? '' : 's')." in {$zone->name}.");
+        return back()->with('success', "Queued sync for {$count} drifted record" . ($count === 1 ? '' : 's') . " in {$zone->name}.");
     }
 
     /**

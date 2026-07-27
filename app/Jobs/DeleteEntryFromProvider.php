@@ -1,13 +1,15 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Jobs;
 
+use Throwable;
+use App\Models\SyncLog;
 use App\Enums\SyncStatus;
 use App\Models\EntrySyncState;
-use App\Models\SyncLog;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Throwable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 
 class DeleteEntryFromProvider implements ShouldQueue
 {
@@ -18,7 +20,9 @@ class DeleteEntryFromProvider implements ShouldQueue
     /** @var array<int, int> */
     public array $backoff = [10, 60];
 
-    public function __construct(public int $syncStateId) {}
+    public function __construct(public int $syncStateId)
+    {
+    }
 
     public function handle(): void
     {

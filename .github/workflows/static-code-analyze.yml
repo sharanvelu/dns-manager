@@ -1,0 +1,74 @@
+# Static-analysis gate: runs on every PR targeting master.
+# PHP: PHPStan (via Larastan) at level 5; pre-existing debt lives in
+# phpstan-baseline.neon so only new violations fail.
+# JS: TypeScript compiler in --noEmit mode over the whole frontend.
+name: static-code-analyze
+
+on:
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: static-code-analyze-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  php:
+    name: PHP Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+
+      - name: Install Dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      # Larastan boots the framework, so it needs a valid app key.
+      - name: Prepare Environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: PHPStan
+        run: composer run analyze
+
+  js:
+    name: JS Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      # tsc needs vendor/ too: tsconfig maps ziggy-js to
+      # vendor/tightenco/ziggy (Ziggy's JS ships in the composer package,
+      # not npm), so type-checking fails with TS2307 without it.
+      - name: Install Dependencies
+        run: |
+          composer install --no-interaction --no-scripts --no-progress --prefer-dist
+          npm ci
+
+      - name: TypeScript (tsc --noEmit)
+        run: npm run analyze

@@ -1,18 +1,20 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Http\Controllers;
 
 use App\Enums\Role;
-use App\Enums\ZoneRole;
-use App\Models\DnsZone;
 use App\Models\User;
-use App\Models\ZoneUser;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Enums\ZoneRole;
+use App\Models\DnsZone;
+use App\Models\ZoneUser;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Http\RedirectResponse;
 
 class UserController extends Controller
 {

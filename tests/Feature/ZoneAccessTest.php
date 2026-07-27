@@ -1,8 +1,10 @@
 <?php
 
+declare(strict_types = 1);
+
+use App\Models\User;
 use App\Enums\ZoneRole;
 use App\Models\DnsZone;
-use App\Models\User;
 use App\Models\ZoneUser;
 use Spatie\Activitylog\Models\Activity;
 

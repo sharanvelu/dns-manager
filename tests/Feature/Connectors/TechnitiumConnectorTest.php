@@ -1,16 +1,18 @@
 <?php
 
-use App\Connectors\DTOs\RemoteRecord;
-use App\Connectors\Exceptions\ConnectorException;
-use App\Connectors\Exceptions\RecordNotFoundException;
-use App\Connectors\TechnitiumConnector;
-use App\Enums\RecordType;
-use App\Models\DnsEntry;
+declare(strict_types = 1);
+
 use App\Models\DnsZone;
+use App\Models\DnsEntry;
 use App\Models\Provider;
+use App\Enums\RecordType;
 use App\Models\ZoneProvider;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use App\Connectors\DTOs\RemoteRecord;
+use App\Connectors\TechnitiumConnector;
+use App\Connectors\Exceptions\ConnectorException;
+use App\Connectors\Exceptions\RecordNotFoundException;
 
 const TECHNITIUM_BASE = 'https://technitium.internal:53443';
 
@@ -94,11 +96,11 @@ beforeEach(function () {
 
     $this->connector = new TechnitiumConnector($this->provider, $this->zoneProvider);
 
-    $this->zonesListUrl = TECHNITIUM_BASE.'/api/zones/list*';
-    $this->addUrl = TECHNITIUM_BASE.'/api/zones/records/add*';
-    $this->getUrl = TECHNITIUM_BASE.'/api/zones/records/get*';
-    $this->updateUrl = TECHNITIUM_BASE.'/api/zones/records/update*';
-    $this->deleteUrl = TECHNITIUM_BASE.'/api/zones/records/delete*';
+    $this->zonesListUrl = TECHNITIUM_BASE . '/api/zones/list*';
+    $this->addUrl = TECHNITIUM_BASE . '/api/zones/records/add*';
+    $this->getUrl = TECHNITIUM_BASE . '/api/zones/records/get*';
+    $this->updateUrl = TECHNITIUM_BASE . '/api/zones/records/update*';
+    $this->deleteUrl = TECHNITIUM_BASE . '/api/zones/records/delete*';
 });
 
 describe('createRecord', function () {
@@ -117,7 +119,7 @@ describe('createRecord', function () {
 
         Http::assertSent(function (Request $request) {
             return $request->method() === 'GET'
-                && str_starts_with($request->url(), TECHNITIUM_BASE.'/api/zones/records/add?')
+                && str_starts_with($request->url(), TECHNITIUM_BASE . '/api/zones/records/add?')
                 && $request->hasHeader('Authorization', 'Bearer test-token')
                 && $request['domain'] === 'www.example.com'
                 && $request['zone'] === 'example.com'
@@ -342,7 +344,7 @@ describe('updateRecord', function () {
 
         Http::assertSent(function (Request $request) {
             return $request->method() === 'GET'
-                && str_starts_with($request->url(), TECHNITIUM_BASE.'/api/zones/records/update?')
+                && str_starts_with($request->url(), TECHNITIUM_BASE . '/api/zones/records/update?')
                 && $request['domain'] === 'www.example.com'
                 && $request['zone'] === 'example.com'
                 && $request['type'] === 'A'
@@ -443,7 +445,7 @@ describe('deleteRecord', function () {
 
         Http::assertSent(function (Request $request) {
             return $request->method() === 'GET'
-                && str_starts_with($request->url(), TECHNITIUM_BASE.'/api/zones/records/delete?')
+                && str_starts_with($request->url(), TECHNITIUM_BASE . '/api/zones/records/delete?')
                 && $request['domain'] === 'www.example.com'
                 && $request['zone'] === 'example.com'
                 && $request['type'] === 'A'
@@ -630,7 +632,7 @@ describe('testConnection', function () {
             ->and($result->details)->toBe(['zones' => 12]);
 
         Http::assertSent(fn (Request $request) => $request->method() === 'GET'
-            && str_starts_with($request->url(), TECHNITIUM_BASE.'/api/zones/list?')
+            && str_starts_with($request->url(), TECHNITIUM_BASE . '/api/zones/list?')
             && $request['zonesPerPage'] === 1);
     });
 

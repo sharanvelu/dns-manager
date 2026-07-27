@@ -1,0 +1,913 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Method App\\Connectors\\AbstractDnsConnector\:\:zone\(\) should return App\\Models\\DnsZone but returns Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Connectors/AbstractDnsConnector.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>config" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Connectors/AbstractDnsConnector.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\DnsEntry\:\:\$fqdn\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Connectors/CloudflareConnector.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: app/Connectors/CloudflareConnector.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Connectors/ConnectorRegistry.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Connectors/ConnectorRegistry.php
+
+		-
+			message: '#^Parameter \#2 \$provider of method App\\Connectors\\ConnectorRegistry\:\:make\(\) expects App\\Models\\Provider, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Connectors/ConnectorRegistry.php
+
+		-
+			message: '#^Property App\\Connectors\\ConnectorRegistry\:\:\$connectors \(array\<string, class\-string\<App\\Connectors\\Contracts\\DnsConnector\>\>\) does not accept default value of type array\<int, string\>\.$#'
+			identifier: property.defaultValue
+			count: 1
+			path: app/Connectors/ConnectorRegistry.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\DnsEntry\:\:\$fqdn\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Connectors/DTOs/RemoteRecord.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: app/Connectors/DTOs/RemoteRecord.php
+
+		-
+			message: '#^Cannot call method hasPriority\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Connectors/DTOs/RemoteRecord.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\DnsEntry\:\:\$fqdn\.$#'
+			identifier: property.notFound
+			count: 5
+			path: app/Connectors/PiholeConnector.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: app/Connectors/PiholeConnector.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between string and App\\Enums\\RecordType\:\:CNAME will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Connectors/PiholeConnector.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\DnsEntry\:\:\$fqdn\.$#'
+			identifier: property.notFound
+			count: 8
+			path: app/Connectors/TechnitiumConnector.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 12
+			path: app/Connectors/TechnitiumConnector.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\Auth\\OidcController\:\:redirect\(\) should return Illuminate\\Http\\RedirectResponse but returns Symfony\\Component\\HttpFoundation\\RedirectResponse\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Controllers/Auth/OidcController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\DnsEntry\:\:\$drifted_states_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/DashboardController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\DnsEntry\:\:\$error_states_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/DashboardController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Provider\:\:\$drifted_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/DashboardController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Provider\:\:\$error_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/DashboardController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Provider\:\:\$records_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/DashboardController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Provider\:\:\$synced_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/DashboardController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$provider\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/DashboardController.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: app/Http/Controllers/DashboardController.php
+
+		-
+			message: '#^Cannot call method label\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/DashboardController.php
+
+		-
+			message: '#^Cannot call method toIso8601String\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/DashboardController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\Provider\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/DashboardController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$zoneProvider\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/DnsEntryBulkController.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Http/Controllers/DnsEntryBulkController.php
+
+		-
+			message: '#^Parameter \#2 \$zone of static method App\\Support\\DnsEntryRules\:\:rules\(\) expects App\\Models\\DnsZone\|null, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/DnsEntryBulkController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\DnsEntry\:\:\$fqdn\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Http/Controllers/DnsEntryController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Contracts\\Pagination\\LengthAwarePaginator\:\:through\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/DnsEntryController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Provider\:\:\$records_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/ProviderController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Provider\:\:\$synced_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/ProviderController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$dns_zone_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/ProviderController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$enabled\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/ProviderController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/ProviderController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$zone\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/ProviderController.php
+
+		-
+			message: '#^Anonymous function should return array\{id\: int, name\: string, type\: mixed, typeLabel\: mixed, enabled\: bool, healthStatus\: mixed, healthMessage\: string\|null, lastCheckedAt\: mixed, \.\.\.\} but returns array\{id\: int, name\: string, type\: mixed, typeLabel\: mixed, enabled\: bool, healthStatus\: mixed, healthMessage\: string\|null, lastCheckedAt\: mixed, \.\.\.\}\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Controllers/ProviderController.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: app/Http/Controllers/ProviderController.php
+
+		-
+			message: '#^Cannot call method label\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/ProviderController.php
+
+		-
+			message: '#^Cannot call method toIso8601String\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/ProviderController.php
+
+		-
+			message: '#^Offset string on array\{\}\|string on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Http/Controllers/ProviderController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\Provider\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/ProviderController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/ProviderController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/ProviderImportController.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Http/Controllers/ProviderImportController.php
+
+		-
+			message: '#^Parameter \#1 \$provider of static method App\\Models\\SyncLog\:\:record\(\) expects App\\Models\\Provider\|null, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/ProviderImportController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/UserController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/UserController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{zoneId\: int\<0, max\>, zoneName\: mixed, roles\: array\{\}\|string\}, Closure\(App\\Models\\ZoneUser\)\: array\{zoneId\: int\<0, max\>, zoneName\: mixed, roles\: array\{\}\|string\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/UserController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:sortBy\(\) expects array\<array\{string, string\}\|\(callable\(Illuminate\\Database\\Eloquent\\Model, Illuminate\\Database\\Eloquent\\Model\)\: mixed\)\|\(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: mixed\)\|string\>\|\(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: mixed\)\|string, Closure\(App\\Models\\ZoneUser\)\: mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/UserController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$avatar_url\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/ZoneAccessController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$email\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/ZoneAccessController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/ZoneAccessController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/ZoneAccessController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{userId\: int\<0, max\>, userName\: mixed, userEmail\: mixed, userAvatarUrl\: mixed, roles\: array\{\}\|string, createdAt\: string\|null\}, Closure\(App\\Models\\ZoneUser\)\: array\{userId\: int\<0, max\>, userName\: mixed, userEmail\: mixed, userAvatarUrl\: mixed, roles\: array\{\}\|string, createdAt\: string\|null\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/ZoneAccessController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:sortBy\(\) expects array\<array\{string, string\}\|\(callable\(Illuminate\\Database\\Eloquent\\Model, Illuminate\\Database\\Eloquent\\Model\)\: mixed\)\|\(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: mixed\)\|string\>\|\(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: mixed\)\|string, Closure\(App\\Models\\ZoneUser\)\: lowercase\-string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/ZoneAccessController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ZoneProvider\:\:\$drifted_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/ZoneController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ZoneProvider\:\:\$error_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/ZoneController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ZoneProvider\:\:\$records_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/ZoneController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ZoneProvider\:\:\$synced_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/ZoneController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$drifted_states_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/ZoneController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$enabled\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/ZoneController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$error_states_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/ZoneController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$health_message\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/ZoneController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$health_status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/ZoneController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/ZoneController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Http/Controllers/ZoneController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$type\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Http/Controllers/ZoneController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Contracts\\Pagination\\LengthAwarePaginator\:\:through\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/ZoneController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:isActive\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/ZoneController.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 3
+			path: app/Http/Controllers/ZoneController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\DnsZone\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/ZoneController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\Provider\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 2
+			path: app/Http/Controllers/ZoneController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 2
+			path: app/Http/Controllers/ZoneController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{id\: int, providerId\: mixed, name\: mixed, type\: mixed, enabled\: bool\}, Closure\(App\\Models\\ZoneProvider\)\: array\{id\: int, providerId\: mixed, name\: mixed, type\: mixed, enabled\: bool\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/ZoneController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{id\: int, providerId\: mixed, providerName\: mixed, providerType\: mixed, providerEnabled\: mixed, enabled\: bool, healthStatus\: mixed, healthMessage\: mixed, zoneConfig\: array, supportsZones\: bool, recordsCount\: mixed, syncedCount\: mixed, driftedCount\: mixed, errorCount\: mixed\}, Closure\(App\\Models\\ZoneProvider\)\: array\{id\: int, providerId\: mixed, providerName\: mixed, providerType\: mixed, providerEnabled\: mixed, enabled\: bool, healthStatus\: mixed, healthMessage\: mixed, zoneConfig\: array, supportsZones\: bool, recordsCount\: mixed, syncedCount\: mixed, driftedCount\: mixed, errorCount\: mixed\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/ZoneController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:sortBy\(\) expects array\<array\{string, string\}\|\(callable\(Illuminate\\Database\\Eloquent\\Model, Illuminate\\Database\\Eloquent\\Model\)\: mixed\)\|\(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: mixed\)\|string\>\|\(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: mixed\)\|string, Closure\(App\\Models\\ZoneProvider\)\: mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/ZoneController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,array\<string, mixed\>\>\:\:filter\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/ZoneController.php
+
+		-
+			message: '#^Parameter \#1 \$entry of method App\\Services\\SyncService\:\:syncEntry\(\) expects App\\Models\\DnsEntry, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/ZoneController.php
+
+		-
+			message: '#^Parameter \#1 \$provider of method App\\Http\\Controllers\\ZoneController\:\:supportsZones\(\) expects App\\Models\\Provider, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/ZoneController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Http/Controllers/ZoneProviderController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/ZoneProviderController.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Http/Controllers/ZoneProviderController.php
+
+		-
+			message: '#^Offset string on array\{\}\|string on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Http/Controllers/ZoneProviderController.php
+
+		-
+			message: '#^Method App\\Http\\Requests\\DnsEntryRequest\:\:targetZone\(\) should return App\\Models\\DnsZone\|null but returns Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Requests/DnsEntryRequest.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Requests/DnsEntryRequest.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Http/Requests/ZoneProviderRequest.php
+
+		-
+			message: '#^Method App\\Http\\Requests\\ZoneProviderRequest\:\:targetProvider\(\) should return App\\Models\\Provider\|null but returns Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Requests/ZoneProviderRequest.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$dns_zone_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Jobs/CheckProviderDrift.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$fqdn\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Jobs/CheckProviderDrift.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Jobs/CheckProviderDrift.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Jobs/CheckProviderDrift.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$zone\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Jobs/CheckProviderDrift.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:connector\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Jobs/CheckProviderDrift.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Jobs/CheckProviderDrift.php
+
+		-
+			message: '#^Parameter \#1 \$entry of method App\\Connectors\\DTOs\\RemoteRecord\:\:diff\(\) expects App\\Models\\DnsEntry, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Jobs/CheckProviderDrift.php
+
+		-
+			message: '#^Parameter \#1 \$entry of method App\\Connectors\\DTOs\\RemoteRecord\:\:matches\(\) expects App\\Models\\DnsEntry, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Jobs/CheckProviderDrift.php
+
+		-
+			message: '#^Parameter \#1 \$states of method App\\Jobs\\CheckProviderDrift\:\:compareStates\(\) expects Illuminate\\Support\\Collection\<int, App\\Models\\EntrySyncState\>, Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Jobs/CheckProviderDrift.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>externalId" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Jobs/CheckProviderDrift.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$dns_zone_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Jobs/DeleteEntryFromProvider.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$fqdn\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Jobs/DeleteEntryFromProvider.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$provider\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Jobs/DeleteEntryFromProvider.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Jobs/DeleteEntryFromProvider.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:connector\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Jobs/DeleteEntryFromProvider.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:label\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Jobs/DeleteEntryFromProvider.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:syncStates\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Jobs/DeleteEntryFromProvider.php
+
+		-
+			message: '#^Parameter \#2 \$entry of static method App\\Models\\SyncLog\:\:record\(\) expects App\\Models\\DnsEntry\|null, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Jobs/DeleteEntryFromProvider.php
+
+		-
+			message: '#^Result of && is always false\.$#'
+			identifier: booleanAnd.alwaysFalse
+			count: 1
+			path: app/Jobs/DeleteEntryFromProvider.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between string and App\\Enums\\SyncStatus\:\:Deleting will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Jobs/DeleteEntryFromProvider.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\DnsEntry\:\:\$fqdn\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Jobs/SyncEntryToProvider.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$external_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Jobs/SyncEntryToProvider.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$sync_status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Jobs/SyncEntryToProvider.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Jobs/SyncEntryToProvider.php
+
+		-
+			message: '#^Parameter \#1 \$provider of static method App\\Models\\SyncLog\:\:record\(\) expects App\\Models\\Provider\|null, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Jobs/SyncEntryToProvider.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/DnsEntry.php
+
+		-
+			message: '#^Access to an undefined property Spatie\\Activitylog\\Contracts\\Activity\:\:\$properties\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Models/DnsEntry.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:fqdn\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Models/DnsEntry.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:mapWithKeys\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\<int\<0, max\>, array\{\}\|string\>, Closure\(App\\Models\\ZoneUser\)\: non\-empty\-array\<int\<0, max\>, array\{\}\|string\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$enabled\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/ZoneProvider.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Models/ZoneProvider.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:managesType\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Models/ZoneProvider.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/SyncService.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:isActive\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: app/Services/SyncService.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:zoneProviders\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: app/Services/SyncService.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: app/Services/SyncService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:each\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: mixed, Closure\(App\\Models\\EntrySyncState\)\: void given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Services/SyncService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:filter\(\) expects \(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: bool\)\|null, Closure\(App\\Models\\EntrySyncState\)\: bool given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/SyncService.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Services/ZoneAttachmentService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\<string, mixed\>, Closure\(Spatie\\Activitylog\\Models\\Activity\)\: array\<string, mixed\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/ActivityQuery.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\DnsEntry\:\:\$fqdn\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/EntryPresenter.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$drift_details\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/EntryPresenter.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$enabled\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/EntryPresenter.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Support/EntryPresenter.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$last_error\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/EntryPresenter.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$last_synced_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/EntryPresenter.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Support/EntryPresenter.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$sync_status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/EntryPresenter.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/EntryPresenter.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$zoneProvider\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Support/EntryPresenter.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$zone_provider_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/EntryPresenter.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Support/EntryPresenter.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<\(int\|string\),Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\ZoneProvider\>\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Support/EntryPresenter.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\ZoneProvider\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Support/EntryPresenter.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Support/EntryPresenter.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\DnsEntry\:\:\$fqdn\.$#'
+			identifier: property.notFound
+			count: 2
+			path: database/seeders/DatabaseSeeder.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: database/seeders/DatabaseSeeder.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$provider\.$#'
+			identifier: property.notFound
+			count: 2
+			path: database/seeders/DatabaseSeeder.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:label\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: database/seeders/DatabaseSeeder.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: database/seeders/DatabaseSeeder.php

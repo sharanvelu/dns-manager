@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types = 1);
+
 use App\Support\DocsRepository;
 
 beforeEach(function () {
@@ -17,7 +19,7 @@ it('renders the index page at /docs', function () {
     $response->assertOk();
     $response->assertSee('Fixture Home');
     $response->assertSee(
-        'You are viewing the documentation for your installed version (v'.config('app.version').').'
+        'You are viewing the documentation for your installed version (v' . config('app.version') . ').'
     );
 });
 

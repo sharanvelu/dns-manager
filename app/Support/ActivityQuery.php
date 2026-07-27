@@ -1,15 +1,17 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Support;
 
 use App\Models\User;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Activity;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\Relation;
 
 /**
  * Shared filter/paginate/serialize pipeline for the activity log — used by
@@ -131,6 +133,43 @@ class ActivityQuery
     }
 
     /**
+     * Resolve the "filtered to X" chip when both subject_type and subject_id
+     * are given. Falls back to the subject's last logged name snapshot when
+     * the record no longer exists.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array{type: string, id: int, label: ?string}|null
+     */
+    public static function resolveSubject(array $filters): ?array
+    {
+        $type = $filters['subject_type'];
+        $id = $filters['subject_id'];
+
+        if (! $type || ! $id) {
+            return null;
+        }
+
+        $class = Relation::getMorphedModel($type);
+        $label = $class ? $class::query()->find($id)?->getAttribute('name') : null;
+
+        if ($label === null) {
+            $latest = Activity::query()
+                ->where('subject_type', $type)
+                ->where('subject_id', $id)
+                ->latest()
+                ->latest('id')
+                ->first();
+
+            $label = data_get($latest?->attribute_changes, 'attributes.name')
+                ?? data_get($latest?->attribute_changes, 'old.name')
+                ?? data_get($latest?->properties, 'attributes.name')
+                ?? data_get($latest?->properties, 'old.name');
+        }
+
+        return ['type' => $type, 'id' => $id, 'label' => $label];
+    }
+
+    /**
      * @param  array<string, mixed>  $filters
      */
     private static function query(array $filters): Builder
@@ -203,42 +242,5 @@ class ActivityQuery
             'changes' => $changes,
             'createdAt' => $activity->created_at->toIso8601String(),
         ];
-    }
-
-    /**
-     * Resolve the "filtered to X" chip when both subject_type and subject_id
-     * are given. Falls back to the subject's last logged name snapshot when
-     * the record no longer exists.
-     *
-     * @param  array<string, mixed>  $filters
-     * @return array{type: string, id: int, label: ?string}|null
-     */
-    public static function resolveSubject(array $filters): ?array
-    {
-        $type = $filters['subject_type'];
-        $id = $filters['subject_id'];
-
-        if (! $type || ! $id) {
-            return null;
-        }
-
-        $class = Relation::getMorphedModel($type);
-        $label = $class ? $class::query()->find($id)?->getAttribute('name') : null;
-
-        if ($label === null) {
-            $latest = Activity::query()
-                ->where('subject_type', $type)
-                ->where('subject_id', $id)
-                ->latest()
-                ->latest('id')
-                ->first();
-
-            $label = data_get($latest?->attribute_changes, 'attributes.name')
-                ?? data_get($latest?->attribute_changes, 'old.name')
-                ?? data_get($latest?->properties, 'attributes.name')
-                ?? data_get($latest?->properties, 'old.name');
-        }
-
-        return ['type' => $type, 'id' => $id, 'label' => $label];
     }
 }

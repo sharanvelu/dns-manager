@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Connectors\DTOs;
 
 /**
@@ -16,7 +18,8 @@ final readonly class ConfigField
         public bool $required = true,
         public ?string $help = null,
         public mixed $default = null,
-    ) {}
+    ) {
+    }
 
     public function toArray(): array
     {

@@ -1,24 +1,26 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Connectors;
 
-use App\Connectors\DTOs\ConfigField;
-use App\Connectors\DTOs\ConnectorCapabilities;
-use App\Connectors\DTOs\RemoteRecord;
-use App\Connectors\DTOs\TestResult;
-use App\Connectors\Exceptions\ConnectorException;
-use App\Enums\RecordType;
-use App\Models\DnsEntry;
-use Carbon\CarbonInterface;
-use Illuminate\Contracts\Cache\LockTimeoutException;
-use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Http\Client\PendingRequest;
-use Illuminate\Http\Client\Response;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Sleep;
 use Throwable;
+use App\Models\DnsEntry;
+use App\Enums\RecordType;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Sleep;
+use Illuminate\Support\Collection;
+use App\Connectors\DTOs\TestResult;
+use App\Connectors\DTOs\ConfigField;
+use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Http;
+use App\Connectors\DTOs\RemoteRecord;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Http\Client\PendingRequest;
+use App\Connectors\DTOs\ConnectorCapabilities;
+use Illuminate\Http\Client\ConnectionException;
+use App\Connectors\Exceptions\ConnectorException;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 
 class PiholeConnector extends AbstractDnsConnector
 {
@@ -121,7 +123,7 @@ class PiholeConnector extends AbstractDnsConnector
                 );
             });
         } catch (ConnectionException $e) {
-            return TestResult::failure('Could not reach Pi-hole: '.$e->getMessage());
+            return TestResult::failure('Could not reach Pi-hole: ' . $e->getMessage());
         } catch (ConnectorException $e) {
             return TestResult::failure($e->getMessage());
         }
@@ -214,7 +216,7 @@ class PiholeConnector extends AbstractDnsConnector
 
         $this->touchingConfigPath($path);
 
-        $response = $this->http($sid)->put($path.'/'.rawurlencode($value));
+        $response = $this->http($sid)->put($path . '/' . rawurlencode($value));
 
         // 400 "already exists" means the desired state is already in place —
         // adopt it, unless the provider is configured not to.
@@ -240,7 +242,7 @@ class PiholeConnector extends AbstractDnsConnector
 
         $this->touchingConfigPath($path);
 
-        $response = $this->http($sid)->delete($path.'/'.rawurlencode($externalId));
+        $response = $this->http($sid)->delete($path . '/' . rawurlencode($externalId));
 
         // 404 means the entry is already gone.
         if ($response->failed() && $response->status() !== 404) {
@@ -330,6 +332,35 @@ class PiholeConnector extends AbstractDnsConnector
         }
     }
 
+    protected function http(?string $sid = null): PendingRequest
+    {
+        $request = Http::baseUrl(rtrim((string) $this->config('base_url'), '/'))
+            ->acceptJson();
+
+        if ($this->config('verify_tls', true) === false) {
+            $request = $request->withoutVerifying();
+        }
+
+        if ($sid !== null) {
+            $request = $request->withHeaders(['X-FTL-SID' => $sid]);
+        }
+
+        return $request;
+    }
+
+    protected function errorMessageFrom(Response $response): string
+    {
+        $message = $response->json('error.message');
+
+        if (! is_string($message) || $message === '') {
+            return parent::errorMessageFrom($response);
+        }
+
+        $hint = $response->json('error.hint');
+
+        return is_string($hint) && $hint !== '' ? "{$message} ({$hint})" : $message;
+    }
+
     private function awaitRestartCooldown(): void
     {
         $until = Cache::get($this->restartCooldownKey());
@@ -371,34 +402,5 @@ class PiholeConnector extends AbstractDnsConnector
         } catch (Throwable) {
             // Never let a failed logout mask the operation's outcome.
         }
-    }
-
-    protected function http(?string $sid = null): PendingRequest
-    {
-        $request = Http::baseUrl(rtrim((string) $this->config('base_url'), '/'))
-            ->acceptJson();
-
-        if ($this->config('verify_tls', true) === false) {
-            $request = $request->withoutVerifying();
-        }
-
-        if ($sid !== null) {
-            $request = $request->withHeaders(['X-FTL-SID' => $sid]);
-        }
-
-        return $request;
-    }
-
-    protected function errorMessageFrom(Response $response): string
-    {
-        $message = $response->json('error.message');
-
-        if (! is_string($message) || $message === '') {
-            return parent::errorMessageFrom($response);
-        }
-
-        $hint = $response->json('error.hint');
-
-        return is_string($hint) && $hint !== '' ? "{$message} ({$hint})" : $message;
     }
 }

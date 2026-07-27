@@ -1,13 +1,15 @@
 <?php
 
+declare(strict_types = 1);
+
 use App\Enums\Role;
-use App\Enums\ZoneRole;
-use App\Models\DnsEntry;
-use App\Models\DnsZone;
-use App\Models\Provider;
 use App\Models\User;
-use App\Models\ZoneProvider;
+use App\Enums\ZoneRole;
+use App\Models\DnsZone;
+use App\Models\DnsEntry;
+use App\Models\Provider;
 use App\Models\ZoneUser;
+use App\Models\ZoneProvider;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Socialite\Facades\Socialite;
@@ -349,8 +351,8 @@ test('super viewer bulk selections shrink to nothing instead of failing', functi
 // ── Provisioning ────────────────────────────────────────────────────────────
 
 test('first oidc user becomes super admin, later users start with no roles', function () {
-    $oidcUser = fn (string $sub, string $email) => (new SocialiteUser)->map([
-        'id' => $sub, 'name' => 'U '.$sub, 'email' => $email,
+    $oidcUser = fn (string $sub, string $email) => (new SocialiteUser())->map([
+        'id' => $sub, 'name' => 'U ' . $sub, 'email' => $email,
     ]);
 
     Socialite::shouldReceive('driver->user')->andReturn(

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Connectors\DTOs;
 
 final readonly class TestResult
@@ -9,7 +11,8 @@ final readonly class TestResult
         public string $message,
         /** Extra details, e.g. ['zone' => 'example.com', 'version' => 'v6.1'] */
         public array $details = [],
-    ) {}
+    ) {
+    }
 
     public static function success(string $message, array $details = []): self
     {

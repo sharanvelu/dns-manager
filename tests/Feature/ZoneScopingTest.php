@@ -1,11 +1,13 @@
 <?php
 
-use App\Models\DnsEntry;
-use App\Models\DnsZone;
-use App\Models\Provider;
+declare(strict_types = 1);
+
 use App\Models\User;
-use App\Models\ZoneProvider;
+use App\Models\DnsZone;
+use App\Models\DnsEntry;
+use App\Models\Provider;
 use App\Models\ZoneUser;
+use App\Models\ZoneProvider;
 use Illuminate\Support\Facades\Queue;
 
 beforeEach(function () {

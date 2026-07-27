@@ -1,11 +1,13 @@
 <?php
 
-use App\Enums\SyncStatus;
-use App\Models\DnsEntry;
-use App\Models\DnsZone;
-use App\Models\Provider;
-use App\Models\SyncLog;
+declare(strict_types = 1);
+
 use App\Models\User;
+use App\Models\DnsZone;
+use App\Models\SyncLog;
+use App\Models\DnsEntry;
+use App\Models\Provider;
+use App\Enums\SyncStatus;
 use App\Models\ZoneProvider;
 
 test('guests are redirected to the login page', function () {

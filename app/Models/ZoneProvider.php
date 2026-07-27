@@ -1,14 +1,16 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Models;
 
 use App\Connectors\ConnectorRegistry;
+use Illuminate\Database\Eloquent\Model;
 use App\Connectors\Contracts\DnsConnector;
 use Database\Factories\ZoneProviderFactory;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class ZoneProvider extends Model
 {
@@ -27,14 +29,6 @@ class ZoneProvider extends Model
     protected $hidden = [
         'config',
     ];
-
-    protected function casts(): array
-    {
-        return [
-            'config' => 'encrypted:array',
-            'enabled' => 'boolean',
-        ];
-    }
 
     public function zone(): BelongsTo
     {
@@ -80,5 +74,13 @@ class ZoneProvider extends Model
     public function label(): string
     {
         return "{$this->provider->name} ({$this->zone->name})";
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'config' => 'encrypted:array',
+            'enabled' => 'boolean',
+        ];
     }
 }

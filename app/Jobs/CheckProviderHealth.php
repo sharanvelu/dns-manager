@@ -1,14 +1,16 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Jobs;
 
-use App\Connectors\DTOs\TestResult;
-use App\Enums\HealthStatus;
-use App\Models\Provider;
-use App\Models\SyncLog;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Queue\Queueable;
 use Throwable;
+use App\Models\SyncLog;
+use App\Models\Provider;
+use App\Enums\HealthStatus;
+use App\Connectors\DTOs\TestResult;
+use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 
 class CheckProviderHealth implements ShouldQueue
 {
@@ -16,7 +18,9 @@ class CheckProviderHealth implements ShouldQueue
 
     public int $tries = 1;
 
-    public function __construct(public int $providerId) {}
+    public function __construct(public int $providerId)
+    {
+    }
 
     public function handle(): void
     {

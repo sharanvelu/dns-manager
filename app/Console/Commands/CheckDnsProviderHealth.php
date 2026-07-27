@@ -1,10 +1,12 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Console\Commands;
 
-use App\Jobs\CheckProviderHealth;
 use App\Models\Provider;
 use Illuminate\Console\Command;
+use App\Jobs\CheckProviderHealth;
 
 class CheckDnsProviderHealth extends Command
 {
@@ -27,7 +29,7 @@ class CheckDnsProviderHealth extends Command
         $this->info(sprintf(
             'Queued health check for %d provider(s)%s.',
             $providers->count(),
-            $providers->isEmpty() ? '' : ': '.$providers->implode(', '),
+            $providers->isEmpty() ? '' : ': ' . $providers->implode(', '),
         ));
 
         return self::SUCCESS;

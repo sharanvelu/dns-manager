@@ -1,10 +1,12 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace Database\Factories;
 
-use App\Enums\RecordType;
-use App\Models\DnsEntry;
 use App\Models\DnsZone;
+use App\Models\DnsEntry;
+use App\Enums\RecordType;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

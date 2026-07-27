@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Support;
 
-use App\Models\DnsEntry;
 use App\Models\DnsZone;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use App\Models\DnsEntry;
 use Illuminate\Http\Request;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 /**
  * Shared filter/sort/paginate pipeline for entry listings — the global
@@ -58,21 +60,24 @@ class EntryQuery
             ->when($zone, fn ($q) => $q->where('dns_zone_id', $zone->id))
             ->when($zone === null && ($filters['zone'] ?? null), fn ($q) => $q->where('dns_zone_id', $filters['zone']))
             ->when($filters['search'] ?? null, function ($q, $search) use ($zone) {
-                $term = '%'.mb_strtolower($search).'%';
+                $term = '%' . mb_strtolower($search) . '%';
 
                 $q->where(fn ($q) => $q
                     ->whereRaw('LOWER(name) LIKE ?', [$term])
                     ->orWhereRaw('LOWER(content) LIKE ?', [$term])
                     ->when($zone === null, fn ($q) => $q->orWhereHas(
-                        'zone', fn ($q) => $q->whereRaw('LOWER(name) LIKE ?', [$term]),
+                        'zone',
+                        fn ($q) => $q->whereRaw('LOWER(name) LIKE ?', [$term]),
                     )));
             })
             ->when($filters['type'] ?? null, fn ($q, $type) => $q->where('type', $type))
             ->when($filters['provider'] ?? null, fn ($q, $provider) => $q->whereHas(
-                'syncStates.zoneProvider', fn ($q) => $q->where('provider_id', $provider),
+                'syncStates.zoneProvider',
+                fn ($q) => $q->where('provider_id', $provider),
             ))
             ->when($filters['status'] ?? null, fn ($q, $status) => $q->whereHas(
-                'syncStates', fn ($q) => $q->where('sync_status', $status),
+                'syncStates',
+                fn ($q) => $q->where('sync_status', $status),
             ))
             ->tap(fn ($q) => self::applySort($q, $sort, $direction))
             ->paginate(25)

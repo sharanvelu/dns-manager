@@ -1,27 +1,35 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Connectors;
 
-use App\Connectors\DTOs\ConfigField;
-use App\Connectors\DTOs\ConnectorCapabilities;
-use App\Connectors\DTOs\RemoteRecord;
-use App\Connectors\DTOs\TestResult;
-use App\Connectors\Exceptions\ConnectorException;
-use App\Connectors\Exceptions\RecordNotFoundException;
+use Throwable;
 use App\Models\DnsEntry;
-use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Collection;
+use App\Connectors\DTOs\TestResult;
+use App\Connectors\DTOs\ConfigField;
+use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Http;
+use App\Connectors\DTOs\RemoteRecord;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
-use Illuminate\Http\Client\Response;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Http;
-use Throwable;
+use App\Connectors\DTOs\ConnectorCapabilities;
+use Illuminate\Http\Client\ConnectionException;
+use App\Connectors\Exceptions\ConnectorException;
+use App\Connectors\Exceptions\RecordNotFoundException;
 
 class CloudflareConnector extends AbstractDnsConnector
 {
     protected const BASE_URL = 'https://api.cloudflare.com/client/v4';
 
     protected const PER_PAGE = 5000;
+
+    /**
+     * Cloudflare error codes meaning "a record like this is already there":
+     * 81057 = identical record exists, 81053 = conflicting record on the name.
+     */
+    protected const ALREADY_EXISTS_CODES = [81057, 81053];
 
     public static function type(): string
     {
@@ -94,7 +102,7 @@ class CloudflareConnector extends AbstractDnsConnector
             $response = $this->http()->get('/zones', ['per_page' => 1]);
 
             if (! $response->successful() || $response->json('success') !== true) {
-                return TestResult::failure('Token check failed: '.$this->errorMessageFrom($response));
+                return TestResult::failure('Token check failed: ' . $this->errorMessageFrom($response));
             }
 
             $zoneCount = $response->json('result_info.total_count');
@@ -108,7 +116,7 @@ class CloudflareConnector extends AbstractDnsConnector
 
             return TestResult::success('API token is valid.');
         } catch (ConnectionException $e) {
-            return TestResult::failure('Could not reach Cloudflare: '.$e->getMessage());
+            return TestResult::failure('Could not reach Cloudflare: ' . $e->getMessage());
         }
     }
 
@@ -117,10 +125,10 @@ class CloudflareConnector extends AbstractDnsConnector
         $this->requireZoneContext();
 
         try {
-            $zone = $this->http()->get('/zones/'.$this->config('zone_id'));
+            $zone = $this->http()->get('/zones/' . $this->config('zone_id'));
 
             if (! $zone->successful() || $zone->json('success') !== true) {
-                return TestResult::failure('Zone lookup failed: '.$this->errorMessageFrom($zone));
+                return TestResult::failure('Zone lookup failed: ' . $this->errorMessageFrom($zone));
             }
 
             $remoteName = (string) $zone->json('result.name');
@@ -130,12 +138,12 @@ class CloudflareConnector extends AbstractDnsConnector
                 return TestResult::failure("Zone ID belongs to {$remoteName} — expected {$localName}");
             }
 
-            return TestResult::success('Connected to zone '.$remoteName, [
+            return TestResult::success('Connected to zone ' . $remoteName, [
                 'zone' => $remoteName,
                 'status' => $zone->json('result.status'),
             ]);
         } catch (ConnectionException $e) {
-            return TestResult::failure('Could not reach Cloudflare: '.$e->getMessage());
+            return TestResult::failure('Could not reach Cloudflare: ' . $e->getMessage());
         }
     }
 
@@ -187,12 +195,6 @@ class CloudflareConnector extends AbstractDnsConnector
         return $records;
     }
 
-    /**
-     * Cloudflare error codes meaning "a record like this is already there":
-     * 81057 = identical record exists, 81053 = conflicting record on the name.
-     */
-    protected const ALREADY_EXISTS_CODES = [81057, 81053];
-
     public function createRecord(DnsEntry $entry): string
     {
         $response = $this->http()->post($this->recordsPath(), $this->payloadFor($entry));
@@ -216,7 +218,7 @@ class CloudflareConnector extends AbstractDnsConnector
 
     public function updateRecord(DnsEntry $entry, string $externalId): string
     {
-        $response = $this->http()->put($this->recordsPath().'/'.$externalId, $this->payloadFor($entry));
+        $response = $this->http()->put($this->recordsPath() . '/' . $externalId, $this->payloadFor($entry));
 
         // 404 / 81044: the record was deleted out-of-band — signal it so the
         // sync job can fall back to creating the record fresh.
@@ -233,7 +235,7 @@ class CloudflareConnector extends AbstractDnsConnector
 
     public function deleteRecord(string $externalId): void
     {
-        $response = $this->http()->delete($this->recordsPath().'/'.$externalId);
+        $response = $this->http()->delete($this->recordsPath() . '/' . $externalId);
 
         if ($response->status() === 404) {
             return; // Already gone remotely — nothing to do.
@@ -280,7 +282,7 @@ class CloudflareConnector extends AbstractDnsConnector
     {
         $this->requireZoneContext();
 
-        return '/zones/'.$this->config('zone_id').'/dns_records';
+        return '/zones/' . $this->config('zone_id') . '/dns_records';
     }
 
     protected function shouldAdoptExisting(): bool
@@ -409,7 +411,7 @@ class CloudflareConnector extends AbstractDnsConnector
             return $content;
         }
 
-        return '"'.$content.'"';
+        return '"' . $content . '"';
     }
 
     /**

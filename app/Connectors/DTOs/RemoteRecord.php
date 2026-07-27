@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Connectors\DTOs;
 
 use App\Models\DnsEntry;
@@ -18,7 +20,8 @@ final readonly class RemoteRecord
         public ?int $ttl = null,
         public ?int $priority = null,
         public bool $proxied = false,
-    ) {}
+    ) {
+    }
 
     /**
      * Whether this remote record matches the desired local state.

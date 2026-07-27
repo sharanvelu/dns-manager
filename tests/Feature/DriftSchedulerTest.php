@@ -1,7 +1,9 @@
 <?php
 
-use App\Jobs\CheckProviderDrift;
+declare(strict_types = 1);
+
 use App\Models\Provider;
+use App\Jobs\CheckProviderDrift;
 use Illuminate\Support\Facades\Queue;
 
 beforeEach(function () {

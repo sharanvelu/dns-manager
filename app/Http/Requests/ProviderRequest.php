@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Http\Requests;
 
-use App\Connectors\ConnectorRegistry;
 use App\Enums\ProviderType;
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
+use App\Connectors\ConnectorRegistry;
+use Illuminate\Foundation\Http\FormRequest;
 
 class ProviderRequest extends FormRequest
 {

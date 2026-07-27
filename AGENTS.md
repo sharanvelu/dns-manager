@@ -23,9 +23,15 @@ DNS Manager: a homelab web app that manages DNS entries across multiple provider
 
 ```sh
 composer run dev          # serve app + queue worker + vite (local dev)
-./vendor/bin/pest         # test suite (sqlite :memory:, HTTP fully faked)
-./vendor/bin/pint --dirty # PHP formatting (run before finishing)
-npx tsc --noEmit          # TypeScript check
+composer run ci           # everything CI runs: PHP + JS style, tests, static analysis
+composer run test         # Pest suite (sqlite :memory:, HTTP fully faked); test-unit / test-feature scope by suite
+composer run test-coverage # Pest with coverage gate (--min in composer.json; CI runs this — ratchet the min up as coverage grows)
+composer run check-style  # Pint check-only (fix-style rewrites; or pint --dirty while iterating)
+composer run analyze      # PHPStan via Larastan, level 5 (phpstan.neon; pre-existing debt in phpstan-baseline.neon)
+composer run analyze-baseline # regenerate phpstan-baseline.neon (only after FIXING debt — never to absorb new errors)
+npm run check-style       # ESLint check-only (fix-style rewrites)
+npm run test              # Vitest (resources/js/tests/{unit,feature}); test-unit / test-feature scope by dir
+npm run analyze           # TypeScript check (tsc --noEmit)
 npm run build             # Vite production build
 php artisan migrate       # run migrations (Postgres in dev/prod)
 php artisan dns:check-drift [--provider=ID]   # queue drift checks (what the schedule runs)
@@ -60,7 +66,7 @@ routes/console.php       # the schedule (Laravel 12 has no console Kernel — th
 
 ## Conventions
 
-- **PHP**: Laravel 12 conventions, typed signatures, Pint-formatted. Enums in `app/Enums`. Form Requests for validation. No comments that restate code.
+- **PHP**: Laravel 12 conventions, typed signatures, Pint-formatted using the custom `pint.json` (PSR-12 preset + project rules — notably `declare_strict_types` (every file starts with `declare(strict_types=1);`), `not_operator_with_successor_space` (`! $foo`), single quotes, length-sorted imports, `blank_line_before_statement`, `ordered_class_elements`). Enums in `app/Enums`. Form Requests for validation. No comments that restate code.
 - **TypeScript/React**: Inertia 2 + React 19, shadcn-style components in `resources/js/components/ui/` (do not hand-roll equivalents), Tailwind CSS 4 tokens (`text-muted-foreground`, `bg-card`, …), dark mode via `dark:` variants everywhere. Page-local components live in the page's folder; components promoted to serve multiple pages live under `components/` (`entries/`, `activity/`, `zones/`, `zone-tabs.tsx`, `stat-tile.tsx`, `config-fields.tsx`, `flash-toast.tsx`).
 - **Scoped shared views**: `EntriesView` takes an `EntriesScope` (`{ baseUrl, zone? }`) and `ActivityTable` takes a `baseUrl` — every filter/sort/pagination request MUST target the scope's `baseUrl` (`/entries` vs `/zones/{id}/records`, `/activity` vs `/zones/{id}/activity`). Never hard-code `/entries` (or any listing path) inside these shared components.
 - **Tests**: Pest 4. `tests/TestCase.php` applies `withoutVite()`, `Http::preventStrayRequests()` — every outbound HTTP call in a test must be faked or the test fails — and `Sleep::fake()`, so connector pacing (Pi-hole's post-CNAME restart cooldown) records sleeps instead of actually waiting. Factories exist for `User`, `Provider` (`->cloudflare()`, `->pihole()`, `->technitium()`), `DnsEntry` (`->cname()`, `->mx()`), `ZoneUser` (zone grants).
@@ -75,6 +81,7 @@ routes/console.php       # the schedule (Laravel 12 has no console Kernel — th
 - Vite preloading is **disabled** (`Vite::usePreloadTagAttributes(false)` in `AppServiceProvider`): the preload `Link` header (~4KB+) overflowed default nginx `fastcgi_buffer_size` (4KB) causing 502s on full-page refreshes. `docker/nginx.conf` also raises the buffers. Do not re-enable preloading without checking both.
 - Dev containers that run `config:cache` against a mounted volume poison `bootstrap/cache/config.php` with container paths for host tooling. Clear with `php artisan config:clear` if tests fail with `/var/www/html/...` path errors.
 - Pages live in lowercase `resources/js/pages`; `config/inertia.php` is published to point `testing.page_paths` there. Without it, Inertia's default (`js/Pages`) passes on case-insensitive macOS but fails every `assertInertia` component check on Linux CI ("page component file does not exist").
+- `tsc --noEmit` needs `vendor/` present: tsconfig maps `ziggy-js` → `vendor/tightenco/ziggy` (Ziggy's JS ships in the composer package, not npm), so any CI job that type-checks must run `composer install` before `tsc` or it fails with TS2307. Vite builds are unaffected — the only `ziggy-js` import is type-only usage that esbuild drops.
 - Behind TLS-terminating proxies, `FORCE_HTTPS` (→ `URL::forceScheme`) only fixes generator-built URLs; **pagination links derive from the request URL** and stayed http (mixed-content blocked) until `trustProxies(at: '*')` was added in `bootstrap/app.php`. Keep both.
 - Pi-hole caps concurrent API sessions (~16): the connector must always logout (`DELETE /api/auth`) in a `finally`.
 - Pi-hole restarts FTL's resolver after **every CNAME config write**, taking its REST API down for seconds — rapid bulk pushes failed on every entry after the first. The connector serializes sessions per provider (cache lock) and waits a 5 s cooldown after CNAME writes. Do not "optimize" this away, and do not batch via `PATCH /api/config`: that replaces the whole array and wipes CNAMEs managed outside the app.

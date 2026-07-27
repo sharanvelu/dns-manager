@@ -1,8 +1,10 @@
 <?php
 
-use App\Models\DnsEntry;
-use App\Models\DnsZone;
+declare(strict_types = 1);
+
 use App\Models\User;
+use App\Models\DnsZone;
+use App\Models\DnsEntry;
 use Illuminate\Support\Carbon;
 
 beforeEach(function () {

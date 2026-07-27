@@ -1,7 +1,9 @@
 <?php
 
-use Illuminate\Console\Scheduling\Schedule;
+declare(strict_types = 1);
+
 use Spatie\Activitylog\Models\Activity;
+use Illuminate\Console\Scheduling\Schedule;
 
 /**
  * Re-evaluate routes/console.php against a fresh Schedule so tests can

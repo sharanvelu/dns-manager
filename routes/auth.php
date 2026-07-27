@@ -1,7 +1,9 @@
 <?php
 
-use App\Http\Controllers\Auth\OidcController;
+declare(strict_types = 1);
+
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Auth\OidcController;
 
 Route::middleware('guest')->group(function () {
     Route::get('login', [OidcController::class, 'show'])->name('login');

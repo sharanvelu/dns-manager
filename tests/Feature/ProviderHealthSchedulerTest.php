@@ -1,7 +1,9 @@
 <?php
 
-use App\Jobs\CheckProviderHealth;
+declare(strict_types = 1);
+
 use App\Models\Provider;
+use App\Jobs\CheckProviderHealth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 

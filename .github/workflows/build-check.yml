@@ -1,0 +1,79 @@
+# Build sanity gate: runs on every PR targeting master so a merge can't
+# break what build.yml will do afterwards. The frontend build always runs;
+# the Docker image build (no push) only runs when the image definition
+# itself changed (Dockerfile or docker/), since it is by far the slowest
+# job. A skipped job satisfies branch protection, so "Docker Build Check"
+# can safely be a required check.
+name: build-check
+
+on:
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Vite Build
+        run: npm run build
+
+  changes:
+    name: Detect Docker Changes
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      docker: ${{ steps.filter.outputs.docker }}
+    steps:
+      - name: Filter changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            docker:
+              - 'Dockerfile'
+              - 'docker/**'
+
+  docker:
+    name: Docker Build Check
+    needs: changes
+    if: needs.changes.outputs.docker == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Single platform and no push — this only proves the image still
+      # builds; build.yml does the real multi-arch build after merge.
+      - name: Build (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          platforms: linux/amd64
+          cache-from: type=gha

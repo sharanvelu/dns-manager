@@ -1,38 +1,27 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Models;
 
-use App\Connectors\ConnectorRegistry;
-use App\Connectors\Contracts\DnsConnector;
 use App\Enums\HealthStatus;
 use App\Enums\ProviderType;
+use App\Connectors\ConnectorRegistry;
 use Database\Factories\ProviderFactory;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasManyThrough;
-use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use App\Connectors\Contracts\DnsConnector;
 use Spatie\Activitylog\Support\LogOptions;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Provider extends Model
 {
     /** @use HasFactory<ProviderFactory> */
-    use HasFactory, LogsActivity;
-
-    /**
-     * Never log `config` (encrypted secrets) or the health columns
-     * (background jobs would flood the audit trail every few minutes —
-     * logOnly + dontLogEmptyChanges guarantees those updates log nothing).
-     */
-    public function getActivitylogOptions(): LogOptions
-    {
-        return LogOptions::defaults()
-            ->useLogName('providers')
-            ->logOnly(['name', 'type', 'enabled', 'managed_record_types'])
-            ->logOnlyDirty()
-            ->dontLogEmptyChanges();
-    }
+    use HasFactory;
+    use LogsActivity;
 
     protected $fillable = [
         'name',
@@ -49,16 +38,18 @@ class Provider extends Model
         'config',
     ];
 
-    protected function casts(): array
+    /**
+     * Never log `config` (encrypted secrets) or the health columns
+     * (background jobs would flood the audit trail every few minutes —
+     * logOnly + dontLogEmptyChanges guarantees those updates log nothing).
+     */
+    public function getActivitylogOptions(): LogOptions
     {
-        return [
-            'type' => ProviderType::class,
-            'config' => 'encrypted:array',
-            'managed_record_types' => 'array',
-            'enabled' => 'boolean',
-            'health_status' => HealthStatus::class,
-            'last_checked_at' => 'datetime',
-        ];
+        return LogOptions::defaults()
+            ->useLogName('providers')
+            ->logOnly(['name', 'type', 'enabled', 'managed_record_types'])
+            ->logOnlyDirty()
+            ->dontLogEmptyChanges();
     }
 
     public function syncStates(): HasManyThrough
@@ -101,5 +92,17 @@ class Provider extends Model
     {
         return in_array($type, $this->managed_record_types ?? [], true)
             && in_array($type, $this->connector()->supportedRecordTypes(), true);
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'type' => ProviderType::class,
+            'config' => 'encrypted:array',
+            'managed_record_types' => 'array',
+            'enabled' => 'boolean',
+            'health_status' => HealthStatus::class,
+            'last_checked_at' => 'datetime',
+        ];
     }
 }

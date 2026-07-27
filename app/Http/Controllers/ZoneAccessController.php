@@ -1,17 +1,19 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Http\Controllers;
 
-use App\Enums\ZoneRole;
-use App\Models\DnsZone;
 use App\Models\User;
-use App\Models\ZoneUser;
-use App\Support\ZonePermissions;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Enums\ZoneRole;
+use App\Models\DnsZone;
+use App\Models\ZoneUser;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use App\Support\ZonePermissions;
+use Illuminate\Http\RedirectResponse;
 
 class ZoneAccessController extends Controller
 {
