@@ -1,7 +1,8 @@
-# Image build: master is push-protected, so a push to master only happens
-# when a PR merges — and the PR gates (code-style, tests, static analysis,
-# build-check) are required checks, so they already passed on the merged
-# commit. `v*` tag pushes also build, producing the semver image tags.
+# Image build: runs only on `v*` tag pushes. tag.yml tags every merge to
+# master that touches app code, so each release builds exactly once with
+# the bumped VERSION in the tree; meta-only merges produce no tag and no
+# image. The PR gates (code-style, tests, static analysis, build-check)
+# are required checks, so the tagged commit already passed them.
 #
 # Architecture: each platform builds natively (amd64 on ubuntu-latest,
 # arm64 on ubuntu-24.04-arm — no QEMU emulation) and pushes an untagged
@@ -12,8 +13,6 @@ name: build
 
 on:
   push:
-    branches:
-      - master
     tags:
       - "v*"
   workflow_dispatch:
@@ -25,8 +24,8 @@ on:
 
 permissions: {}
 
-# An in-flight image build on master is left to finish; queued builds for
-# the same ref still coalesce.
+# An in-flight image build is left to finish; queued builds for the same
+# tag still coalesce.
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: false
@@ -133,10 +132,11 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          # latest on master, sha-<short> on every build,
-          # semver (1.2.3 / 1.2 / 1) on v* release tags
+          # semver (1.2.3 / 1.2 / 1) + sha-<short> for commit traceability;
+          # `latest` is added automatically by the default latest=auto
+          # flavor on semver tag builds — latest and the semver tags are
+          # always the same manifest.
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -154,32 +154,3 @@ jobs:
 
       - name: Inspect manifest
         run: docker buildx imagetools inspect "$REGISTRY/$IMAGE_NAME:$DOCKER_METADATA_OUTPUT_VERSION"
-
-  # Deletes truly stale digests after each build. Manifest-aware: the
-  # per-arch digests just pushed look "untagged" in GHCR but are children
-  # of the tagged manifest and MUST NOT be deleted — the cleaner walks all
-  # tagged manifests first and only removes versions nothing references
-  # (orphans from re-runs and superseded builds). Weekly backstop lives in
-  # cleanup-registry.yml.
-  cleanup:
-    name: Clean Stale Digests
-    needs: merge
-    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    env:
-      TOKEN: ${{ secrets.GHCR_CLEANUP_TOKEN }}
-    steps:
-      - name: Skip notice
-        if: env.TOKEN == ''
-        run: echo "::notice::GHCR_CLEANUP_TOKEN not set — skipping stale digest cleanup."
-
-      - name: Delete unreferenced untagged versions
-        if: env.TOKEN != ''
-        uses: stumpylog/image-cleaner-action/untagged@4fe057d991d63b8f6d5d22c40f17c1bca2226537 # v0.12.0
-        with:
-          token: ${{ env.TOKEN }}
-          owner: ${{ github.repository_owner }}
-          is_org: "false"
-          package_name: dns-manager
-          do_delete: "true"
