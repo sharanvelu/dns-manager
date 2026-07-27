@@ -94,7 +94,7 @@ export function BulkProvidersDialog({ open, onOpenChange, selectedIds, attachmen
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>
                         Providers for {selectedIds.length} {selectedIds.length === 1 ? 'entry' : 'entries'}

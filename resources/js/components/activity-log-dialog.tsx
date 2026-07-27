@@ -181,7 +181,7 @@ export function ActivityLogDialog({ open, onOpenChange, subjectType, subjectId, 
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Activity — {subjectLabel}</DialogTitle>
                     <DialogDescription>Audit trail for this {subjectType}, newest first.</DialogDescription>
