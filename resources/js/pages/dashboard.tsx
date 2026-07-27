@@ -450,74 +450,70 @@ export default function Dashboard({ noAccess, isUserAdmin, stats, providers, zon
                         </Card>
                     )}
 
-                    <div className="grid flex-1 items-start gap-6 lg:grid-cols-3">
-                        {/* Providers — hidden entirely for zone-scoped users without any (they can't connect one). */}
-                        {showProvidersSection && (
-                            <section className="flex flex-col gap-3 lg:col-span-2">
-                                <SectionHeading
-                                    title="Providers"
-                                    action={
-                                        hasProviders ? (
-                                            <Link
-                                                href="/providers"
-                                                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs font-medium transition-colors"
-                                            >
-                                                View all
-                                                <ArrowRight className="size-3.5" />
-                                            </Link>
-                                        ) : undefined
-                                    }
-                                />
-                                {hasProviders ? (
-                                    <div className="grid gap-3 xl:grid-cols-2">
-                                        {providers.map((provider) => (
-                                            <ProviderCard key={provider.id} provider={provider} />
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <Card className="flex flex-col items-center gap-4 border-dashed px-6 py-10 text-center">
-                                        <EmptyProvidersIllustration className="text-muted-foreground" />
-                                        <div>
-                                            <p className="text-sm font-medium">No providers connected</p>
-                                            <p className="text-muted-foreground mx-auto mt-1 max-w-sm text-sm">
-                                                Connect Cloudflare, Pi-hole, or another DNS provider to start managing and syncing your records.
-                                            </p>
-                                        </div>
-                                        <Button asChild size="sm">
-                                            <Link href="/providers">
-                                                <Plus />
-                                                Connect a provider
-                                            </Link>
-                                        </Button>
-                                    </Card>
-                                )}
-                            </section>
-                        )}
-
-                        {/* Recent activity */}
+                    {/* Providers — hidden entirely for zone-scoped users without any (they can't connect one). */}
+                    {showProvidersSection && (
                         <section className="flex flex-col gap-3">
-                            <SectionHeading title="Recent activity" />
-                            <Card className="p-4">
-                                {activity.length > 0 ? (
-                                    <ul className="-my-3 divide-y">
-                                        {activity.map((item) => (
-                                            <ActivityRow key={item.id} item={item} />
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
-                                        <EmptyActivityIllustration className="text-muted-foreground" />
-                                        <div>
-                                            <p className="text-sm font-medium">No sync activity yet</p>
-                                            <p className="text-muted-foreground mt-1 text-sm">
-                                                Pushes, deletions, and drift checks will show up here.
-                                            </p>
-                                        </div>
+                            <SectionHeading
+                                title="Providers"
+                                action={
+                                    hasProviders ? (
+                                        <Link
+                                            href="/providers"
+                                            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs font-medium transition-colors"
+                                        >
+                                            View all
+                                            <ArrowRight className="size-3.5" />
+                                        </Link>
+                                    ) : undefined
+                                }
+                            />
+                            {hasProviders ? (
+                                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                                    {providers.map((provider) => (
+                                        <ProviderCard key={provider.id} provider={provider} />
+                                    ))}
+                                </div>
+                            ) : (
+                                <Card className="flex flex-col items-center gap-4 border-dashed px-6 py-10 text-center">
+                                    <EmptyProvidersIllustration className="text-muted-foreground" />
+                                    <div>
+                                        <p className="text-sm font-medium">No providers connected</p>
+                                        <p className="text-muted-foreground mx-auto mt-1 max-w-sm text-sm">
+                                            Connect Cloudflare, Pi-hole, or another DNS provider to start managing and syncing your records.
+                                        </p>
                                     </div>
-                                )}
-                            </Card>
+                                    <Button asChild size="sm">
+                                        <Link href="/providers">
+                                            <Plus />
+                                            Connect a provider
+                                        </Link>
+                                    </Button>
+                                </Card>
+                            )}
                         </section>
-                    </div>
+                    )}
+
+                    {/* Recent activity */}
+                    <section className="flex flex-col gap-3">
+                        <SectionHeading title="Recent activity" />
+                        <Card className="p-4">
+                            {activity.length > 0 ? (
+                                <ul className="-my-3 divide-y">
+                                    {activity.map((item) => (
+                                        <ActivityRow key={item.id} item={item} />
+                                    ))}
+                                </ul>
+                            ) : (
+                                <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
+                                    <EmptyActivityIllustration className="text-muted-foreground" />
+                                    <div>
+                                        <p className="text-sm font-medium">No sync activity yet</p>
+                                        <p className="text-muted-foreground mt-1 text-sm">Pushes, deletions, and drift checks will show up here.</p>
+                                    </div>
+                                </div>
+                            )}
+                        </Card>
+                    </section>
                 </div>
             </TooltipProvider>
         </AppLayout>
