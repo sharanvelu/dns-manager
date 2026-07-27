@@ -11,16 +11,22 @@ on:
     branches:
       - master
 
-permissions:
-  pull-requests: read
+permissions: {}
+
+concurrency:
+  group: pr-title-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   lint:
     name: PR Title Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
     steps:
       - name: Validate title against Conventional Commits
-        uses: amannn/action-semantic-pull-request@v5
+        uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:

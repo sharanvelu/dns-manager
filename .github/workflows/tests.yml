@@ -1,4 +1,7 @@
-# Test gate: runs on every PR targeting master.
+# Test gate: changes → work → gate. "Tests Gate" is the required check.
+# PHP tests run with a coverage floor; the migrations job runs the full
+# migration chain against real Postgres 16 (prod parity — Pest runs on
+# sqlite :memory:, which can hide Postgres-only migration failures).
 name: tests
 
 on:
@@ -7,30 +10,67 @@ on:
       - master
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
-  group: tests-${{ github.ref }}
+  group: tests-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+    outputs:
+      php: ${{ github.event_name != 'pull_request' && 'true' || steps.filter.outputs.php }}
+      js: ${{ github.event_name != 'pull_request' && 'true' || steps.filter.outputs.js }}
+    steps:
+      - name: Filter changed paths
+        id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+        with:
+          filters: |
+            php:
+              - '**.php'
+              - 'composer.json'
+              - 'composer.lock'
+              - 'phpunit.xml'
+              - '.env.example'
+              - 'docs/content/**'
+              - '.github/workflows/tests.yml'
+              - '.github/actions/setup/**'
+            js:
+              - 'resources/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'tsconfig.json'
+              - 'vitest.config.ts'
+              - '.github/workflows/tests.yml'
+              - '.github/actions/setup/**'
+
   php:
     name: PHP Tests
+    needs: changes
+    if: needs.changes.outputs.php == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          php-version: '8.4'
-          tools: composer:v2
-          coverage: pcov
+          persist-credentials: false
 
-      - name: Install Dependencies
-        run: composer install --no-interaction --no-progress --prefer-dist --optimize-autoloader
+      - name: Setup
+        uses: ./.github/actions/setup
+        with:
+          node: 'false'
+          coverage: pcov
+          composer-options: '--optimize-autoloader'
 
       - name: Prepare Environment
         run: |
@@ -45,21 +85,87 @@ jobs:
       - name: Pest (coverage gate)
         run: composer run test-coverage
 
-  js:
-    name: JS Tests
+  migrations:
+    name: Postgres Migrations
+    needs: changes
+    if: needs.changes.outputs.php == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: dns_manager
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: '5432'
+      DB_DATABASE: dns_manager
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: '22'
-          cache: 'npm'
+          persist-credentials: false
 
-      - name: Install Dependencies
-        run: npm ci
+      - name: Setup
+        uses: ./.github/actions/setup
+        with:
+          node: 'false'
+
+      - name: Prepare Environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Run migrations against Postgres
+        run: |
+          php artisan migrate --force
+          php artisan migrate:status
+
+  js:
+    name: JS Tests
+    needs: changes
+    if: needs.changes.outputs.js == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup
+        uses: ./.github/actions/setup
+        with:
+          php: 'false'
 
       - name: Vitest
         run: npm run test
+
+  gate:
+    name: Tests Gate
+    needs: [changes, php, migrations, js]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail if any needed job failed or was cancelled
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
+      - name: All good
+        run: echo "All test jobs succeeded or were skipped as not relevant."

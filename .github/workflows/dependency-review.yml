@@ -4,6 +4,9 @@
 # vulnerabilities in the tree don't fail this check.
 # Requires the repository's dependency graph to be enabled
 # (Settings → Advanced Security → Dependency graph).
+# Deliberately NOT path-filtered: the action itself no-ops fast when no
+# manifests changed, and keeping it unconditional keeps the required check
+# simple (no gate job needed).
 name: dependency-review
 
 on:
@@ -11,22 +14,24 @@ on:
     branches:
       - master
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   dependency-review:
     name: Dependency Review
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Dependency Review
-        uses: actions/dependency-review-action@v4
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: moderate
           comment-summary-in-pr: on-failure

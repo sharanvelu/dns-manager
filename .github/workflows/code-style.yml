@@ -1,6 +1,8 @@
-# Coding-style gate: runs on every PR targeting master. Check-only — CI
-# never rewrites code. Run the fixers locally instead (composer fix-style,
-# npm run fix-style, npm run format).
+# Coding-style gate: changes → work → gate. Work jobs only run for the
+# domains a PR actually touches; the "Code Style Gate" job is the single
+# required check for branch protection (passes when jobs were skipped,
+# fails if any needed job failed). Check-only — CI never rewrites code;
+# run the fixers locally (composer fix-style, npm run fix-style, npm run format).
 name: code-style
 
 on:
@@ -9,51 +11,105 @@ on:
       - master
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
-  group: code-style-${{ github.ref }}
+  group: code-style-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+    outputs:
+      # Anything but a PR (workflow_dispatch) force-runs everything.
+      php: ${{ github.event_name != 'pull_request' && 'true' || steps.filter.outputs.php }}
+      js: ${{ github.event_name != 'pull_request' && 'true' || steps.filter.outputs.js }}
+    steps:
+      - name: Filter changed paths
+        id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+        with:
+          filters: |
+            php:
+              - '**.php'
+              - 'composer.json'
+              - 'composer.lock'
+              - 'pint.json'
+              - '.github/workflows/code-style.yml'
+              - '.github/actions/setup/**'
+            js:
+              - 'resources/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'tsconfig.json'
+              - 'eslint.config.js'
+              - '.prettierrc'
+              - '.prettierignore'
+              - '.github/workflows/code-style.yml'
+              - '.github/actions/setup/**'
+
   php:
     name: PHP Code Style
+    needs: changes
+    if: needs.changes.outputs.php == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          php-version: '8.4'
-          tools: composer:v2
+          persist-credentials: false
 
-      - name: Install Dependencies
-        run: composer install --no-interaction --no-scripts --no-progress --prefer-dist
+      - name: Setup
+        uses: ./.github/actions/setup
+        with:
+          node: 'false'
+          composer-options: '--no-scripts'
 
       - name: Pint (check only)
         run: composer run check-style
 
   js:
     name: JS Code Style
+    needs: changes
+    if: needs.changes.outputs.js == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: '22'
-          cache: 'npm'
+          persist-credentials: false
 
-      - name: Install Dependencies
-        run: npm ci
+      - name: Setup
+        uses: ./.github/actions/setup
+        with:
+          php: 'false'
 
       - name: ESLint (check only)
         run: npm run check-style
 
       - name: Prettier (format check)
         run: npm run format:check
+
+  gate:
+    name: Code Style Gate
+    needs: [changes, php, js]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail if any needed job failed or was cancelled
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
+      - name: All good
+        run: echo "All style jobs succeeded or were skipped as not relevant."

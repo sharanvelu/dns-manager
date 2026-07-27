@@ -1,9 +1,8 @@
-# Build sanity gate: runs on every PR targeting master so a merge can't
-# break what build.yml will do afterwards. The frontend build always runs;
-# the Docker image build (no push) only runs when the image definition
-# itself changed (Dockerfile or docker/), since it is by far the slowest
-# job. A skipped job satisfies branch protection, so "Docker Build Check"
-# can safely be a required check.
+# Build sanity gate: changes → work → gate. "Build Check Gate" is the
+# required check. The frontend build runs when frontend inputs changed;
+# the Docker image build (no push) only when the image definition changed
+# (Dockerfile or docker/), since it is by far the slowest job. build.yml
+# does the real multi-arch build after merge.
 name: build-check
 
 on:
@@ -12,68 +11,102 @@ on:
       - master
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
-  group: build-check-${{ github.ref }}
+  group: build-check-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  frontend:
-    name: Frontend Build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Install Dependencies
-        run: npm ci
-
-      - name: Vite Build
-        run: npm run build
-
   changes:
-    name: Detect Docker Changes
+    name: Detect Changes
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       pull-requests: read
     outputs:
-      docker: ${{ steps.filter.outputs.docker }}
+      frontend: ${{ github.event_name != 'pull_request' && 'true' || steps.filter.outputs.frontend }}
+      docker: ${{ github.event_name != 'pull_request' && 'true' || steps.filter.outputs.docker }}
     steps:
       - name: Filter changed paths
         id: filter
-        uses: dorny/paths-filter@v3
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
         with:
           filters: |
+            frontend:
+              - 'resources/**'
+              - 'public/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'tsconfig.json'
+              - 'vite.config.js'
+              - '.github/workflows/build-check.yml'
+              - '.github/actions/setup/**'
             docker:
               - 'Dockerfile'
+              - '.dockerignore'
               - 'docker/**'
+              - '.github/workflows/build-check.yml'
+
+  frontend:
+    name: Frontend Build
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup
+        uses: ./.github/actions/setup
+        with:
+          php: 'false'
+
+      - name: Vite Build
+        run: npm run build
 
   docker:
     name: Docker Build Check
     needs: changes
     if: needs.changes.outputs.docker == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
       # Single platform and no push — this only proves the image still
       # builds; build.yml does the real multi-arch build after merge.
       - name: Build (no push)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           push: false
           platforms: linux/amd64
-          cache-from: type=gha
+          cache-from: type=gha,scope=build-amd64
+
+  gate:
+    name: Build Check Gate
+    needs: [changes, frontend, docker]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail if any needed job failed or was cancelled
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
+      - name: All good
+        run: echo "All build jobs succeeded or were skipped as not relevant."

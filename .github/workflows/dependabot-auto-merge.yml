@@ -1,0 +1,36 @@
+# Auto-merge Dependabot PRs for patch/minor updates. `gh pr merge --auto`
+# only ENABLES auto-merge — GitHub still waits for every required check
+# (the four gates, pr-title, dependency review) before merging, so nothing
+# lands unverified. Majors are left for manual review.
+#
+# Uses BOT_TOKEN when available so the resulting merge push triggers
+# build.yml and tag.yml (pushes made with the default GITHUB_TOKEN do not
+# chain into other workflows). Repo setting "Allow auto-merge" must be on.
+name: dependabot-auto-merge
+
+on: pull_request
+
+permissions: {}
+
+jobs:
+  auto-merge:
+    name: Enable Auto-Merge
+    if: github.repository_owner == 'sharanvelu' && github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Enable auto-merge for patch/minor updates
+        if: steps.metadata.outputs.update-type == 'version-update:semver-patch' || steps.metadata.outputs.update-type == 'version-update:semver-minor'
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.BOT_TOKEN || secrets.GITHUB_TOKEN }}
+        run: gh pr merge --auto --squash "$PR_URL"
