@@ -17,6 +17,7 @@ class EntrySyncState extends Pivot
         return [
             'sync_status' => SyncStatus::class,
             'last_synced_at' => 'datetime',
+            'drift_details' => 'array',
         ];
     }
 

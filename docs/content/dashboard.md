@@ -60,6 +60,6 @@ This feed tracks background sync jobs, not user actions — for the audit trail 
 
 ## When something is amber or red
 
-- **Drifted entries** — someone or something changed records directly at the provider. The zone card tells you which zone; open its Records tab (or [DNS Entries](dns-entries)), hover the amber chip to see what drifted, and use **Sync now** to re-push the entry (the app's database wins and overwrites the remote record). If the remote change is the one you want, edit the entry to match instead. **Sync all** on the zone header stomps widespread drift in one go.
+- **Drifted entries** — someone or something changed records directly at the provider. The zone card tells you which zone; open its Records tab (or [DNS Entries](dns-entries)), hover the amber chip to see exactly which fields drifted (tracked vs actual values), and use **Sync now** to re-push the entry (the app's database wins and overwrites the remote record). If the remote change is the one you want, edit the entry to match instead. The **Sync** button on the Records tab's Drifted tile re-pushes only the drifted records to only the providers they drifted on; **Sync all** on the zone header stomps widespread drift in one go.
 - **Errored entries** — hover the red chip on the entry row for the exact error, fix the cause, then **Sync now**. Failed jobs also retry automatically with backoff.
 - **Unhealthy provider** — open [Providers](providers), edit the provider, use **Test connection** to diagnose, and run **Check drift** once it is fixed.

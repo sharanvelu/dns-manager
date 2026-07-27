@@ -71,7 +71,7 @@ class DnsEntry extends Model
     {
         return $this->belongsToMany(ZoneProvider::class, 'dns_entry_zone_provider')
             ->using(EntrySyncState::class)
-            ->withPivot(['id', 'external_id', 'sync_status', 'last_synced_at', 'last_error'])
+            ->withPivot(['id', 'external_id', 'sync_status', 'last_synced_at', 'last_error', 'drift_details'])
             ->withTimestamps();
     }
 

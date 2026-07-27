@@ -9,7 +9,7 @@ import { Link, router } from '@inertiajs/react';
 import { Cloud, History, MoreHorizontal, Pencil, RefreshCw, Trash2 } from 'lucide-react';
 import { useState, type ComponentType, type SVGProps } from 'react';
 import { relativeTime } from './helpers';
-import type { EntryItem, SyncStateItem, SyncStatus } from './types';
+import type { DriftDetail, EntryItem, SyncStateItem, SyncStatus } from './types';
 
 const statusConfig: Record<SyncStatus, { icon: ComponentType<SVGProps<SVGSVGElement>>; iconClass: string; nameClass?: string; label: string }> = {
     synced: { icon: StatusSyncedIcon, iconClass: 'text-emerald-600 dark:text-emerald-400', label: 'Synced' },
@@ -18,6 +18,12 @@ const statusConfig: Record<SyncStatus, { icon: ComponentType<SVGProps<SVGSVGElem
     error: { icon: StatusErrorIcon, iconClass: 'text-red-600 dark:text-red-400', label: 'Error' },
     deleting: { icon: StatusDeletingIcon, iconClass: 'text-muted-foreground', nameClass: 'line-through', label: 'Deleting' },
 };
+
+function formatDriftValue(detail: DriftDetail, value: DriftDetail['tracked']): string {
+    if (value === null) return detail.field === 'ttl' ? 'Auto' : '—';
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+    return String(value);
+}
 
 function SyncStateChip({ state }: { state: SyncStateItem }) {
     const config = statusConfig[state.status];
@@ -47,6 +53,21 @@ function SyncStateChip({ state }: { state: SyncStateItem }) {
                     <p className="text-muted-foreground mt-0.5 text-xs break-words">
                         {state.lastError ?? (state.status === 'drifted' ? 'Remote record no longer matches this entry.' : 'Sync failed.')}
                     </p>
+                    {state.status === 'drifted' && state.driftDetails && state.driftDetails.length > 0 && (
+                        <div className="border-border/50 mt-1.5 flex flex-col gap-1 border-t pt-1.5">
+                            {state.driftDetails.map((detail) => (
+                                <div key={detail.field} className="text-xs">
+                                    <span className="font-medium capitalize">{detail.field === 'ttl' ? 'TTL' : detail.field}</span>
+                                    <span className="text-muted-foreground block font-mono break-all">
+                                        tracked: {formatDriftValue(detail, detail.tracked)}
+                                    </span>
+                                    <span className="text-muted-foreground block font-mono break-all">
+                                        actual: {formatDriftValue(detail, detail.actual)}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </TooltipContent>
             </Tooltip>
         );

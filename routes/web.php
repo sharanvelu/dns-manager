@@ -80,6 +80,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::middleware('can:manageRecords,zone')->group(function () {
         Route::post('zones/{zone}/sync', [ZoneController::class, 'syncAll'])->name('zones.sync');
+        Route::post('zones/{zone}/sync-drifted', [ZoneController::class, 'syncDrifted'])->name('zones.sync-drifted');
 
         // Importing from a zone attachment creates/updates DNS entries, so it
         // requires record management even though it hangs off a provider.

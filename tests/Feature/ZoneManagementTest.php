@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\SyncStatus;
+use App\Jobs\SyncEntryToProvider;
 use App\Models\DnsEntry;
 use App\Models\DnsZone;
 use App\Models\Provider;
@@ -141,6 +142,71 @@ test('super viewers can see zones but cannot mutate them', function () {
     $this->put("/zones/{$zone->id}", ['name' => 'example.com'])->assertForbidden();
     $this->delete("/zones/{$zone->id}")->assertForbidden();
     $this->post("/zones/{$zone->id}/sync")->assertForbidden();
+    $this->post("/zones/{$zone->id}/sync-drifted")->assertForbidden();
+});
+
+test('sync drifted re-queues only the zone\'s drifted states, each to its own attachment', function () {
+    $zone = DnsZone::factory()->create(['name' => 'example.com']);
+    $otherZone = DnsZone::factory()->create(['name' => 'other.test']);
+
+    $attachment = ZoneProvider::factory()->cloudflare()->create(['dns_zone_id' => $zone->id]);
+    $paused = ZoneProvider::factory()->cloudflare()->create(['dns_zone_id' => $zone->id, 'enabled' => false]);
+    $foreign = ZoneProvider::factory()->cloudflare()->create(['dns_zone_id' => $otherZone->id]);
+
+    $drifted = DnsEntry::factory()->create(['dns_zone_id' => $zone->id, 'name' => 'drifted']);
+    $driftedState = $drifted->syncStates()->create([
+        'zone_provider_id' => $attachment->id,
+        'sync_status' => SyncStatus::Drifted,
+        'external_id' => 'cf-1',
+        'last_error' => 'Remote record differs from the managed entry.',
+        'drift_details' => [['field' => 'content', 'tracked' => '10.0.0.1', 'actual' => '10.9.9.9']],
+    ]);
+
+    $synced = DnsEntry::factory()->create(['dns_zone_id' => $zone->id, 'name' => 'synced']);
+    $syncedState = $synced->syncStates()->create([
+        'zone_provider_id' => $attachment->id,
+        'sync_status' => SyncStatus::Synced,
+        'external_id' => 'cf-2',
+    ]);
+
+    // Paused attachments keep waiting — nothing is queued against them.
+    $pausedDrifted = DnsEntry::factory()->create(['dns_zone_id' => $zone->id, 'name' => 'paused']);
+    $pausedState = $pausedDrifted->syncStates()->create([
+        'zone_provider_id' => $paused->id,
+        'sync_status' => SyncStatus::Drifted,
+        'external_id' => 'cf-3',
+    ]);
+
+    $foreignDrifted = DnsEntry::factory()->create(['dns_zone_id' => $otherZone->id, 'name' => 'foreign']);
+    $foreignState = $foreignDrifted->syncStates()->create([
+        'zone_provider_id' => $foreign->id,
+        'sync_status' => SyncStatus::Drifted,
+        'external_id' => 'cf-4',
+    ]);
+
+    $this->post("/zones/{$zone->id}/sync-drifted")->assertRedirect();
+
+    expect(session('success'))->toContain('1 drifted record');
+
+    expect($driftedState->fresh()->sync_status)->toBe(SyncStatus::Pending)
+        ->and($driftedState->fresh()->last_error)->toBeNull()
+        ->and($driftedState->fresh()->drift_details)->toBeNull()
+        ->and($syncedState->fresh()->sync_status)->toBe(SyncStatus::Synced)
+        ->and($pausedState->fresh()->sync_status)->toBe(SyncStatus::Drifted)
+        ->and($foreignState->fresh()->sync_status)->toBe(SyncStatus::Drifted);
+
+    Queue::assertPushed(SyncEntryToProvider::class, 1);
+    Queue::assertPushed(SyncEntryToProvider::class, fn (SyncEntryToProvider $job) => $job->entryId === $drifted->id
+        && $job->zoneProviderId === $attachment->id);
+});
+
+test('sync drifted with nothing drifted queues nothing', function () {
+    $zone = DnsZone::factory()->create(['name' => 'example.com']);
+
+    $this->post("/zones/{$zone->id}/sync-drifted")->assertRedirect();
+
+    expect(session('success'))->toContain('No drifted records');
+    Queue::assertNothingPushed();
 });
 
 test('zone changes are recorded in the activity log', function () {

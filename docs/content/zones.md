@@ -40,7 +40,7 @@ Pasting a **full hostname is fine**: `www.example.com` entered in zone `example.
 
 Selecting a zone opens its **Records** tab. Every zone page shares a header — the zone name and description, a **Sync all** button (for those who can manage the zone's records), and a kebab menu with **Edit zone** (Zone Admins), **Activity** (those with zone-activity access), and **Delete zone** (Super Admins only) — above the tab pills. You only see the tabs your roles allow:
 
-- **Records** — a row of stat tiles (**Records**, **Fully in sync**, **Drifted**, **Errors**, with the same meanings as the [global dashboard](dashboard)) above the zone's entries, in exactly the same table as the global [DNS Entries](dns-entries) page but scoped to this zone (no Zone column, and creating or importing here is pinned to this zone).
+- **Records** — a row of stat tiles (**Records**, **Fully in sync**, **Drifted**, **Errors**, with the same meanings as the [global dashboard](dashboard)) above the zone's entries, in exactly the same table as the global [DNS Entries](dns-entries) page but scoped to this zone (no Zone column, and creating or importing here is pinned to this zone). When something has drifted, the **Drifted** tile shows a **Sync** button (for users who can manage the zone's records): it re-queues a push for **only the drifted records**, each to only the attachment it drifted on — untouched providers of the same entry are not re-pushed. As always, the app's database wins.
 - **Providers** — the zone's attached [providers](#attaching-a-provider) with their management controls, and the not-yet-attached providers under **Available**.
 - **Activity** — the zone's audit trail, visible to the zone's **Zone Admins** and **Viewers** plus Super Admins and Super Viewers (a zone **DNS Manager** does *not* see it): changes to the zone itself (including provider attach/detach events) *plus* every entry change stamped with this zone — see [Activity Log](activity-log).
 - **Access** — who has been granted roles on this zone; see [Zone access](#zone-access).
@@ -112,6 +112,8 @@ The result (*"Imported N new and updated M existing entries from …"*) is also 
 ## Sync all
 
 **Sync all** in the zone header re-queues a push for **every record in the zone** to its currently assigned attachments — the bulk version of a per-entry **Sync now**. It appears for users who can manage the zone's records (**Zone Admin** or **DNS Manager**). Use it after re-enabling an attachment or to stomp widespread drift; the app's database wins.
+
+For a lighter touch, the **Sync** button on the Records tab's **Drifted** stat tile re-pushes **only the drifted records**, each to only the provider attachment it drifted on (paused attachments keep waiting, as always).
 
 ## Deleting a zone
 

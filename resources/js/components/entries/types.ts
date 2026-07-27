@@ -4,6 +4,15 @@ export type RecordType = (typeof RECORD_TYPES)[number];
 export const SYNC_STATUSES = ['synced', 'pending', 'drifted', 'error', 'deleting'] as const;
 export type SyncStatus = (typeof SYNC_STATUSES)[number];
 
+/** One field where the provider's record differs from the managed entry. */
+export interface DriftDetail {
+    field: string;
+    /** The managed entry's value (what the app tracks). */
+    tracked: string | number | boolean | null;
+    /** The value the provider currently holds. */
+    actual: string | number | boolean | null;
+}
+
 export interface SyncStateItem {
     id: number;
     zoneProviderId: number;
@@ -13,6 +22,7 @@ export interface SyncStateItem {
     status: SyncStatus;
     lastSyncedAt: string | null;
     lastError: string | null;
+    driftDetails: DriftDetail[] | null;
 }
 
 export interface ZoneOption {
@@ -60,6 +70,7 @@ export interface ConnectorInfo {
         supportsZones: boolean;
         minTtl: number | null;
         maxTtl: number | null;
+        defaultTtl: number | null;
     };
 }
 
