@@ -1,11 +1,12 @@
 <?php
 
-use Spatie\Activitylog\Actions\CleanActivityLogAction;
-use Spatie\Activitylog\Actions\LogActivityAction;
+declare(strict_types = 1);
+
 use Spatie\Activitylog\Models\Activity;
+use Spatie\Activitylog\Actions\LogActivityAction;
+use Spatie\Activitylog\Actions\CleanActivityLogAction;
 
 return [
-
     /*
      * If set to false, no activities will be saved to the database.
      */

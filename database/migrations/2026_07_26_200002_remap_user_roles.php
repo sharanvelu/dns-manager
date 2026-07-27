@@ -1,7 +1,9 @@
 <?php
 
-use Illuminate\Database\Migrations\Migration;
+declare(strict_types = 1);
+
 use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Migrations\Migration;
 
 /**
  * Role-system redesign: the old global roles (dns-manager, providers-manager,
@@ -10,8 +12,7 @@ use Illuminate\Support\Facades\DB;
  * becomes a read-only SUPER_VIEWER until an admin grants zone access.
  * String literals only — this migration must stay valid as enums evolve.
  */
-return new class extends Migration
-{
+return new class () extends Migration {
     public function up(): void
     {
         DB::table('users')->get(['id', 'roles'])->each(function ($row) {

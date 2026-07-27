@@ -1,21 +1,23 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Providers;
 
-use App\Models\DnsEntry;
-use App\Models\DnsZone;
-use App\Models\Provider as DnsProvider;
 use App\Models\User;
+use App\Models\DnsZone;
+use App\Models\DnsEntry;
 use App\Models\ZoneUser;
 use App\Policies\DnsZonePolicy;
-use Illuminate\Database\Eloquent\Relations\Relation;
-use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Vite;
+use Illuminate\Support\Facades\Event;
+use SocialiteProviders\OIDC\Provider;
+use App\Models\Provider as DnsProvider;
 use Illuminate\Support\ServiceProvider;
 use SocialiteProviders\Manager\SocialiteWasCalled;
-use SocialiteProviders\OIDC\Provider;
+use Illuminate\Database\Eloquent\Relations\Relation;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -24,7 +26,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
     }
 
     /**

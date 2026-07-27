@@ -1,22 +1,26 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Models;
 
 use App\Enums\Role;
 use App\Enums\ZoneRole;
-use Database\Factories\UserFactory;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
-use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Database\Factories\UserFactory;
+use Illuminate\Notifications\Notifiable;
 use Spatie\Activitylog\Support\LogOptions;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, LogsActivity, Notifiable;
+    use HasFactory;
+    use LogsActivity;
+    use Notifiable;
 
     /**
      * Memoized zone-grant map — every policy check, zoneCan prop, and query
@@ -25,15 +29,6 @@ class User extends Authenticatable
      * @var Collection<int, array<string>>|null map of dns_zone_id => role values
      */
     protected ?Collection $zoneRolesMap = null;
-
-    public function getActivitylogOptions(): LogOptions
-    {
-        return LogOptions::defaults()
-            ->useLogName('users')
-            ->logOnly(['name', 'email', 'roles'])
-            ->logOnlyDirty()
-            ->dontLogEmptyChanges();
-    }
 
     /**
      * The attributes that are mass assignable.
@@ -59,18 +54,13 @@ class User extends Authenticatable
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
-    protected function casts(): array
+    public function getActivitylogOptions(): LogOptions
     {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-            'roles' => 'array',
-        ];
+        return LogOptions::defaults()
+            ->useLogName('users')
+            ->logOnly(['name', 'email', 'roles'])
+            ->logOnlyDirty()
+            ->dontLogEmptyChanges();
     }
 
     public function zoneGrants(): HasMany
@@ -165,5 +155,19 @@ class User extends Authenticatable
             ->filter(fn (array $held) => $wanted === null || array_intersect($held, $wanted) !== [])
             ->keys()
             ->all();
+    }
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+            'roles' => 'array',
+        ];
     }
 }

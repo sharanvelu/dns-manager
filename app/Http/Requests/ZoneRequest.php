@@ -1,21 +1,14 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Foundation\Http\FormRequest;
 
 class ZoneRequest extends FormRequest
 {
-    protected function prepareForValidation(): void
-    {
-        if ($this->has('name')) {
-            $this->merge([
-                'name' => rtrim(strtolower(trim((string) $this->input('name'))), '.'),
-            ]);
-        }
-    }
-
     public function rules(): array
     {
         return [
@@ -35,5 +28,13 @@ class ZoneRequest extends FormRequest
         return [
             'name.regex' => 'The zone name must be a domain like example.com.',
         ];
+    }
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('name')) {
+            $this->merge([
+                'name' => rtrim(strtolower(trim((string) $this->input('name'))), '.'),
+            ]);
+        }
     }
 }

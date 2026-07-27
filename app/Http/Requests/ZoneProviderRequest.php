@@ -1,13 +1,15 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Http\Requests;
 
-use App\Connectors\ConnectorRegistry;
 use App\Models\Provider;
 use App\Models\ZoneProvider;
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
+use App\Connectors\ConnectorRegistry;
+use Illuminate\Foundation\Http\FormRequest;
 
 class ZoneProviderRequest extends FormRequest
 {

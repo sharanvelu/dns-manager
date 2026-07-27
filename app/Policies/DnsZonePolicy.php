@@ -1,10 +1,12 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Policies;
 
+use App\Models\User;
 use App\Enums\ZoneRole;
 use App\Models\DnsZone;
-use App\Models\User;
 
 /**
  * Zone-scoped abilities. Super Admin passes everything via Gate::before();

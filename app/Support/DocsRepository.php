@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Support;
 
 use Illuminate\Support\Str;
@@ -34,7 +36,7 @@ class DocsRepository
     {
         $pages = [];
 
-        foreach (glob($this->basePath.'/*.md') ?: [] as $file) {
+        foreach (glob($this->basePath . '/*.md') ?: [] as $file) {
             $slug = basename($file, '.md');
             [$meta] = $this->parse((string) file_get_contents($file));
 
@@ -63,7 +65,7 @@ class DocsRepository
             return null;
         }
 
-        $file = $this->basePath.'/'.$slug.'.md';
+        $file = $this->basePath . '/' . $slug . '.md';
 
         if (! is_file($file)) {
             return null;

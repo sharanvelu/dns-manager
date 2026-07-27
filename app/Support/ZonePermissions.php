@@ -1,9 +1,11 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Support;
 
-use App\Models\DnsZone;
 use App\Models\User;
+use App\Models\DnsZone;
 
 class ZonePermissions
 {

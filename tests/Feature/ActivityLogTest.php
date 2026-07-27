@@ -1,20 +1,22 @@
 <?php
 
-use App\Enums\HealthStatus;
-use App\Enums\SyncStatus;
-use App\Jobs\CheckProviderHealth;
-use App\Models\DnsEntry;
-use App\Models\DnsZone;
-use App\Models\Provider;
+declare(strict_types = 1);
+
 use App\Models\User;
-use App\Models\ZoneProvider;
+use App\Models\DnsZone;
+use App\Models\DnsEntry;
+use App\Models\Provider;
 use App\Models\ZoneUser;
+use App\Enums\SyncStatus;
+use App\Enums\HealthStatus;
+use App\Models\ZoneProvider;
+use App\Jobs\CheckProviderHealth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Spatie\Activitylog\Models\Activity;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as OidcSocialiteUser;
-use Spatie\Activitylog\Models\Activity;
 
 // ── Model activities ────────────────────────────────────────────────────────
 
@@ -176,7 +178,7 @@ test('provider health checks write zero activity rows', function () {
 // ── Auth events ─────────────────────────────────────────────────────────────
 
 test('oidc login logs an auth activity with the logged-in user as causer and subject', function () {
-    Socialite::shouldReceive('driver->user')->andReturn((new OidcSocialiteUser)->map([
+    Socialite::shouldReceive('driver->user')->andReturn((new OidcSocialiteUser())->map([
         'id' => 'sub-1',
         'name' => 'Jane Doe',
         'nickname' => 'jane',

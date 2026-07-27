@@ -1,25 +1,29 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Http\Controllers;
 
-use App\Enums\RecordType;
-use App\Enums\SyncStatus;
 use App\Enums\ZoneRole;
 use App\Models\DnsEntry;
+use App\Enums\RecordType;
+use App\Enums\SyncStatus;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
 use App\Models\ZoneProvider;
+use Illuminate\Http\Request;
 use App\Services\SyncService;
 use App\Support\DnsEntryRules;
-use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Database\Eloquent\Collection;
 
 class DnsEntryBulkController extends Controller
 {
-    public function __construct(private SyncService $sync) {}
+    public function __construct(private SyncService $sync)
+    {
+    }
 
     /**
      * Re-queue a push for each selected entry to its assigned providers.
@@ -191,7 +195,7 @@ class DnsEntryBulkController extends Controller
         ]);
 
         if ($skippedParts !== []) {
-            $message .= ' ('.implode(', ', $skippedParts).'.)';
+            $message .= ' (' . implode(', ', $skippedParts) . '.)';
         }
 
         return back()->with('success', $message);

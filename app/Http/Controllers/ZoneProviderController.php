@@ -1,20 +1,24 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Http\Controllers;
 
-use App\Connectors\ConnectorRegistry;
-use App\Http\Requests\ZoneProviderRequest;
+use Throwable;
 use App\Models\DnsZone;
 use App\Models\Provider;
 use App\Models\ZoneProvider;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Throwable;
+use Illuminate\Http\JsonResponse;
+use App\Connectors\ConnectorRegistry;
+use Illuminate\Http\RedirectResponse;
+use App\Http\Requests\ZoneProviderRequest;
 
 class ZoneProviderController extends Controller
 {
-    public function __construct(private ConnectorRegistry $registry) {}
+    public function __construct(private ConnectorRegistry $registry)
+    {
+    }
 
     public function store(ZoneProviderRequest $request, DnsZone $zone): RedirectResponse
     {

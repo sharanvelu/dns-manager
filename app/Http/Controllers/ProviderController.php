@@ -1,26 +1,30 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Http\Controllers;
 
-use App\Connectors\ConnectorRegistry;
-use App\Enums\HealthStatus;
-use App\Enums\SyncStatus;
-use App\Http\Requests\ProviderRequest;
-use App\Jobs\CheckProviderDrift;
-use App\Jobs\CheckProviderHealth;
-use App\Models\DnsZone;
-use App\Models\Provider;
-use App\Services\ZoneAttachmentService;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
+use Throwable;
 use Inertia\Inertia;
 use Inertia\Response;
-use Throwable;
+use App\Models\DnsZone;
+use App\Models\Provider;
+use App\Enums\SyncStatus;
+use App\Enums\HealthStatus;
+use Illuminate\Http\Request;
+use App\Jobs\CheckProviderDrift;
+use App\Jobs\CheckProviderHealth;
+use Illuminate\Http\JsonResponse;
+use App\Connectors\ConnectorRegistry;
+use Illuminate\Http\RedirectResponse;
+use App\Http\Requests\ProviderRequest;
+use App\Services\ZoneAttachmentService;
 
 class ProviderController extends Controller
 {
-    public function __construct(private ConnectorRegistry $registry) {}
+    public function __construct(private ConnectorRegistry $registry)
+    {
+    }
 
     public function index(): Response
     {

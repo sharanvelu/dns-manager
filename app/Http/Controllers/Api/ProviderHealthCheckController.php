@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
-use App\Jobs\CheckProviderHealth;
 use App\Models\Provider;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Jobs\CheckProviderHealth;
+use Illuminate\Http\JsonResponse;
+use App\Http\Controllers\Controller;
 
 class ProviderHealthCheckController extends Controller
 {

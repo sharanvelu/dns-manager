@@ -1,18 +1,29 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Models;
 
 use Database\Factories\ZoneUserFactory;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class ZoneUser extends Model
 {
     /** @use HasFactory<ZoneUserFactory> */
-    use HasFactory, LogsActivity;
+    use HasFactory;
+    use LogsActivity;
+
+    protected $table = 'zone_user';
+
+    protected $fillable = [
+        'dns_zone_id',
+        'user_id',
+        'roles',
+    ];
 
     public function getActivitylogOptions(): LogOptions
     {
@@ -23,21 +34,6 @@ class ZoneUser extends Model
             ->dontLogEmptyChanges();
     }
 
-    protected $table = 'zone_user';
-
-    protected $fillable = [
-        'dns_zone_id',
-        'user_id',
-        'roles',
-    ];
-
-    protected function casts(): array
-    {
-        return [
-            'roles' => 'array',
-        ];
-    }
-
     public function zone(): BelongsTo
     {
         return $this->belongsTo(DnsZone::class, 'dns_zone_id');
@@ -46,5 +42,12 @@ class ZoneUser extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'roles' => 'array',
+        ];
     }
 }

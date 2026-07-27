@@ -1,12 +1,14 @@
 <?php
 
-use App\Enums\SyncStatus;
-use App\Jobs\SyncEntryToProvider;
-use App\Models\DnsEntry;
-use App\Models\DnsZone;
-use App\Models\Provider;
+declare(strict_types = 1);
+
 use App\Models\User;
+use App\Models\DnsZone;
+use App\Models\DnsEntry;
+use App\Models\Provider;
+use App\Enums\SyncStatus;
 use App\Models\ZoneProvider;
+use App\Jobs\SyncEntryToProvider;
 use Illuminate\Support\Facades\Queue;
 use Spatie\Activitylog\Models\Activity;
 

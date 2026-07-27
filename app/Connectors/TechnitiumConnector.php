@@ -1,19 +1,21 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Connectors;
 
-use App\Connectors\DTOs\ConfigField;
-use App\Connectors\DTOs\ConnectorCapabilities;
-use App\Connectors\DTOs\RemoteRecord;
+use App\Models\DnsEntry;
+use Illuminate\Support\Collection;
 use App\Connectors\DTOs\TestResult;
+use App\Connectors\DTOs\ConfigField;
+use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Http;
+use App\Connectors\DTOs\RemoteRecord;
+use Illuminate\Http\Client\PendingRequest;
+use App\Connectors\DTOs\ConnectorCapabilities;
+use Illuminate\Http\Client\ConnectionException;
 use App\Connectors\Exceptions\ConnectorException;
 use App\Connectors\Exceptions\RecordNotFoundException;
-use App\Models\DnsEntry;
-use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Http\Client\PendingRequest;
-use Illuminate\Http\Client\Response;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Http;
 
 /**
  * Technitium DNS Server connector (HTTP API with a permanent API token).
@@ -112,7 +114,7 @@ class TechnitiumConnector extends AbstractDnsConnector
             $response = $this->http()->get('/api/zones/list', ['pageNumber' => 1, 'zonesPerPage' => 1]);
 
             if ($response->failed() || $response->json('status') !== 'ok') {
-                return TestResult::failure('Token check failed: '.$this->errorMessageFrom($response));
+                return TestResult::failure('Token check failed: ' . $this->errorMessageFrom($response));
             }
 
             $zoneCount = $response->json('response.totalZones');
@@ -126,7 +128,7 @@ class TechnitiumConnector extends AbstractDnsConnector
 
             return TestResult::success('API token is valid.');
         } catch (ConnectionException $e) {
-            return TestResult::failure('Could not reach Technitium: '.$e->getMessage());
+            return TestResult::failure('Could not reach Technitium: ' . $e->getMessage());
         }
     }
 
@@ -138,12 +140,12 @@ class TechnitiumConnector extends AbstractDnsConnector
 
         try {
             if ($this->zoneExists($zoneName)) {
-                return TestResult::success('Connected to zone '.$zoneName, ['zone' => $zoneName]);
+                return TestResult::success('Connected to zone ' . $zoneName, ['zone' => $zoneName]);
             }
 
             return TestResult::failure("Zone {$zoneName} does not exist on this Technitium server");
         } catch (ConnectionException $e) {
-            return TestResult::failure('Could not reach Technitium: '.$e->getMessage());
+            return TestResult::failure('Could not reach Technitium: ' . $e->getMessage());
         } catch (ConnectorException $e) {
             return TestResult::failure($e->getMessage());
         }

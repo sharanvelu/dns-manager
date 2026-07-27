@@ -1,9 +1,11 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Support;
 
-use App\Enums\RecordType;
 use App\Models\DnsZone;
+use App\Enums\RecordType;
 use Illuminate\Validation\Rule;
 
 class DnsEntryRules
@@ -29,7 +31,7 @@ class DnsEntryRules
             'required',
             'string',
             'max:253',
-            'regex:'.self::NAME_REGEX,
+            'regex:' . self::NAME_REGEX,
         ];
 
         if ($zone !== null) {

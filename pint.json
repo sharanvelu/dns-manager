@@ -13,7 +13,12 @@
         "_ide_helper.php"
     ],
     "rules": {
-        "phpdoc_no_empty_return": false,
+        "new_with_parentheses": {
+            "anonymous_class": true,
+            "named_class": true
+        },
+        "declare_strict_types": true,
+        "phpdoc_no_empty_return": true,
         "phpdoc_var_annotation_correct_order": true,
         "array_syntax": {
             "syntax": "short"
@@ -38,6 +43,11 @@
         "lowercase_static_reference": true,
         "no_empty_phpdoc": true,
         "no_empty_comment": true,
+        "ordered_class_elements": true,
+        "ordered_traits": true,
+        "php_unit_method_casing": {
+            "case": "snake_case"
+        },
         "array_indentation": true,
         "short_scalar_cast": true,
         "no_mixed_echo_print": {
@@ -100,7 +110,7 @@
         },
         "no_multiline_whitespace_around_double_arrow": true,
         "no_useless_return": true,
-        "phpdoc_add_missing_param_annotation": false,
+        "phpdoc_add_missing_param_annotation": true,
         "phpdoc_order": true,
         "phpdoc_scalar": false,
         "phpdoc_separation": false,

@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Http\Controllers;
 
-use App\Support\ActivityQuery;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Illuminate\Http\Request;
+use App\Support\ActivityQuery;
+use Illuminate\Http\JsonResponse;
 
 class ActivityLogController extends Controller
 {

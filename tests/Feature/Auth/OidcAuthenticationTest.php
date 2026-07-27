@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types = 1);
+
 use App\Models\User;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 
 function fakeOidcUser(string $sub = 'sub-123', string $email = 'jane@example.com', string $name = 'Jane Doe'): SocialiteUser
 {
-    return (new SocialiteUser)->map([
+    return (new SocialiteUser())->map([
         'id' => $sub,
         'name' => $name,
         'nickname' => 'jane',
@@ -36,7 +38,7 @@ test('oidc callback provisions a new user with gravatar avatar and logs them in'
     expect($user->email)->toBe('jane@example.com')
         ->and($user->oidc_sub)->toBe('sub-123')
         ->and($user->name)->toBe('Jane Doe')
-        ->and($user->avatar_url)->toContain('gravatar.com/avatar/'.hash('sha256', 'jane@example.com'))
+        ->and($user->avatar_url)->toContain('gravatar.com/avatar/' . hash('sha256', 'jane@example.com'))
         ->and($user->avatar_url)->toContain('d=404');
 });
 
@@ -69,7 +71,7 @@ test('oidc callback matches an existing user by email and links the sub', functi
 
 test('oidc callback without an email is rejected', function () {
     Socialite::shouldReceive('driver->user')->andReturn(
-        (new SocialiteUser)->map(['id' => 'sub-123', 'name' => 'Jane'])
+        (new SocialiteUser())->map(['id' => 'sub-123', 'name' => 'Jane'])
     );
 
     $response = $this->get('/auth/callback?code=abc&state=xyz');

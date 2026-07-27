@@ -1,34 +1,23 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Connectors;
 
-use App\Connectors\Contracts\DnsConnector;
-use App\Connectors\DTOs\TestResult;
-use App\Connectors\Exceptions\ConnectorException;
 use App\Models\DnsZone;
 use App\Models\Provider;
 use App\Models\ZoneProvider;
+use App\Connectors\DTOs\TestResult;
 use Illuminate\Http\Client\Response;
+use App\Connectors\Contracts\DnsConnector;
+use App\Connectors\Exceptions\ConnectorException;
 
 abstract class AbstractDnsConnector implements DnsConnector
 {
     public function __construct(
         protected Provider $provider,
         protected ?ZoneProvider $zoneProvider = null,
-    ) {}
-
-    /**
-     * Decrypted provider configuration overlaid with the per-zone
-     * settings when a zone attachment is present (zone value wins).
-     */
-    protected function config(?string $key = null, mixed $default = null): mixed
-    {
-        $config = array_merge(
-            $this->provider->config ?? [],
-            $this->zoneProvider?->config ?? [],
-        );
-
-        return $key === null ? $config : ($config[$key] ?? $default);
+    ) {
     }
 
     /**
@@ -37,21 +26,6 @@ abstract class AbstractDnsConnector implements DnsConnector
     public static function zoneConfigSchema(): array
     {
         return [];
-    }
-
-    /**
-     * The zone attachment this connector was built for, or throw when the
-     * operation was invoked without one.
-     */
-    protected function requireZoneContext(): ZoneProvider
-    {
-        return $this->zoneProvider
-            ?? throw new ConnectorException(static::displayName().' operation requires a zone attachment.');
-    }
-
-    protected function zone(): DnsZone
-    {
-        return $this->requireZoneContext()->zone;
     }
 
     /**
@@ -69,6 +43,35 @@ abstract class AbstractDnsConnector implements DnsConnector
     public function discoverZoneConfig(string $zoneName): ?array
     {
         return null;
+    }
+
+    /**
+     * Decrypted provider configuration overlaid with the per-zone
+     * settings when a zone attachment is present (zone value wins).
+     */
+    protected function config(?string $key = null, mixed $default = null): mixed
+    {
+        $config = array_merge(
+            $this->provider->config ?? [],
+            $this->zoneProvider?->config ?? [],
+        );
+
+        return $key === null ? $config : ($config[$key] ?? $default);
+    }
+
+    /**
+     * The zone attachment this connector was built for, or throw when the
+     * operation was invoked without one.
+     */
+    protected function requireZoneContext(): ZoneProvider
+    {
+        return $this->zoneProvider
+            ?? throw new ConnectorException(static::displayName() . ' operation requires a zone attachment.');
+    }
+
+    protected function zone(): DnsZone
+    {
+        return $this->requireZoneContext()->zone;
     }
 
     /**

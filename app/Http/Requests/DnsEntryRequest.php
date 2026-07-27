@@ -1,13 +1,15 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Http\Requests;
 
-use App\Enums\RecordType;
-use App\Models\DnsEntry;
 use App\Models\DnsZone;
+use App\Models\DnsEntry;
+use App\Enums\RecordType;
 use App\Support\DnsEntryRules;
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Foundation\Http\FormRequest;
 
 class DnsEntryRequest extends FormRequest
 {
@@ -27,29 +29,6 @@ class DnsEntryRequest extends FormRequest
         }
 
         return $this->user()->can('manageRecords', $zone);
-    }
-
-    /**
-     * Normalize the submitted name to its zone-relative form so a pasted
-     * FQDN ("www.example.com" in zone example.com) still validates.
-     */
-    protected function prepareForValidation(): void
-    {
-        if (! is_string($this->input('name'))) {
-            return;
-        }
-
-        $name = strtolower(rtrim(trim($this->input('name')), '.'));
-
-        if ($zone = $this->targetZone()) {
-            if ($name === $zone->name) {
-                $name = '@';
-            } elseif (str_ends_with($name, '.'.$zone->name)) {
-                $name = substr($name, 0, -strlen('.'.$zone->name));
-            }
-        }
-
-        $this->merge(['name' => $name]);
     }
 
     public function rules(): array
@@ -76,6 +55,29 @@ class DnsEntryRequest extends FormRequest
     public function messages(): array
     {
         return DnsEntryRules::messages();
+    }
+
+    /**
+     * Normalize the submitted name to its zone-relative form so a pasted
+     * FQDN ("www.example.com" in zone example.com) still validates.
+     */
+    protected function prepareForValidation(): void
+    {
+        if (! is_string($this->input('name'))) {
+            return;
+        }
+
+        $name = strtolower(rtrim(trim($this->input('name')), '.'));
+
+        if ($zone = $this->targetZone()) {
+            if ($name === $zone->name) {
+                $name = '@';
+            } elseif (str_ends_with($name, '.' . $zone->name)) {
+                $name = substr($name, 0, -strlen('.' . $zone->name));
+            }
+        }
+
+        $this->merge(['name' => $name]);
     }
 
     protected function isUpdate(): bool

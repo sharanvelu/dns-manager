@@ -1,19 +1,29 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Models;
 
 use Database\Factories\DnsZoneFactory;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Spatie\Activitylog\Support\LogOptions;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
-use Spatie\Activitylog\Support\LogOptions;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class DnsZone extends Model
 {
-    /** @use HasFactory<DnsZoneFactory> */
-    use HasFactory, LogsActivity;
+    /**
+     * @use     HasFactory<DnsZoneFactory>
+     */
+    use HasFactory;
+    use LogsActivity;
+
+    protected $fillable = [
+        'name',
+        'description',
+    ];
 
     public function getActivitylogOptions(): LogOptions
     {
@@ -23,11 +33,6 @@ class DnsZone extends Model
             ->logOnlyDirty()
             ->dontLogEmptyChanges();
     }
-
-    protected $fillable = [
-        'name',
-        'description',
-    ];
 
     public function entries(): HasMany
     {
@@ -76,8 +81,8 @@ class DnsZone extends Model
             return '@';
         }
 
-        if (str_ends_with($fqdn, '.'.$this->name)) {
-            return substr($fqdn, 0, -strlen('.'.$this->name));
+        if (str_ends_with($fqdn, '.' . $this->name)) {
+            return substr($fqdn, 0, -strlen('.' . $this->name));
         }
 
         return null;

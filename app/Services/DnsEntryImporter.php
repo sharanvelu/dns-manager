@@ -1,10 +1,12 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Services;
 
-use App\Enums\RecordType;
-use App\Models\DnsEntry;
 use App\Models\DnsZone;
+use App\Models\DnsEntry;
+use App\Enums\RecordType;
 use App\Support\DnsEntryRules;
 use Illuminate\Support\Facades\Validator;
 
@@ -17,7 +19,9 @@ class DnsEntryImporter
     /** Errors are capped so a completely broken file yields a readable report. */
     private const MAX_REPORTED_FAILURES = 25;
 
-    public function __construct(private SyncService $sync) {}
+    public function __construct(private SyncService $sync)
+    {
+    }
 
     /**
      * Import entries into the given zone from raw CSV content. Names are
@@ -98,7 +102,7 @@ class DnsEntryImporter
             'media,CNAME,nas.example.com,300,,false,Jellyfin',
             '@,MX,mail.example.com,,10,false,Primary mail',
             '_dmarc,TXT,"v=DMARC1; p=none",,,false,',
-        ])."\n";
+        ]) . "\n";
     }
 
     /**
@@ -137,12 +141,12 @@ class DnsEntryImporter
 
         if ($missing !== []) {
             throw new \InvalidArgumentException(
-                'Missing required column(s): '.implode(', ', $missing).'. Download the sample file for the expected format.',
+                'Missing required column(s): ' . implode(', ', $missing) . '. Download the sample file for the expected format.',
             );
         }
 
         if (count($lines) > self::MAX_ROWS) {
-            throw new \InvalidArgumentException('Too many rows — the limit is '.self::MAX_ROWS.' per import.');
+            throw new \InvalidArgumentException('Too many rows — the limit is ' . self::MAX_ROWS . ' per import.');
         }
 
         $rows = [];

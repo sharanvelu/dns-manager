@@ -1,10 +1,12 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Console\Commands;
 
-use App\Jobs\CheckProviderDrift;
 use App\Models\Provider;
 use Illuminate\Console\Command;
+use App\Jobs\CheckProviderDrift;
 
 class CheckDnsDrift extends Command
 {
@@ -27,7 +29,7 @@ class CheckDnsDrift extends Command
         $this->info(sprintf(
             'Queued drift check for %d provider(s)%s.',
             $providers->count(),
-            $providers->isEmpty() ? '' : ': '.$providers->implode(', '),
+            $providers->isEmpty() ? '' : ': ' . $providers->implode(', '),
         ));
 
         return self::SUCCESS;

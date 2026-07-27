@@ -1,18 +1,20 @@
 <?php
 
-use App\Http\Controllers\ActivityLogController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\DnsEntryBulkController;
-use App\Http\Controllers\DnsEntryController;
-use App\Http\Controllers\DocsController;
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\ProviderController;
-use App\Http\Controllers\ProviderImportController;
-use App\Http\Controllers\UserController;
-use App\Http\Controllers\ZoneAccessController;
-use App\Http\Controllers\ZoneController;
-use App\Http\Controllers\ZoneProviderController;
+declare(strict_types = 1);
+
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\DocsController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\ZoneController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\DnsEntryController;
+use App\Http\Controllers\ProviderController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ZoneAccessController;
+use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\DnsEntryBulkController;
+use App\Http\Controllers\ZoneProviderController;
+use App\Http\Controllers\ProviderImportController;
 
 Route::redirect('/', '/dashboard')->name('home');
 
@@ -136,4 +138,4 @@ Route::middleware(['auth'])->group(function () {
     });
 });
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';

@@ -1,19 +1,21 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Jobs;
 
-use App\Connectors\ConnectorRegistry;
-use App\Connectors\DTOs\ConnectorCapabilities;
-use App\Connectors\DTOs\RemoteRecord;
-use App\Enums\HealthStatus;
-use App\Enums\SyncStatus;
-use App\Models\EntrySyncState;
-use App\Models\Provider;
-use App\Models\SyncLog;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Support\Collection;
 use Throwable;
+use App\Models\SyncLog;
+use App\Models\Provider;
+use App\Enums\SyncStatus;
+use App\Enums\HealthStatus;
+use App\Models\EntrySyncState;
+use Illuminate\Support\Collection;
+use App\Connectors\ConnectorRegistry;
+use App\Connectors\DTOs\RemoteRecord;
+use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use App\Connectors\DTOs\ConnectorCapabilities;
 
 class CheckProviderDrift implements ShouldQueue
 {
@@ -21,7 +23,9 @@ class CheckProviderDrift implements ShouldQueue
 
     public int $tries = 1;
 
-    public function __construct(public int $providerId) {}
+    public function __construct(public int $providerId)
+    {
+    }
 
     public function handle(): void
     {

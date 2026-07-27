@@ -1,16 +1,18 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Http\Controllers;
 
-use App\Enums\SyncStatus;
-use App\Models\DnsEntry;
-use App\Models\DnsZone;
-use App\Models\Provider;
-use App\Models\SyncLog;
-use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Models\DnsZone;
+use App\Models\SyncLog;
+use App\Models\DnsEntry;
+use App\Models\Provider;
+use App\Enums\SyncStatus;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 class DashboardController extends Controller
 {

@@ -1,23 +1,37 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Models;
 
 use App\Enums\RecordType;
 use Database\Factories\DnsEntryFactory;
-use Illuminate\Database\Eloquent\Casts\Attribute;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\Contracts\Activity;
-use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class DnsEntry extends Model
 {
     /** @use HasFactory<DnsEntryFactory> */
-    use HasFactory, LogsActivity;
+    use HasFactory;
+    use LogsActivity;
+
+    protected $fillable = [
+        'dns_zone_id',
+        'name',
+        'type',
+        'content',
+        'ttl',
+        'priority',
+        'proxied',
+        'comment',
+    ];
 
     public function getActivitylogOptions(): LogOptions
     {
@@ -41,27 +55,6 @@ class DnsEntry extends Model
         ]);
     }
 
-    protected $fillable = [
-        'dns_zone_id',
-        'name',
-        'type',
-        'content',
-        'ttl',
-        'priority',
-        'proxied',
-        'comment',
-    ];
-
-    protected function casts(): array
-    {
-        return [
-            'type' => RecordType::class,
-            'ttl' => 'integer',
-            'priority' => 'integer',
-            'proxied' => 'boolean',
-        ];
-    }
-
     public function zone(): BelongsTo
     {
         return $this->belongsTo(DnsZone::class, 'dns_zone_id');
@@ -78,6 +71,16 @@ class DnsEntry extends Model
     public function syncStates(): HasMany
     {
         return $this->hasMany(EntrySyncState::class);
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'type' => RecordType::class,
+            'ttl' => 'integer',
+            'priority' => 'integer',
+            'proxied' => 'boolean',
+        ];
     }
 
     /**

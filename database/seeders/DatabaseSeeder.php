@@ -1,13 +1,15 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace Database\Seeders;
 
-use App\Enums\SyncStatus;
-use App\Models\DnsEntry;
-use App\Models\DnsZone;
-use App\Models\Provider;
-use App\Models\SyncLog;
 use App\Models\User;
+use App\Models\DnsZone;
+use App\Models\SyncLog;
+use App\Models\DnsEntry;
+use App\Models\Provider;
+use App\Enums\SyncStatus;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -72,7 +74,7 @@ class DatabaseSeeder extends Seeder
                 $entry->syncStates()->create([
                     'zone_provider_id' => $attachment->id,
                     'external_id' => $attachment->is($cloudflareAttachment)
-                        ? 'cf-seed-'.$i
+                        ? 'cf-seed-' . $i
                         : "{$entry->content} {$entry->fqdn}",
                     'sync_status' => $drifted ? SyncStatus::Drifted : SyncStatus::Synced,
                     'last_synced_at' => now()->subMinutes(30),

@@ -1,7 +1,8 @@
 <?php
 
-return [
+declare(strict_types = 1);
 
+return [
     /*
     |--------------------------------------------------------------------------
     | Third Party Services
@@ -44,5 +45,4 @@ return [
         // Shown on the sign-in button: "Sign in with {label}".
         'label' => env('OIDC_PROVIDER_LABEL', 'SSO'),
     ],
-
 ];

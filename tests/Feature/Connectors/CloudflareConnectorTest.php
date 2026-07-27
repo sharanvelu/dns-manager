@@ -1,15 +1,17 @@
 <?php
 
-use App\Connectors\CloudflareConnector;
-use App\Connectors\DTOs\RemoteRecord;
-use App\Connectors\Exceptions\ConnectorException;
-use App\Enums\RecordType;
-use App\Models\DnsEntry;
+declare(strict_types = 1);
+
 use App\Models\DnsZone;
+use App\Models\DnsEntry;
 use App\Models\Provider;
+use App\Enums\RecordType;
 use App\Models\ZoneProvider;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use App\Connectors\DTOs\RemoteRecord;
+use App\Connectors\CloudflareConnector;
+use App\Connectors\Exceptions\ConnectorException;
 
 function cloudflareEnvelope(mixed $result, array $overrides = []): array
 {
@@ -24,7 +26,7 @@ function cloudflareEnvelope(mixed $result, array $overrides = []): array
 function cloudflareApiRecord(array $overrides = []): array
 {
     return array_merge([
-        'id' => 'rec-'.fake()->uuid(),
+        'id' => 'rec-' . fake()->uuid(),
         'type' => 'A',
         'name' => 'www.example.com',
         'content' => '192.0.2.1',
@@ -271,8 +273,8 @@ describe('adopt-on-conflict', function () {
         ]);
 
         Http::fake([
-            $this->recordsUrl.'/existing-id-1' => Http::response(cloudflareEnvelope(cloudflareApiRecord(['id' => 'existing-id-1']))),
-            $this->recordsUrl.'?*' => Http::response(cloudflareEnvelope([
+            $this->recordsUrl . '/existing-id-1' => Http::response(cloudflareEnvelope(cloudflareApiRecord(['id' => 'existing-id-1']))),
+            $this->recordsUrl . '?*' => Http::response(cloudflareEnvelope([
                 cloudflareApiRecord(['id' => 'existing-id-1', 'name' => 'www.example.com', 'content' => '192.0.2.1']),
             ])),
             $this->recordsUrl => alreadyExistsResponse(),
@@ -294,8 +296,8 @@ describe('adopt-on-conflict', function () {
         $entry = DnsEntry::factory()->cname('new-target.example.com')->for($this->zone, 'zone')->create(['name' => 'alias']);
 
         Http::fake([
-            $this->recordsUrl.'/cname-1' => Http::response(cloudflareEnvelope(cloudflareApiRecord(['id' => 'cname-1', 'type' => 'CNAME']))),
-            $this->recordsUrl.'?*' => Http::response(cloudflareEnvelope([
+            $this->recordsUrl . '/cname-1' => Http::response(cloudflareEnvelope(cloudflareApiRecord(['id' => 'cname-1', 'type' => 'CNAME']))),
+            $this->recordsUrl . '?*' => Http::response(cloudflareEnvelope([
                 cloudflareApiRecord(['id' => 'cname-1', 'type' => 'CNAME', 'name' => 'alias.example.com', 'content' => 'old-target.example.com']),
             ])),
             $this->recordsUrl => alreadyExistsResponse(81053),
@@ -312,7 +314,7 @@ describe('adopt-on-conflict', function () {
         $entry = DnsEntry::factory()->for($this->zone, 'zone')->create(['name' => 'multi', 'content' => '10.9.9.9']);
 
         Http::fake([
-            $this->recordsUrl.'?*' => Http::response(cloudflareEnvelope([
+            $this->recordsUrl . '?*' => Http::response(cloudflareEnvelope([
                 cloudflareApiRecord(['id' => 'a-1', 'name' => 'multi.example.com', 'content' => '10.0.0.1']),
                 cloudflareApiRecord(['id' => 'a-2', 'name' => 'multi.example.com', 'content' => '10.0.0.2']),
             ])),
@@ -344,7 +346,7 @@ describe('adopt-on-conflict', function () {
 describe('updateRecord', function () {
     it('PUTs the full FQDN payload to the record id and returns the id', function () {
         Http::fake([
-            $this->recordsUrl.'/rec-42' => Http::response(cloudflareEnvelope(cloudflareApiRecord(['id' => 'rec-42']))),
+            $this->recordsUrl . '/rec-42' => Http::response(cloudflareEnvelope(cloudflareApiRecord(['id' => 'rec-42']))),
         ]);
 
         $entry = DnsEntry::factory()->for($this->zone, 'zone')->create([
@@ -359,7 +361,7 @@ describe('updateRecord', function () {
 
         Http::assertSent(function (Request $request) {
             return $request->method() === 'PUT'
-                && $request->url() === $this->recordsUrl.'/rec-42'
+                && $request->url() === $this->recordsUrl . '/rec-42'
                 && $request['name'] === 'app.example.com'
                 && $request['content'] === '192.0.2.50'
                 && $request['ttl'] === 300
@@ -371,18 +373,18 @@ describe('updateRecord', function () {
 describe('deleteRecord', function () {
     it('sends a DELETE for the record id', function () {
         Http::fake([
-            $this->recordsUrl.'/rec-7' => Http::response(cloudflareEnvelope(['id' => 'rec-7'])),
+            $this->recordsUrl . '/rec-7' => Http::response(cloudflareEnvelope(['id' => 'rec-7'])),
         ]);
 
         $this->connector->deleteRecord('rec-7');
 
         Http::assertSent(fn (Request $request) => $request->method() === 'DELETE'
-            && $request->url() === $this->recordsUrl.'/rec-7');
+            && $request->url() === $this->recordsUrl . '/rec-7');
     });
 
     it('treats a 404 as success', function () {
         Http::fake([
-            $this->recordsUrl.'/rec-gone' => Http::response(cloudflareEnvelope(null, [
+            $this->recordsUrl . '/rec-gone' => Http::response(cloudflareEnvelope(null, [
                 'success' => false,
                 'errors' => [['code' => 81044, 'message' => 'Record does not exist.']],
             ]), 404),
@@ -395,7 +397,7 @@ describe('deleteRecord', function () {
 
     it('throws on other failures', function () {
         Http::fake([
-            $this->recordsUrl.'/rec-8' => Http::response(cloudflareEnvelope(null, [
+            $this->recordsUrl . '/rec-8' => Http::response(cloudflareEnvelope(null, [
                 'success' => false,
                 'errors' => [['code' => 10000, 'message' => 'Authentication error']],
             ]), 403),
@@ -409,7 +411,7 @@ describe('deleteRecord', function () {
 describe('listRecords', function () {
     it('maps the API response to RemoteRecords and filters unsupported types', function () {
         Http::fake([
-            $this->recordsUrl.'*' => Http::response(cloudflareEnvelope([
+            $this->recordsUrl . '*' => Http::response(cloudflareEnvelope([
                 cloudflareApiRecord([
                     'id' => 'rec-a',
                     'type' => 'A',
@@ -495,7 +497,7 @@ describe('listRecords', function () {
 
     it('paginates when total_pages is greater than 1', function () {
         Http::fake([
-            $this->recordsUrl.'*' => Http::sequence()
+            $this->recordsUrl . '*' => Http::sequence()
                 ->push(cloudflareEnvelope(
                     [cloudflareApiRecord(['id' => 'rec-page-1'])],
                     ['result_info' => ['page' => 1, 'per_page' => 5000, 'total_pages' => 2]],
@@ -517,7 +519,7 @@ describe('listRecords', function () {
 
     it('throws a ConnectorException when listing fails', function () {
         Http::fake([
-            $this->recordsUrl.'*' => Http::response(cloudflareEnvelope(null, [
+            $this->recordsUrl . '*' => Http::response(cloudflareEnvelope(null, [
                 'success' => false,
                 'errors' => [['code' => 7003, 'message' => 'Could not route to /zones/bad']],
             ]), 404),
@@ -531,7 +533,7 @@ describe('listRecords', function () {
 describe('testConnection', function () {
     it('validates the token by listing zones, without any zone context', function () {
         Http::fake([
-            $this->zonesUrl.'?*' => Http::response(cloudflareEnvelope(
+            $this->zonesUrl . '?*' => Http::response(cloudflareEnvelope(
                 [['id' => 'zone-abc-123', 'name' => 'example.com', 'status' => 'active']],
                 ['result_info' => ['page' => 1, 'per_page' => 1, 'total_pages' => 3, 'count' => 1, 'total_count' => 3]],
             )),
@@ -544,7 +546,7 @@ describe('testConnection', function () {
             ->and($result->details)->toBe(['zones' => 3]);
 
         Http::assertSent(fn (Request $request) => $request->method() === 'GET'
-            && str_starts_with($request->url(), $this->zonesUrl.'?')
+            && str_starts_with($request->url(), $this->zonesUrl . '?')
             && $request->data() == ['per_page' => 1]);
 
         // Regression guard: /user/tokens/verify rejects account-owned tokens,
@@ -554,7 +556,7 @@ describe('testConnection', function () {
 
     it('succeeds without a zone count when result_info is absent', function () {
         Http::fake([
-            $this->zonesUrl.'?*' => Http::response(cloudflareEnvelope([])),
+            $this->zonesUrl . '?*' => Http::response(cloudflareEnvelope([])),
         ]);
 
         $result = $this->connector->testConnection();
@@ -566,7 +568,7 @@ describe('testConnection', function () {
 
     it('fails with the Cloudflare error message when the token is invalid', function () {
         Http::fake([
-            $this->zonesUrl.'?*' => Http::response(cloudflareEnvelope(null, [
+            $this->zonesUrl . '?*' => Http::response(cloudflareEnvelope(null, [
                 'success' => false,
                 'errors' => [['code' => 1000, 'message' => 'Invalid API Token']],
             ]), 401),

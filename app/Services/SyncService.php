@@ -1,13 +1,15 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Services;
 
-use App\Enums\SyncStatus;
-use App\Jobs\DeleteEntryFromProvider;
-use App\Jobs\SyncEntryToProvider;
 use App\Models\DnsEntry;
-use App\Models\EntrySyncState;
+use App\Enums\SyncStatus;
 use App\Models\ZoneProvider;
+use App\Models\EntrySyncState;
+use App\Jobs\SyncEntryToProvider;
+use App\Jobs\DeleteEntryFromProvider;
 
 class SyncService
 {
@@ -107,24 +109,6 @@ class SyncService
     }
 
     /**
-     * Unassign one attachment: queue a remote delete when a record exists
-     * there, drop the bare state otherwise — and never touch paused ones.
-     */
-    private function removeState(EntrySyncState $state): void
-    {
-        if ($state->zoneProvider && ! $state->zoneProvider->isActive()) {
-            return;
-        }
-
-        if ($state->external_id) {
-            $state->update(['sync_status' => SyncStatus::Deleting]);
-            DeleteEntryFromProvider::dispatch($state->id);
-        } else {
-            $state->delete();
-        }
-    }
-
-    /**
      * Delete an entry everywhere. Remote deletions happen in queued jobs;
      * the local row disappears once every attachment has confirmed. Records
      * held by inactive attachments (attachment or provider disabled) are
@@ -151,6 +135,24 @@ class SyncService
         foreach ($pendingRemote as $state) {
             $state->update(['sync_status' => SyncStatus::Deleting]);
             DeleteEntryFromProvider::dispatch($state->id);
+        }
+    }
+
+    /**
+     * Unassign one attachment: queue a remote delete when a record exists
+     * there, drop the bare state otherwise — and never touch paused ones.
+     */
+    private function removeState(EntrySyncState $state): void
+    {
+        if ($state->zoneProvider && ! $state->zoneProvider->isActive()) {
+            return;
+        }
+
+        if ($state->external_id) {
+            $state->update(['sync_status' => SyncStatus::Deleting]);
+            DeleteEntryFromProvider::dispatch($state->id);
+        } else {
+            $state->delete();
         }
     }
 }

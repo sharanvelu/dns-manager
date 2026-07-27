@@ -1,16 +1,18 @@
 <?php
 
-use App\Enums\SyncStatus;
-use App\Jobs\CheckProviderDrift;
-use App\Jobs\DeleteEntryFromProvider;
-use App\Jobs\SyncEntryToProvider;
-use App\Models\DnsEntry;
+declare(strict_types = 1);
+
 use App\Models\DnsZone;
+use App\Models\DnsEntry;
 use App\Models\Provider;
+use App\Enums\SyncStatus;
 use App\Models\ZoneProvider;
 use App\Services\SyncService;
+use App\Jobs\CheckProviderDrift;
+use App\Jobs\SyncEntryToProvider;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use App\Jobs\DeleteEntryFromProvider;
 use Illuminate\Support\Facades\Queue;
 
 function attachCloudflare(DnsZone $zone, array $providerAttributes = [], array $attachmentAttributes = []): ZoneProvider
@@ -22,7 +24,7 @@ function attachCloudflare(DnsZone $zone, array $providerAttributes = [], array $
     return ZoneProvider::factory()->create($attachmentAttributes + [
         'dns_zone_id' => $zone->id,
         'provider_id' => $provider->id,
-        'config' => ['zone_id' => 'cf-zone-'.$zone->id],
+        'config' => ['zone_id' => 'cf-zone-' . $zone->id],
     ]);
 }
 

@@ -1,20 +1,22 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Http\Controllers;
 
-use App\Enums\RecordType;
-use App\Enums\SyncStatus;
-use App\Models\DnsEntry;
+use Throwable;
 use App\Models\DnsZone;
 use App\Models\SyncLog;
+use App\Models\DnsEntry;
+use App\Enums\RecordType;
+use App\Enums\SyncStatus;
 use App\Models\ZoneProvider;
+use Illuminate\Http\Request;
 use App\Support\DnsEntryRules;
+use Illuminate\Validation\Rule;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
-use Throwable;
 
 class ProviderImportController extends Controller
 {
@@ -158,15 +160,15 @@ class ProviderImportController extends Controller
             null,
             'import',
             $failed > 0 ? 'error' : 'success',
-            $message.($failed > 0 ? " ({$failed} skipped as invalid)" : '').'.',
+            $message . ($failed > 0 ? " ({$failed} skipped as invalid)" : '') . '.',
             $zone->id,
         );
 
-        return back()->with('success', $message.($failed > 0 ? " — {$failed} skipped as invalid" : '').'.');
+        return back()->with('success', $message . ($failed > 0 ? " — {$failed} skipped as invalid" : '') . '.');
     }
 
     private function keyFor(string $name, string $type, string $content): string
     {
-        return strtolower(rtrim($name, '.')).'|'.$type.'|'.strtolower(rtrim($content, '.'));
+        return strtolower(rtrim($name, '.')) . '|' . $type . '|' . strtolower(rtrim($content, '.'));
     }
 }

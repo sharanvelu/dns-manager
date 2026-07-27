@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Services;
 
-use App\Connectors\ConnectorRegistry;
 use App\Models\DnsZone;
 use App\Models\Provider;
 use App\Models\ZoneProvider;
+use App\Connectors\ConnectorRegistry;
 
 /**
  * Auto-attachment of zoneless providers (Pi-hole, ...) to zones. A deleted
@@ -14,7 +16,9 @@ use App\Models\ZoneProvider;
  */
 class ZoneAttachmentService
 {
-    public function __construct(private ConnectorRegistry $registry) {}
+    public function __construct(private ConnectorRegistry $registry)
+    {
+    }
 
     /**
      * When a zone is created, attach every enabled provider whose connector

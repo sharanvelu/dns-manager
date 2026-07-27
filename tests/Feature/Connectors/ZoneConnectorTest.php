@@ -1,17 +1,19 @@
 <?php
 
-use App\Connectors\CloudflareConnector;
-use App\Connectors\ConnectorRegistry;
-use App\Connectors\Exceptions\ConnectorException;
-use App\Connectors\PiholeConnector;
-use App\Models\DnsEntry;
+declare(strict_types = 1);
+
 use App\Models\DnsZone;
+use App\Models\DnsEntry;
 use App\Models\Provider;
 use App\Models\ZoneProvider;
-use Illuminate\Http\Client\Request;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
+use App\Connectors\PiholeConnector;
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Http;
+use App\Connectors\ConnectorRegistry;
+use Illuminate\Support\Facades\Cache;
+use App\Connectors\CloudflareConnector;
+use App\Connectors\Exceptions\ConnectorException;
 
 const CF_ZONES_BASE = 'https://api.cloudflare.com/client/v4';
 
@@ -53,7 +55,7 @@ function cloudflareAttachment(
 describe('Cloudflare testZone', function () {
     it('succeeds when the remote zone name matches the local zone', function () {
         Http::fake([
-            CF_ZONES_BASE.'/zones/zone-abc-123' => Http::response(
+            CF_ZONES_BASE . '/zones/zone-abc-123' => Http::response(
                 cfZoneEnvelope(['id' => 'zone-abc-123', 'name' => 'Example.COM', 'status' => 'active']),
             ),
         ]);
@@ -68,7 +70,7 @@ describe('Cloudflare testZone', function () {
 
     it('fails when the zone ID belongs to a different zone', function () {
         Http::fake([
-            CF_ZONES_BASE.'/zones/zone-abc-123' => Http::response(
+            CF_ZONES_BASE . '/zones/zone-abc-123' => Http::response(
                 cfZoneEnvelope(['id' => 'zone-abc-123', 'name' => 'other.net', 'status' => 'active']),
             ),
         ]);
@@ -82,7 +84,7 @@ describe('Cloudflare testZone', function () {
 
     it('fails with the Cloudflare error message when the zone lookup errors', function () {
         Http::fake([
-            CF_ZONES_BASE.'/zones/zone-abc-123' => Http::response(cfZoneEnvelope(null, [
+            CF_ZONES_BASE . '/zones/zone-abc-123' => Http::response(cfZoneEnvelope(null, [
                 'success' => false,
                 'errors' => [['code' => 7003, 'message' => 'Could not route to /zones/zone-abc-123']],
             ]), 404),
@@ -113,7 +115,7 @@ describe('Cloudflare testZone', function () {
 describe('Cloudflare discoverZoneConfig', function () {
     it('returns the zone_id when the zone is found by name', function () {
         Http::fake([
-            CF_ZONES_BASE.'/zones?*' => Http::response(cfZoneEnvelope([
+            CF_ZONES_BASE . '/zones?*' => Http::response(cfZoneEnvelope([
                 ['id' => 'discovered-zone-id', 'name' => 'example.com', 'status' => 'active'],
             ])),
         ]);
@@ -127,14 +129,14 @@ describe('Cloudflare discoverZoneConfig', function () {
         expect($config)->toBe(['zone_id' => 'discovered-zone-id']);
 
         Http::assertSent(fn (Request $request) => $request->method() === 'GET'
-            && str_starts_with($request->url(), CF_ZONES_BASE.'/zones?')
+            && str_starts_with($request->url(), CF_ZONES_BASE . '/zones?')
             && $request->data()['name'] === 'example.com'
             && $request->data()['per_page'] == 1);
     });
 
     it('returns null when no zone matches the name', function () {
         Http::fake([
-            CF_ZONES_BASE.'/zones?*' => Http::response(cfZoneEnvelope([])),
+            CF_ZONES_BASE . '/zones?*' => Http::response(cfZoneEnvelope([])),
         ]);
 
         $provider = Provider::factory()->cloudflare()->create([
@@ -146,7 +148,7 @@ describe('Cloudflare discoverZoneConfig', function () {
 
     it('returns null when the API call fails', function () {
         Http::fake([
-            CF_ZONES_BASE.'/zones?*' => Http::response(cfZoneEnvelope(null, [
+            CF_ZONES_BASE . '/zones?*' => Http::response(cfZoneEnvelope(null, [
                 'success' => false,
                 'errors' => [['code' => 10000, 'message' => 'Authentication error']],
             ]), 403),
@@ -163,7 +165,7 @@ describe('Cloudflare discoverZoneConfig', function () {
 describe('merged config precedence', function () {
     it('prefers the ZoneProvider zone_id over the provider-level one', function () {
         Http::fake([
-            CF_ZONES_BASE.'/zones/zone-level-wins' => Http::response(
+            CF_ZONES_BASE . '/zones/zone-level-wins' => Http::response(
                 cfZoneEnvelope(['id' => 'zone-level-wins', 'name' => 'example.com', 'status' => 'active']),
             ),
         ]);
@@ -173,13 +175,13 @@ describe('merged config precedence', function () {
 
         expect($result->ok)->toBeTrue();
 
-        Http::assertSent(fn (Request $request) => $request->url() === CF_ZONES_BASE.'/zones/zone-level-wins');
+        Http::assertSent(fn (Request $request) => $request->url() === CF_ZONES_BASE . '/zones/zone-level-wins');
         Http::assertNotSent(fn (Request $request) => str_contains($request->url(), 'provider-level-zone'));
     });
 
     it('falls back to the provider-level zone_id when the attachment has no config', function () {
         Http::fake([
-            CF_ZONES_BASE.'/zones/provider-level-zone' => Http::response(
+            CF_ZONES_BASE . '/zones/provider-level-zone' => Http::response(
                 cfZoneEnvelope(['id' => 'provider-level-zone', 'name' => 'example.com', 'status' => 'active']),
             ),
         ]);
@@ -189,14 +191,14 @@ describe('merged config precedence', function () {
 
         expect($result->ok)->toBeTrue();
 
-        Http::assertSent(fn (Request $request) => $request->url() === CF_ZONES_BASE.'/zones/provider-level-zone');
+        Http::assertSent(fn (Request $request) => $request->url() === CF_ZONES_BASE . '/zones/provider-level-zone');
     });
 });
 
 describe('ConnectorRegistry zone support', function () {
     it('builds a connector with zone context from a ZoneProvider', function () {
         Http::fake([
-            CF_ZONES_BASE.'/zones/zone-abc-123' => Http::response(
+            CF_ZONES_BASE . '/zones/zone-abc-123' => Http::response(
                 cfZoneEnvelope(['id' => 'zone-abc-123', 'name' => 'example.com', 'status' => 'active']),
             ),
         ]);

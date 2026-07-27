@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Connectors;
 
-use App\Connectors\Contracts\DnsConnector;
 use App\Models\Provider;
 use App\Models\ZoneProvider;
 use InvalidArgumentException;
+use App\Connectors\Contracts\DnsConnector;
 
 class ConnectorRegistry
 {

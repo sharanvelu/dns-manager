@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Connectors\DTOs;
 
 final readonly class ConnectorCapabilities
@@ -17,7 +19,8 @@ final readonly class ConnectorCapabilities
          * both sides, so "auto" and an explicit default never drift.
          */
         public ?int $defaultTtl = null,
-    ) {}
+    ) {
+    }
 
     public function toArray(): array
     {

@@ -1,16 +1,18 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Jobs;
 
-use App\Connectors\Exceptions\RecordNotFoundException;
-use App\Enums\SyncStatus;
-use App\Models\DnsEntry;
-use App\Models\EntrySyncState;
-use App\Models\SyncLog;
-use App\Models\ZoneProvider;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Queue\Queueable;
 use Throwable;
+use App\Models\SyncLog;
+use App\Models\DnsEntry;
+use App\Enums\SyncStatus;
+use App\Models\ZoneProvider;
+use App\Models\EntrySyncState;
+use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use App\Connectors\Exceptions\RecordNotFoundException;
 
 class SyncEntryToProvider implements ShouldQueue
 {
@@ -24,7 +26,8 @@ class SyncEntryToProvider implements ShouldQueue
     public function __construct(
         public int $entryId,
         public int $zoneProviderId,
-    ) {}
+    ) {
+    }
 
     public function handle(): void
     {

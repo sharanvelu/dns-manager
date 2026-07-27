@@ -1,13 +1,15 @@
 <?php
 
-use App\Jobs\SyncEntryToProvider;
-use App\Models\DnsEntry;
-use App\Models\DnsZone;
-use App\Models\Provider;
+declare(strict_types = 1);
+
 use App\Models\User;
+use App\Models\DnsZone;
+use App\Models\DnsEntry;
+use App\Models\Provider;
 use App\Models\ZoneProvider;
-use App\Services\DnsEntryImporter;
+use App\Jobs\SyncEntryToProvider;
 use Illuminate\Http\UploadedFile;
+use App\Services\DnsEntryImporter;
 use Illuminate\Support\Facades\Queue;
 
 beforeEach(function () {
@@ -150,6 +152,7 @@ test('sample csv downloads, uses relative names, and is itself importable', func
 
 test('row limit is enforced', function () {
     $rows = "name,type,content\n";
+
     for ($i = 0; $i < 1001; $i++) {
         $rows .= "host{$i},A,10.0.0.1\n";
     }

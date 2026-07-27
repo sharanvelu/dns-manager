@@ -1,17 +1,19 @@
 <?php
 
-use App\Connectors\DTOs\RemoteRecord;
-use App\Connectors\Exceptions\ConnectorException;
-use App\Connectors\PiholeConnector;
-use App\Models\DnsEntry;
+declare(strict_types = 1);
+
 use App\Models\DnsZone;
+use App\Models\DnsEntry;
 use App\Models\Provider;
-use GuzzleHttp\Promise\PromiseInterface;
-use Illuminate\Http\Client\Request;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
+use Illuminate\Support\Sleep;
+use App\Connectors\PiholeConnector;
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Http;
+use App\Connectors\DTOs\RemoteRecord;
+use Illuminate\Support\Facades\Cache;
+use GuzzleHttp\Promise\PromiseInterface;
+use App\Connectors\Exceptions\ConnectorException;
 
 const PIHOLE_BASE = 'https://pihole.internal';
 
@@ -38,7 +40,7 @@ function piholeProvider(array $config = []): Provider
 function fakePihole(array $overrides = []): void
 {
     Http::fake(function (Request $request) use ($overrides) {
-        $key = $request->method().' /'.ltrim(Str::after($request->url(), PIHOLE_BASE), '/');
+        $key = $request->method() . ' /' . ltrim(Str::after($request->url(), PIHOLE_BASE), '/');
 
         foreach ($overrides as $prefix => $response) {
             if (str_starts_with($key, $prefix)) {
@@ -96,14 +98,14 @@ it('creates an A record via an encoded FQDN hosts PUT inside one session', funct
     expect($externalId)->toBe('192.168.1.10 host.example.com');
 
     Http::assertSent(fn (Request $request) => $request->method() === 'PUT'
-        && $request->url() === PIHOLE_BASE.'/api/config/dns/hosts/192.168.1.10%20host.example.com'
+        && $request->url() === PIHOLE_BASE . '/api/config/dns/hosts/192.168.1.10%20host.example.com'
         && $request->hasHeader('X-FTL-SID', 'test-sid'));
 
     // Authenticated first, then released the session afterwards.
     Http::assertSent(fn (Request $request) => $request->method() === 'POST'
-        && $request->url() === PIHOLE_BASE.'/api/auth');
+        && $request->url() === PIHOLE_BASE . '/api/auth');
     Http::assertSent(fn (Request $request) => $request->method() === 'DELETE'
-        && $request->url() === PIHOLE_BASE.'/api/auth');
+        && $request->url() === PIHOLE_BASE . '/api/auth');
 });
 
 it('creates a CNAME with TTL as an encoded fqdn,target,ttl entry', function () {
@@ -118,7 +120,7 @@ it('creates a CNAME with TTL as an encoded fqdn,target,ttl entry', function () {
     expect($connector->createRecord($entry))->toBe('alias.example.com,target.example.com,3600');
 
     Http::assertSent(fn (Request $request) => $request->method() === 'PUT'
-        && $request->url() === PIHOLE_BASE.'/api/config/dns/cnameRecords/alias.example.com%2Ctarget.example.com%2C3600');
+        && $request->url() === PIHOLE_BASE . '/api/config/dns/cnameRecords/alias.example.com%2Ctarget.example.com%2C3600');
 });
 
 it('omits the TTL from a CNAME entry when none is set', function () {
@@ -133,7 +135,7 @@ it('omits the TTL from a CNAME entry when none is set', function () {
     expect($connector->createRecord($entry))->toBe('alias.example.com,target.example.com');
 
     Http::assertSent(fn (Request $request) => $request->method() === 'PUT'
-        && $request->url() === PIHOLE_BASE.'/api/config/dns/cnameRecords/alias.example.com%2Ctarget.example.com');
+        && $request->url() === PIHOLE_BASE . '/api/config/dns/cnameRecords/alias.example.com%2Ctarget.example.com');
 });
 
 it('treats a 400 already-exists response as a successful create', function () {
@@ -151,7 +153,7 @@ it('treats a 400 already-exists response as a successful create', function () {
 
     // The session is still released.
     Http::assertSent(fn (Request $request) => $request->method() === 'DELETE'
-        && $request->url() === PIHOLE_BASE.'/api/auth');
+        && $request->url() === PIHOLE_BASE . '/api/auth');
 });
 
 it('throws on 400 already-exists when adoption is disabled', function () {
@@ -183,18 +185,18 @@ it('updates a record by deleting the old entry then putting the new one in a sin
     expect($externalId)->toBe('192.168.1.20 host.example.com');
 
     $requests = collect(Http::recorded())->map(
-        fn (array $pair) => $pair[0]->method().' '.$pair[0]->url(),
+        fn (array $pair) => $pair[0]->method() . ' ' . $pair[0]->url(),
     )->values();
 
-    $deleteIndex = $requests->search('DELETE '.PIHOLE_BASE.'/api/config/dns/hosts/192.168.1.10%20host.example.com');
-    $putIndex = $requests->search('PUT '.PIHOLE_BASE.'/api/config/dns/hosts/192.168.1.20%20host.example.com');
+    $deleteIndex = $requests->search('DELETE ' . PIHOLE_BASE . '/api/config/dns/hosts/192.168.1.10%20host.example.com');
+    $putIndex = $requests->search('PUT ' . PIHOLE_BASE . '/api/config/dns/hosts/192.168.1.20%20host.example.com');
 
     expect($deleteIndex)->not->toBeFalse()
         ->and($putIndex)->not->toBeFalse()
         ->and($deleteIndex)->toBeLessThan($putIndex);
 
     // Exactly one auth session for the whole update.
-    expect($requests->filter(fn (string $line) => $line === 'POST '.PIHOLE_BASE.'/api/auth'))->toHaveCount(1);
+    expect($requests->filter(fn (string $line) => $line === 'POST ' . PIHOLE_BASE . '/api/auth'))->toHaveCount(1);
 });
 
 it('tolerates a 404 when deleting a record that is already gone', function () {
@@ -207,7 +209,7 @@ it('tolerates a 404 when deleting a record that is already gone', function () {
     $connector->deleteRecord('192.168.1.10 host.example.com');
 
     Http::assertSent(fn (Request $request) => $request->method() === 'DELETE'
-        && $request->url() === PIHOLE_BASE.'/api/config/dns/hosts/192.168.1.10%20host.example.com');
+        && $request->url() === PIHOLE_BASE . '/api/config/dns/hosts/192.168.1.10%20host.example.com');
 });
 
 it('lists and parses hosts and CNAME records including multi-hostname and IPv6 lines', function () {
@@ -278,7 +280,7 @@ it('reports the Pi-hole version on a successful connection test', function () {
         ->and($result->details)->toBe(['version' => 'v6.1']);
 
     Http::assertSent(fn (Request $request) => $request->method() === 'GET'
-        && $request->url() === PIHOLE_BASE.'/api/info/version');
+        && $request->url() === PIHOLE_BASE . '/api/info/version');
 });
 
 it('returns a failure test result when the app password is rejected', function () {

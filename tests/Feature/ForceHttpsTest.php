@@ -1,7 +1,9 @@
 <?php
 
-use App\Models\DnsEntry;
+declare(strict_types = 1);
+
 use App\Models\User;
+use App\Models\DnsEntry;
 use App\Providers\AppServiceProvider;
 
 test('FORCE_HTTPS makes generated URLs use https', function () {
