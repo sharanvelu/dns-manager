@@ -9,9 +9,12 @@ Read **[AGENTS.md](AGENTS.md)** first — it is the canonical agent guide (comma
 
 ```sh
 composer run dev            # app + queue worker + vite
-./vendor/bin/pest           # tests — HTTP is prevented from going to the network
-./vendor/bin/pint --dirty   # PHP format before finishing
-npx tsc --noEmit && npm run build   # frontend checks
+composer run ci             # everything CI gates on: PHP + JS style, tests, static analysis
+composer run test           # Pest — HTTP is prevented from going to the network
+composer run check-style    # Pint check-only (./vendor/bin/pint --dirty to format while iterating)
+composer run analyze        # PHPStan (Larastan, level 5, baseline for pre-existing debt)
+npm run test                # Vitest (resources/js/tests/)
+npm run analyze && npm run build    # tsc --noEmit + Vite build
 ```
 
 - Laravel 12 + Inertia 2 + React 19 + TS + Tailwind 4; Postgres; Redis queue (predis).

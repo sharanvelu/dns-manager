@@ -23,9 +23,13 @@ DNS Manager: a homelab web app that manages DNS entries across multiple provider
 
 ```sh
 composer run dev          # serve app + queue worker + vite (local dev)
-./vendor/bin/pest         # test suite (sqlite :memory:, HTTP fully faked)
-./vendor/bin/pint --dirty # PHP formatting (run before finishing)
-npx tsc --noEmit          # TypeScript check
+composer run ci           # everything CI runs: PHP + JS style, tests, static analysis
+composer run test         # Pest suite (sqlite :memory:, HTTP fully faked); test-unit / test-feature scope by suite
+composer run check-style  # Pint check-only (fix-style rewrites; or pint --dirty while iterating)
+composer run analyze      # PHPStan via Larastan, level 5 (phpstan.neon; pre-existing debt in phpstan-baseline.neon)
+npm run check-style       # ESLint check-only (fix-style rewrites)
+npm run test              # Vitest (resources/js/tests/{unit,feature}); test-unit / test-feature scope by dir
+npm run analyze           # TypeScript check (tsc --noEmit)
 npm run build             # Vite production build
 php artisan migrate       # run migrations (Postgres in dev/prod)
 php artisan dns:check-drift [--provider=ID]   # queue drift checks (what the schedule runs)
