@@ -2,11 +2,12 @@ import { EntriesView } from '@/components/entries/entries-view';
 import { FlashToast } from '@/components/flash-toast';
 import { StatusDriftedIcon, StatusErrorIcon, StatusSyncedIcon } from '@/components/icons';
 import { StatTile } from '@/components/stat-tile';
+import { Button } from '@/components/ui/button';
 import { ZoneTabs } from '@/components/zone-tabs';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
-import { Globe } from 'lucide-react';
+import { Head, router } from '@inertiajs/react';
+import { Globe, RefreshCw } from 'lucide-react';
 import type { ZoneRecordsProps } from './types';
 
 export default function ZoneRecords({ zone, zoneCan, stats, entries, filters, zones, zoneAttachments, connectors }: ZoneRecordsProps) {
@@ -17,6 +18,10 @@ export default function ZoneRecords({ zone, zoneCan, stats, entries, filters, zo
     ];
 
     const fullySynced = stats.entriesCount > 0 && stats.inSync === stats.entriesCount;
+
+    const syncDrifted = () => {
+        router.post(route('zones.sync-drifted', zone.id), {}, { preserveScroll: true });
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -29,7 +34,20 @@ export default function ZoneRecords({ zone, zoneCan, stats, entries, filters, zo
                     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                         <StatTile label="Records" value={stats.entriesCount} icon={Globe} />
                         <StatTile label="Fully in sync" value={stats.inSync} icon={StatusSyncedIcon} accent={fullySynced ? 'green' : 'neutral'} />
-                        <StatTile label="Drifted" value={stats.drifted} icon={StatusDriftedIcon} accent={stats.drifted > 0 ? 'amber' : 'neutral'} />
+                        <StatTile
+                            label="Drifted"
+                            value={stats.drifted}
+                            icon={StatusDriftedIcon}
+                            accent={stats.drifted > 0 ? 'amber' : 'neutral'}
+                            action={
+                                zoneCan.manageRecords && stats.drifted > 0 ? (
+                                    <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={syncDrifted}>
+                                        <RefreshCw className="size-3.5" />
+                                        Sync
+                                    </Button>
+                                ) : undefined
+                            }
+                        />
                         <StatTile label="Errors" value={stats.errored} icon={StatusErrorIcon} accent={stats.errored > 0 ? 'red' : 'neutral'} />
                     </div>
                 </div>

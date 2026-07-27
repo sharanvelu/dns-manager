@@ -556,6 +556,49 @@ describe('listRecords', function () {
             ->and($record->matches($entry, TechnitiumConnector::capabilities()))->toBeTrue();
     });
 
+    it('does not flag TTL drift when the entry pins the connector default (3600) explicitly', function () {
+        Http::fake([
+            $this->getUrl => Http::response(technitiumRecordsList([
+                technitiumApiRecord('A', 'www.example.com', ['ipAddress' => '192.0.2.1'], ttl: 3600),
+            ])),
+        ]);
+
+        // Remote 3600 reads back as auto (null) — an entry that says 3600
+        // explicitly is still the same record, not drift.
+        $entry = DnsEntry::factory()->for($this->zone, 'zone')->create([
+            'name' => 'www',
+            'type' => RecordType::A,
+            'content' => '192.0.2.1',
+            'ttl' => 3600,
+        ]);
+
+        $record = $this->connector->listRecords()->sole();
+
+        expect($record->ttl)->toBeNull()
+            ->and($record->matches($entry, TechnitiumConnector::capabilities()))->toBeTrue()
+            ->and($record->diff($entry, TechnitiumConnector::capabilities()))->toBe([]);
+    });
+
+    it('diffs a drifted record field by field (tracked vs actual)', function () {
+        Http::fake([
+            $this->getUrl => Http::response(technitiumRecordsList([
+                technitiumApiRecord('A', 'www.example.com', ['ipAddress' => '198.51.100.7'], ttl: 300),
+            ])),
+        ]);
+
+        $entry = DnsEntry::factory()->for($this->zone, 'zone')->create([
+            'name' => 'www',
+            'type' => RecordType::A,
+            'content' => '192.0.2.1',
+            'ttl' => null,
+        ]);
+
+        expect($this->connector->listRecords()->sole()->diff($entry, TechnitiumConnector::capabilities()))->toBe([
+            ['field' => 'content', 'tracked' => '192.0.2.1', 'actual' => '198.51.100.7'],
+            ['field' => 'ttl', 'tracked' => null, 'actual' => 300],
+        ]);
+    });
+
     it('decodes TXT character strings when no plain text field is present', function () {
         Http::fake([
             $this->getUrl => Http::response(technitiumRecordsList([

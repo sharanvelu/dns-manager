@@ -59,7 +59,7 @@ class SyncService
         foreach ($targets as $attachment) {
             $entry->syncStates()->updateOrCreate(
                 ['zone_provider_id' => $attachment->id],
-                ['sync_status' => SyncStatus::Pending, 'last_error' => null],
+                ['sync_status' => SyncStatus::Pending, 'last_error' => null, 'drift_details' => null],
             );
 
             SyncEntryToProvider::dispatch($entry->id, $attachment->id);
@@ -84,7 +84,7 @@ class SyncService
         foreach ($targets as $attachment) {
             $entry->syncStates()->updateOrCreate(
                 ['zone_provider_id' => $attachment->id],
-                ['sync_status' => SyncStatus::Pending, 'last_error' => null],
+                ['sync_status' => SyncStatus::Pending, 'last_error' => null, 'drift_details' => null],
             );
 
             SyncEntryToProvider::dispatch($entry->id, $attachment->id);

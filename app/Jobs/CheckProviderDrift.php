@@ -128,23 +128,30 @@ class CheckProviderDrift implements ShouldQueue
                 continue;
             }
 
-            $match = $remote
-                ->where('externalId', $state->external_id)
-                ->first(fn (RemoteRecord $record) => $record->matches($entry, $capabilities));
+            $candidates = $remote->where('externalId', $state->external_id);
+
+            $match = $candidates->first(fn (RemoteRecord $record) => $record->matches($entry, $capabilities));
 
             if ($match) {
-                $state->update(['sync_status' => SyncStatus::Synced, 'last_error' => null]);
+                $state->update(['sync_status' => SyncStatus::Synced, 'last_error' => null, 'drift_details' => null]);
 
                 continue;
             }
 
-            $missing = $remote->where('externalId', $state->external_id)->isEmpty();
+            // The tracked record as the provider holds it now. Tuple-encoded
+            // external ids (Technitium) change with the record's data, so a
+            // remotely edited record has no id match — fall back to the
+            // remote record at the same name+type to still diff it.
+            $closest = $candidates->first()
+                ?? $remote->first(fn (RemoteRecord $record) => $record->type === $entry->type->value
+                    && strcasecmp(rtrim($record->name, '.'), rtrim($entry->fqdn, '.')) === 0);
 
             $state->update([
                 'sync_status' => SyncStatus::Drifted,
-                'last_error' => $missing
+                'last_error' => $closest === null
                     ? 'Record no longer exists at the provider.'
                     : 'Remote record differs from the managed entry.',
+                'drift_details' => $closest?->diff($entry, $capabilities) ?: null,
             ]);
 
             $drifted++;

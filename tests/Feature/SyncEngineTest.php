@@ -391,10 +391,15 @@ test('drift check compares each zone attachment against its own zone listing', f
     (new CheckProviderDrift($provider->id))->handle();
 
     expect($okA->syncStates()->sole()->sync_status)->toBe(SyncStatus::Synced)
+        ->and($okA->syncStates()->sole()->drift_details)->toBeNull()
         ->and($changedA->syncStates()->sole()->sync_status)->toBe(SyncStatus::Drifted)
         ->and($changedA->syncStates()->sole()->last_error)->toBe('Remote record differs from the managed entry.')
+        ->and($changedA->syncStates()->sole()->drift_details)->toBe([
+            ['field' => 'content', 'tracked' => '10.0.0.2', 'actual' => '192.168.99.99'],
+        ])
         ->and($missingA->syncStates()->sole()->sync_status)->toBe(SyncStatus::Drifted)
         ->and($missingA->syncStates()->sole()->last_error)->toBe('Record no longer exists at the provider.')
+        ->and($missingA->syncStates()->sole()->drift_details)->toBeNull()
         ->and($okB->syncStates()->sole()->sync_status)->toBe(SyncStatus::Synced)
         ->and($provider->fresh()->health_status->value)->toBe('ok');
 
@@ -404,6 +409,33 @@ test('drift check compares each zone attachment against its own zone listing', f
         'status' => 'success',
         'message' => 'Checked 4 record(s), 2 drifted',
     ]);
+});
+
+test('drift check diffs a replaced record via its name when the external id is gone', function () {
+    // Tuple external ids (Technitium-style) change with the record's data —
+    // the id no longer matches, but the record at the same name+type is the
+    // tracked record as it exists now, so the diff is still recorded.
+    $zone = DnsZone::factory()->create(['name' => 'alpha.test']);
+    $attachment = attachCloudflare($zone);
+
+    $entry = DnsEntry::factory()->for($zone, 'zone')->create(['name' => 'replaced', 'content' => '10.0.0.5']);
+    $entry->syncStates()->create(['zone_provider_id' => $attachment->id, 'sync_status' => SyncStatus::Synced, 'external_id' => 'cf-old']);
+
+    Http::fake([
+        'api.cloudflare.com/client/v4/zones/*/dns_records*' => Http::response(cfListResponse([
+            cfApiRecord('cf-new', 'A', 'replaced.alpha.test', '10.9.9.9'),
+        ])),
+    ]);
+
+    (new CheckProviderDrift($attachment->provider_id))->handle();
+
+    $state = $entry->syncStates()->sole();
+
+    expect($state->sync_status)->toBe(SyncStatus::Drifted)
+        ->and($state->last_error)->toBe('Remote record differs from the managed entry.')
+        ->and($state->drift_details)->toBe([
+            ['field' => 'content', 'tracked' => '10.0.0.5', 'actual' => '10.9.9.9'],
+        ]);
 });
 
 test('a failing zone attachment does not block drift checks for the others', function () {

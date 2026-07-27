@@ -80,7 +80,7 @@ Each provider chip on an entry row shows one of five states — sync state is tr
 | --- | --- |
 | **Pending** | A push has been queued but has not completed yet. If entries stay pending forever, your queue worker is not running — see [Installation](installation). |
 | **Synced** | The provider's record matches the entry. |
-| **Drifted** | The drift check found the remote record was changed or deleted outside the app. Hover the chip: the tooltip says whether the record differs or no longer exists at the provider. |
+| **Drifted** | The drift check found the remote record was changed or deleted outside the app. Hover the chip: the tooltip says whether the record differs or no longer exists at the provider — and when it differs, lists each drifted field with the **tracked** value (what the entry says) and the **actual** value (what the provider currently holds). |
 | **Error** | The last push or delete failed. Hover the chip for the provider's error message (e.g. an invalid token or an API rejection). |
 | **Deleting** | A remote delete is queued or in flight for this provider. |
 

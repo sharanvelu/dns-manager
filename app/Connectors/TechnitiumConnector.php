@@ -102,6 +102,7 @@ class TechnitiumConnector extends AbstractDnsConnector
             supportsProxied: false,
             supportsTtl: true,
             supportsPriority: true,
+            defaultTtl: self::DEFAULT_TTL,
         );
     }
 

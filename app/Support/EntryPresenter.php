@@ -37,6 +37,7 @@ class EntryPresenter
                 'status' => $state->sync_status->value,
                 'lastSyncedAt' => $state->last_synced_at?->toIso8601String(),
                 'lastError' => $state->last_error,
+                'driftDetails' => $state->drift_details,
             ])->values(),
         ];
     }

@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Connectors\ConnectorRegistry;
 use App\Enums\SyncStatus;
 use App\Http\Requests\ZoneRequest;
+use App\Jobs\SyncEntryToProvider;
 use App\Models\DnsEntry;
 use App\Models\DnsZone;
+use App\Models\EntrySyncState;
 use App\Models\Provider;
 use App\Models\ZoneProvider;
 use App\Services\SyncService;
@@ -246,6 +248,36 @@ class ZoneController extends Controller
         $count = $entries->count();
 
         return back()->with('success', "Queued sync for {$count} record".($count === 1 ? '' : 's')." in {$zone->name}.");
+    }
+
+    /**
+     * Re-push only the zone's drifted sync states, each to the one provider
+     * attachment it drifted on — untouched attachments of the same entry
+     * are not re-synced. Paused attachments keep waiting (the paused
+     * invariant: nothing is queued against a disabled provider).
+     */
+    public function syncDrifted(DnsZone $zone): RedirectResponse
+    {
+        $states = EntrySyncState::query()
+            ->where('sync_status', SyncStatus::Drifted)
+            ->whereHas('entry', fn ($query) => $query->where('dns_zone_id', $zone->id))
+            ->with('zoneProvider.provider')
+            ->get()
+            ->filter(fn (EntrySyncState $state) => $state->zoneProvider?->isActive());
+
+        foreach ($states as $state) {
+            $state->update(['sync_status' => SyncStatus::Pending, 'last_error' => null, 'drift_details' => null]);
+
+            SyncEntryToProvider::dispatch($state->dns_entry_id, $state->zone_provider_id);
+        }
+
+        $count = $states->count();
+
+        if ($count === 0) {
+            return back()->with('success', "No drifted records to sync in {$zone->name}.");
+        }
+
+        return back()->with('success', "Queued sync for {$count} drifted record".($count === 1 ? '' : 's')." in {$zone->name}.");
     }
 
     /**

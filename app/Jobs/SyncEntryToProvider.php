@@ -58,6 +58,7 @@ class SyncEntryToProvider implements ShouldQueue
             'sync_status' => SyncStatus::Synced,
             'last_synced_at' => now(),
             'last_error' => null,
+            'drift_details' => null,
         ]);
 
         SyncLog::record($zoneProvider->provider, $entry, 'push', 'success', "{$entry->type->value} {$entry->fqdn} synced to {$zoneProvider->label()}");

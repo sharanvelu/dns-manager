@@ -57,6 +57,7 @@ export interface ZoneConnector {
         supportsZones: boolean;
         minTtl: number | null;
         maxTtl: number | null;
+        defaultTtl: number | null;
     };
 }
 

@@ -26,30 +26,46 @@ final readonly class RemoteRecord
      */
     public function matches(DnsEntry $entry, ConnectorCapabilities $capabilities): bool
     {
+        return $this->diff($entry, $capabilities) === [];
+    }
+
+    /**
+     * The fields where this remote record differs from the desired local
+     * state — `tracked` is the managed entry's value, `actual` what the
+     * provider holds. Empty when the record matches. Null and the
+     * connector's default TTL count as the same TTL on both sides.
+     *
+     * @return list<array{field: string, tracked: string|int|bool|null, actual: string|int|bool|null}>
+     */
+    public function diff(DnsEntry $entry, ConnectorCapabilities $capabilities): array
+    {
+        $differences = [];
+
         if (strcasecmp(rtrim($this->name, '.'), rtrim($entry->fqdn, '.')) !== 0) {
-            return false;
+            $differences[] = ['field' => 'name', 'tracked' => rtrim($entry->fqdn, '.'), 'actual' => rtrim($this->name, '.')];
         }
 
         if ($this->type !== $entry->type->value) {
-            return false;
+            $differences[] = ['field' => 'type', 'tracked' => $entry->type->value, 'actual' => $this->type];
         }
 
         if (strcasecmp(rtrim($this->content, '.'), rtrim($entry->content, '.')) !== 0) {
-            return false;
+            $differences[] = ['field' => 'content', 'tracked' => $entry->content, 'actual' => $this->content];
         }
 
-        if ($capabilities->supportsTtl && $this->ttl !== $entry->ttl) {
-            return false;
+        if ($capabilities->supportsTtl
+            && ($this->ttl ?? $capabilities->defaultTtl) !== ($entry->ttl ?? $capabilities->defaultTtl)) {
+            $differences[] = ['field' => 'ttl', 'tracked' => $entry->ttl, 'actual' => $this->ttl];
         }
 
         if ($capabilities->supportsPriority && $entry->type->hasPriority() && $this->priority !== $entry->priority) {
-            return false;
+            $differences[] = ['field' => 'priority', 'tracked' => $entry->priority, 'actual' => $this->priority];
         }
 
         if ($capabilities->supportsProxied && $this->proxied !== $entry->proxied) {
-            return false;
+            $differences[] = ['field' => 'proxied', 'tracked' => $entry->proxied, 'actual' => $this->proxied];
         }
 
-        return true;
+        return $differences;
     }
 }

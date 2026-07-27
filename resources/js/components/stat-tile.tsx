@@ -1,6 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { type ComponentType, type SVGProps } from 'react';
+import { type ComponentType, type ReactNode, type SVGProps } from 'react';
 
 export type StatAccent = 'neutral' | 'green' | 'amber' | 'red';
 
@@ -24,11 +24,14 @@ export function StatTile({
     value,
     icon: Icon,
     accent = 'neutral',
+    action,
 }: {
     label: string;
     value: number;
     icon: ComponentType<SVGProps<SVGSVGElement>>;
     accent?: StatAccent;
+    /** Optional inline action (small button) shown beside the value. */
+    action?: ReactNode;
 }) {
     return (
         <Card className="flex flex-col gap-1 p-4">
@@ -36,7 +39,10 @@ export function StatTile({
                 <span className="text-muted-foreground text-xs font-medium">{label}</span>
                 <Icon className={cn('size-4 shrink-0', accentIcon[accent])} />
             </div>
-            <span className={cn('text-2xl font-semibold tracking-tight tabular-nums', accentText[accent])}>{value.toLocaleString()}</span>
+            <div className="flex items-center justify-between gap-2">
+                <span className={cn('text-2xl font-semibold tracking-tight tabular-nums', accentText[accent])}>{value.toLocaleString()}</span>
+                {action}
+            </div>
         </Card>
     );
 }

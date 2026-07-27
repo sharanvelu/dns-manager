@@ -11,6 +11,12 @@ final readonly class ConnectorCapabilities
         public ?int $minTtl = null,
         public ?int $maxTtl = null,
         public bool $supportsZones = true,
+        /**
+         * The TTL the provider stores when an entry has a null (auto) TTL.
+         * Drift comparison treats null and this value as the same TTL on
+         * both sides, so "auto" and an explicit default never drift.
+         */
+        public ?int $defaultTtl = null,
     ) {}
 
     public function toArray(): array
@@ -22,6 +28,7 @@ final readonly class ConnectorCapabilities
             'minTtl' => $this->minTtl,
             'maxTtl' => $this->maxTtl,
             'supportsZones' => $this->supportsZones,
+            'defaultTtl' => $this->defaultTtl,
         ];
     }
 }
