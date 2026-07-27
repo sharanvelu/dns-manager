@@ -121,6 +121,10 @@ class CheckProviderDrift implements ShouldQueue
     {
         $drifted = 0;
 
+        // Ids the checked states already track — the same-name fallback below
+        // must never grab a sibling record another entry legitimately holds.
+        $claimed = $states->pluck('external_id')->filter()->flip();
+
         foreach ($states as $state) {
             $entry = $state->entry;
 
@@ -130,24 +134,35 @@ class CheckProviderDrift implements ShouldQueue
 
             $candidates = $remote->where('externalId', $state->external_id);
 
-            $match = $candidates->first(fn (RemoteRecord $record) => $record->matches($entry, $capabilities));
+            // The tracked record as the provider holds it now. Tuple-encoded
+            // external ids (Technitium, Pi-hole) change with the record's
+            // data, so a remotely edited record has no id match — fall back
+            // to the unclaimed remote record at the same name+type.
+            $closest = $candidates->first(fn (RemoteRecord $record) => $record->matches($entry, $capabilities))
+                ?? $candidates->first()
+                ?? $remote->first(fn (RemoteRecord $record) => $record->type === $entry->type->value
+                    && strcasecmp(rtrim($record->name, '.'), rtrim($entry->fqdn, '.')) === 0
+                    && ! $claimed->has($record->externalId));
 
-            if ($match) {
-                $state->update(['sync_status' => SyncStatus::Synced, 'last_error' => null, 'drift_details' => null]);
+            if ($closest?->matches($entry, $capabilities)) {
+                // Adopt the current identity: a record recreated out-of-band
+                // with identical data is in sync, just under a new id.
+                $state->update([
+                    'sync_status' => SyncStatus::Synced,
+                    'external_id' => $closest->externalId,
+                    'last_error' => null,
+                    'drift_details' => null,
+                ]);
 
                 continue;
             }
 
-            // The tracked record as the provider holds it now. Tuple-encoded
-            // external ids (Technitium) change with the record's data, so a
-            // remotely edited record has no id match — fall back to the
-            // remote record at the same name+type to still diff it.
-            $closest = $candidates->first()
-                ?? $remote->first(fn (RemoteRecord $record) => $record->type === $entry->type->value
-                    && strcasecmp(rtrim($record->name, '.'), rtrim($entry->fqdn, '.')) === 0);
-
             $state->update([
                 'sync_status' => SyncStatus::Drifted,
+                // Re-point at the record as it exists now, so a re-push
+                // UPDATES it back in place — addressing the stale id would
+                // recreate the tracked value alongside the edited record.
+                'external_id' => $closest?->externalId ?? $state->external_id,
                 'last_error' => $closest === null
                     ? 'Record no longer exists at the provider.'
                     : 'Remote record differs from the managed entry.',

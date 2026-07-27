@@ -66,7 +66,7 @@ A Technitium attachment carries **no zone settings**: the app addresses the remo
 
 Two behaviors to know about:
 
-- **No stable record identifiers** — like Pi-hole, Technitium identifies a record by its full value tuple rather than an id. The app tracks records the same way, so renames and edits are handled as old-value → new-value updates. Nothing to configure; it just explains why a record edited *at the server* shows up as drift rather than being followed.
+- **No stable record identifiers** — like Pi-hole, Technitium identifies a record by its full value tuple rather than an id. The app tracks records the same way, so renames and edits are handled as old-value → new-value updates. Nothing to configure; it just explains why a record edited *at the server* shows up as drift rather than being followed. The drift check re-points its tracking at the edited record, so syncing the drift **updates that record back in place** (rather than adding the tracked value as a second record beside it).
 - **TTL** — Technitium always stores a TTL. Entries with an empty (automatic) TTL are pushed with `3600`, and records at `3600` are treated as automatic in drift comparison — so automatic and an explicit `3600` count as the same TTL and never drift against each other. If you want a TTL that is compared exactly, set any explicit value other than 3600.
 
 Attachment management lives on each zone's **Providers** tab and requires the **Zone Admin** or **Provider Manager** role on that zone — full details in [DNS Zones](zones#attaching-a-provider). In short, per attachment you can:

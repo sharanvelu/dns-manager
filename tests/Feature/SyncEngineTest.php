@@ -431,11 +431,114 @@ test('drift check diffs a replaced record via its name when the external id is g
 
     $state = $entry->syncStates()->sole();
 
+    // The state re-points at the record as it exists now — a re-push must
+    // UPDATE it in place, not recreate the tracked value alongside it.
     expect($state->sync_status)->toBe(SyncStatus::Drifted)
+        ->and($state->external_id)->toBe('cf-new')
         ->and($state->last_error)->toBe('Remote record differs from the managed entry.')
         ->and($state->drift_details)->toBe([
             ['field' => 'content', 'tracked' => '10.0.0.5', 'actual' => '10.9.9.9'],
         ]);
+});
+
+test('drift check adopts the new id of a record recreated identically out-of-band', function () {
+    $zone = DnsZone::factory()->create(['name' => 'alpha.test']);
+    $attachment = attachCloudflare($zone);
+
+    $entry = DnsEntry::factory()->for($zone, 'zone')->create(['name' => 'recreated', 'content' => '10.0.0.5']);
+    $entry->syncStates()->create(['zone_provider_id' => $attachment->id, 'sync_status' => SyncStatus::Synced, 'external_id' => 'cf-old']);
+
+    Http::fake([
+        'api.cloudflare.com/client/v4/zones/*/dns_records*' => Http::response(cfListResponse([
+            cfApiRecord('cf-new', 'A', 'recreated.alpha.test', '10.0.0.5'),
+        ])),
+    ]);
+
+    (new CheckProviderDrift($attachment->provider_id))->handle();
+
+    $state = $entry->syncStates()->sole();
+
+    expect($state->sync_status)->toBe(SyncStatus::Synced)
+        ->and($state->external_id)->toBe('cf-new')
+        ->and($state->drift_details)->toBeNull();
+});
+
+test('the drift fallback never re-points to a sibling record another entry tracks', function () {
+    $zone = DnsZone::factory()->create(['name' => 'alpha.test']);
+    $attachment = attachCloudflare($zone);
+
+    // Two managed A records on the SAME name; one was edited remotely.
+    $kept = DnsEntry::factory()->for($zone, 'zone')->create(['name' => 'multi', 'content' => '10.0.0.1']);
+    $kept->syncStates()->create(['zone_provider_id' => $attachment->id, 'sync_status' => SyncStatus::Synced, 'external_id' => 'cf-1']);
+
+    $edited = DnsEntry::factory()->for($zone, 'zone')->create(['name' => 'multi', 'content' => '10.0.0.2']);
+    $edited->syncStates()->create(['zone_provider_id' => $attachment->id, 'sync_status' => SyncStatus::Synced, 'external_id' => 'cf-2']);
+
+    Http::fake([
+        'api.cloudflare.com/client/v4/zones/*/dns_records*' => Http::response(cfListResponse([
+            cfApiRecord('cf-1', 'A', 'multi.alpha.test', '10.0.0.1'),
+            cfApiRecord('cf-9', 'A', 'multi.alpha.test', '10.9.9.9'),
+        ])),
+    ]);
+
+    (new CheckProviderDrift($attachment->provider_id))->handle();
+
+    // cf-1 is claimed by $kept — $edited's fallback must pick cf-9, not steal it.
+    expect($kept->syncStates()->sole()->sync_status)->toBe(SyncStatus::Synced)
+        ->and($kept->syncStates()->sole()->external_id)->toBe('cf-1')
+        ->and($edited->syncStates()->sole()->sync_status)->toBe(SyncStatus::Drifted)
+        ->and($edited->syncStates()->sole()->external_id)->toBe('cf-9')
+        ->and($edited->syncStates()->sole()->drift_details)->toBe([
+            ['field' => 'content', 'tracked' => '10.0.0.2', 'actual' => '10.9.9.9'],
+        ]);
+});
+
+test('a remotely edited Technitium record is updated back in place, not duplicated', function () {
+    $zone = DnsZone::factory()->create(['name' => 'example.com']);
+    $provider = Provider::factory()->technitium()->create();
+    $attachment = ZoneProvider::factory()->create(['dns_zone_id' => $zone->id, 'provider_id' => $provider->id, 'config' => null]);
+
+    $entry = DnsEntry::factory()->for($zone, 'zone')->create(['name' => 'home', 'content' => '10.11.20.102', 'ttl' => null]);
+    $entry->syncStates()->create([
+        'zone_provider_id' => $attachment->id,
+        'sync_status' => SyncStatus::Synced,
+        'external_id' => '{"type":"A","name":"home.example.com","ipAddress":"10.11.20.102"}',
+    ]);
+
+    Http::fake([
+        '*/api/zones/records/get*' => Http::response([
+            'status' => 'ok',
+            'response' => ['records' => [
+                ['name' => 'home.example.com', 'type' => 'A', 'ttl' => 3600, 'rData' => ['ipAddress' => '10.11.20.103']],
+            ]],
+        ]),
+        '*/api/zones/records/update*' => Http::response(['status' => 'ok']),
+    ]);
+
+    (new CheckProviderDrift($provider->id))->handle();
+
+    $state = $entry->syncStates()->sole();
+
+    // The state now tracks the edited record's tuple id...
+    expect($state->sync_status)->toBe(SyncStatus::Drifted)
+        ->and($state->external_id)->toBe('{"type":"A","name":"home.example.com","ipAddress":"10.11.20.103"}')
+        ->and($state->drift_details)->toBe([
+            ['field' => 'content', 'tracked' => '10.11.20.102', 'actual' => '10.11.20.103'],
+        ]);
+
+    // ...so the re-push updates .103 back to .102 in place instead of
+    // creating a second A record next to it.
+    (new SyncEntryToProvider($entry->id, $attachment->id))->handle();
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), '/api/zones/records/update')
+        && $request['ipAddress'] === '10.11.20.103'
+        && $request['newIpAddress'] === '10.11.20.102');
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), '/api/zones/records/add'));
+
+    $state->refresh();
+
+    expect($state->sync_status)->toBe(SyncStatus::Synced)
+        ->and($state->external_id)->toBe('{"type":"A","name":"home.example.com","ipAddress":"10.11.20.102"}');
 });
 
 test('a failing zone attachment does not block drift checks for the others', function () {
