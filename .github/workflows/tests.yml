@@ -27,6 +27,7 @@ jobs:
         with:
           php-version: '8.4'
           tools: composer:v2
+          coverage: pcov
 
       - name: Install Dependencies
         run: composer install --no-interaction --no-progress --prefer-dist --optimize-autoloader
@@ -39,8 +40,10 @@ jobs:
       # Tests run on sqlite :memory: (phpunit.xml) and never hit the
       # network (Http::preventStrayRequests in TestCase) — no services,
       # no built assets (TestCase uses withoutVite) needed.
-      - name: Pest
-        run: composer run test
+      # Coverage gate: fails below the --min in the composer script.
+      # Ratchet: when coverage grows, raise the --min to the new floor.
+      - name: Pest (coverage gate)
+        run: composer run test-coverage
 
   js:
     name: JS Tests

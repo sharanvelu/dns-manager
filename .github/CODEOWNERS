@@ -1,0 +1,4 @@
+# Default owner for everything in the repo. GitHub requests a review from
+# the matching owner(s) on every PR; enforcement (require code-owner review,
+# required approval count) is configured in branch protection, not here.
+* @sharanvelu

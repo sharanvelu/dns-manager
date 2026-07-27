@@ -75,7 +75,13 @@
             "Composer\\Config::disableProcessTimeout",
             "pest"
         ],
+        "test-coverage": [
+            "Composer\\Config::disableProcessTimeout",
+            "@putenv XDEBUG_MODE=coverage",
+            "pest --coverage --min=93"
+        ],
         "analyze": "phpstan analyse --memory-limit=2G",
+        "analyze-baseline": "phpstan analyse --memory-limit=2G --generate-baseline",
         "ci": [
             "Composer\\Config::disableProcessTimeout",
             "@check-style",

@@ -25,8 +25,10 @@ DNS Manager: a homelab web app that manages DNS entries across multiple provider
 composer run dev          # serve app + queue worker + vite (local dev)
 composer run ci           # everything CI runs: PHP + JS style, tests, static analysis
 composer run test         # Pest suite (sqlite :memory:, HTTP fully faked); test-unit / test-feature scope by suite
+composer run test-coverage # Pest with coverage gate (--min in composer.json; CI runs this — ratchet the min up as coverage grows)
 composer run check-style  # Pint check-only (fix-style rewrites; or pint --dirty while iterating)
 composer run analyze      # PHPStan via Larastan, level 5 (phpstan.neon; pre-existing debt in phpstan-baseline.neon)
+composer run analyze-baseline # regenerate phpstan-baseline.neon (only after FIXING debt — never to absorb new errors)
 npm run check-style       # ESLint check-only (fix-style rewrites)
 npm run test              # Vitest (resources/js/tests/{unit,feature}); test-unit / test-feature scope by dir
 npm run analyze           # TypeScript check (tsc --noEmit)

@@ -1,0 +1,32 @@
+# Dependency review: fails a PR that introduces or upgrades to a dependency
+# (composer or npm) with a known vulnerability, and posts a summary comment
+# on failure. Only diffs dependencies changed BY the PR — pre-existing
+# vulnerabilities in the tree don't fail this check.
+# Requires the repository's dependency graph to be enabled
+# (Settings → Advanced Security → Dependency graph).
+name: dependency-review
+
+on:
+  pull_request:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate
+          comment-summary-in-pr: on-failure
