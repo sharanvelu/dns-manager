@@ -3,10 +3,13 @@
 # otherwise the patch component is bumped, committed, and tagged. The v* tag
 # push then triggers build.yml (semver image tags).
 #
-# Requires a BOT_TOKEN secret (fine-grained PAT: contents read/write, allowed
-# to bypass master's branch protection). With the default GITHUB_TOKEN the
-# push to protected master fails, and even a successful tag push would not
-# trigger build.yml (GITHUB_TOKEN events don't chain into other workflows).
+# Pushes authenticate with the DEPLOY_KEY secret (SSH deploy key with write
+# access) whose actor is in the "Protected Branch" ruleset's bypass list —
+# required-status-checks blocks any direct-to-master push otherwise, and
+# GITHUB_TOKEN pushes would not trigger build.yml (GITHUB_TOKEN events don't
+# chain into other workflows). Deploy keys are SSH-only (no API access), so
+# the bump commit is a plain git commit; it shows as Unverified because the
+# bypass skips the required-signatures rule rather than satisfying it.
 name: tag
 
 on:
@@ -28,16 +31,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      contents: write
+      contents: read
     steps:
       - name: Checkout
-        # Credentials persist deliberately: this job pushes a bump commit
-        # and a tag back to master. zizmor: ignore[artipacked]
+        # The deploy key persists deliberately: this job pushes a bump
+        # commit and a tag back to master.
+        # zizmor: ignore[artipacked]
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          persist-credentials: true
-          token: ${{ secrets.BOT_TOKEN || github.token }}
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
 
       - name: Decide whether this merge needs a release
         id: decide
