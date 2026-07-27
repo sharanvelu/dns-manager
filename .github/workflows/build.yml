@@ -154,3 +154,32 @@ jobs:
 
       - name: Inspect manifest
         run: docker buildx imagetools inspect "$REGISTRY/$IMAGE_NAME:$DOCKER_METADATA_OUTPUT_VERSION"
+
+  # Deletes truly stale digests after each build. Manifest-aware: the
+  # per-arch digests just pushed look "untagged" in GHCR but are children
+  # of the tagged manifest and MUST NOT be deleted — the cleaner walks all
+  # tagged manifests first and only removes versions nothing references
+  # (orphans from re-runs and superseded builds). Weekly backstop lives in
+  # cleanup-registry.yml.
+  cleanup:
+    name: Clean Stale Digests
+    needs: merge
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TOKEN: ${{ secrets.GHCR_CLEANUP_TOKEN }}
+    steps:
+      - name: Skip notice
+        if: env.TOKEN == ''
+        run: echo "::notice::GHCR_CLEANUP_TOKEN not set — skipping stale digest cleanup."
+
+      - name: Delete unreferenced untagged versions
+        if: env.TOKEN != ''
+        uses: stumpylog/image-cleaner-action/untagged@4fe057d991d63b8f6d5d22c40f17c1bca2226537 # v0.12.0
+        with:
+          token: ${{ env.TOKEN }}
+          owner: ${{ github.repository_owner }}
+          is_org: "false"
+          package_name: dns-manager
+          do_delete: "true"
