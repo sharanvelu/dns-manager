@@ -1,4 +1,7 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "rewrites": [{ "source": "/docs/_next/:path*", "destination": "/_next/:path*" }]
+    "$schema": "https://openapi.vercel.sh/vercel.json",
+    "framework": null,
+    "buildCommand": "npm run build",
+    "outputDirectory": "out",
+    "trailingSlash": true
 }
