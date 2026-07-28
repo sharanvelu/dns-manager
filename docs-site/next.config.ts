@@ -25,6 +25,12 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
+  // docs-site has no ESLint setup of its own (`npm run typecheck` is the
+  // gate); without this, Next's build-time lint step errors on Vercel
+  // where no parent node_modules provides eslint.
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 };
 
 export default nextConfig;
