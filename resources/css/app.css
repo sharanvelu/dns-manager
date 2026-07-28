@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+@import './docs-palette.css';
+@import './docs.css';
 
 @plugin 'tailwindcss-animate';
 

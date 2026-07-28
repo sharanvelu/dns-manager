@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import FeatureCard from "@/components/landing/FeatureCard";
+import Footer from "@/components/landing/Footer";
+import Hero from "@/components/landing/Hero";
+import Providers from "@/components/landing/Providers";
 import {
   getDoc,
   getFeatureCards,
@@ -8,8 +11,8 @@ import {
   getVersion,
   markdownToHtml,
 } from "@/lib/docs";
+import { docHref } from "@/lib/site";
 
-const GITHUB_URL = "https://github.com/OWNER/dns-manager";
 const FALLBACK_PITCH =
   "Manage DNS entries across multiple providers from one place.";
 
@@ -36,74 +39,32 @@ export default async function LandingPage() {
   const getStartedHref = nav.some((d) => d.slug === "installation")
     ? "/installation/"
     : nav.find((d) => d.slug !== "index")
-      ? `/${nav.find((d) => d.slug !== "index")!.slug}/`
+      ? docHref(nav.find((d) => d.slug !== "index")!.slug)
       : "/";
 
   return (
-    <div className="landing">
-      <section className="hero">
-        <span className="hero-badge">
-          <span className="dot" />
-          v{version}
-        </span>
-        <h1>DNS Manager</h1>
-        <p>{pitch}</p>
-        <div className="hero-actions">
-          <Link className="btn btn-primary" href={getStartedHref}>
-            Get started
-          </Link>
-          <a
-            className="btn btn-secondary"
-            href={GITHUB_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            GitHub
-          </a>
-        </div>
-      </section>
+    <>
+      <Hero version={version} pitch={pitch} getStartedHref={getStartedHref} />
 
       {features.length > 0 && (
-        <section className="features">
-          <p className="section-label">Features</p>
-          <div className="features-grid">
-            {features.map((f, i) => (
-              <div className="feature-card" key={i}>
-                {f.title && <h3>{f.title}</h3>}
-                <div
-                  className="feature-body"
-                  dangerouslySetInnerHTML={{ __html: f.html }}
-                />
-              </div>
+        <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-6">
+          <p className="mb-2 text-center text-xs font-semibold uppercase tracking-[0.1em] text-accent">
+            Features
+          </p>
+          <h2 className="mb-10 text-center text-2xl font-semibold tracking-tight">
+            Everything your homelab DNS needs
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {features.map((feature, i) => (
+              <FeatureCard key={i} feature={feature} index={i} />
             ))}
           </div>
         </section>
       )}
 
-      {providersHtml && (
-        <section className="providers-section">
-          <p className="section-label">Supported providers</p>
-          <div
-            className="prose"
-            dangerouslySetInnerHTML={{ __html: providersHtml }}
-          />
-        </section>
-      )}
+      {providersHtml && <Providers html={providersHtml} />}
 
-      <footer className="landing-footer">
-        <span>DNS Manager documentation · v{version}</span>
-        <span>
-          <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">
-            GitHub
-          </a>
-          {nav.length > 0 && (
-            <>
-              {" · "}
-              <Link href={getStartedHref}>Documentation</Link>
-            </>
-          )}
-        </span>
-      </footer>
-    </div>
+      <Footer version={version} getStartedHref={getStartedHref} />
+    </>
   );
 }

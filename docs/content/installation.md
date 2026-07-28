@@ -91,7 +91,7 @@ Health probes hit Laravel's built-in `/up` endpoint on port 8080. See `k8s/READM
 | `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` | OIDC client credentials registered with your identity provider. |
 | `OIDC_REDIRECT_URI` | Callback URL; defaults to `${APP_URL}/auth/callback`. Register this URI with your identity provider. |
 | `OIDC_PROVIDER_LABEL` | Text on the sign-in button, e.g. `Authentik` renders "Sign in with Authentik". Defaults to `SSO`. |
-| `DOCS_SITE_URL` | URL of the hosted latest-version documentation site, linked from the in-app docs banner. |
+| `DOCS_SITE_URL` | URL of the hosted latest-version documentation site, linked from the in-app docs sidebar ("Latest docs"). |
 | `AUTO_MIGRATE` | `true` runs database migrations at container start. The Kubernetes ConfigMap sets it to `true`; do the same for single-container Docker setups. Defaults to `false`. |
 | `SUPERVISOR_WORKER` / `SUPERVISOR_SCHEDULER` | Whether the container's supervisor also runs the queue worker / scheduler. Default `true` (self-contained container); only set `false` in the advanced setup that splits the roles into separate containers/Deployments with command overrides. |
 | `SCHEDULER_ENABLED` | `false` disables the built-in schedules (drift check **and** provider health check) entirely — use when an external tool triggers checks via the webhooks instead. Defaults to `true`. |

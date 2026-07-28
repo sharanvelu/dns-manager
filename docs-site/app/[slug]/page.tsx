@@ -1,7 +1,17 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import DocsSidebar from "@/components/DocsSidebar";
-import { getAllDocs, getDoc, getNav, getVersion, markdownToHtml } from "@/lib/docs";
+import CodeCopy from "@/components/CodeCopy";
+import PrevNext from "@/components/PrevNext";
+import Sidebar from "@/components/Sidebar";
+import Toc from "@/components/Toc";
+import {
+  getAllDocs,
+  getDoc,
+  getNav,
+  renderDoc,
+  stripLeadingH1,
+} from "@/lib/docs";
+import { groupNav } from "@/lib/site";
 
 export const dynamicParams = false;
 
@@ -34,18 +44,34 @@ export default async function DocPage({
   const doc = getDoc(slug);
   if (!doc || slug === "index") notFound();
 
-  const html = await markdownToHtml(doc.markdown);
-  const hasOwnH1 = /^#\s+/m.test(doc.markdown);
+  // Render our own title block (h1 + description lede) for layout
+  // control; drop the markdown's leading H1 so it isn't duplicated.
+  const { html, toc } = await renderDoc(stripLeadingH1(doc.markdown));
+  const nav = getNav();
 
   return (
-    <div className="docs-shell">
-      <DocsSidebar nav={getNav()} version={getVersion()} currentSlug={slug} />
-      <main className="doc-main">
-        <article className="prose">
-          {!hasOwnH1 && <h1>{doc.title}</h1>}
-          <div dangerouslySetInnerHTML={{ __html: html }} />
-        </article>
-      </main>
+    <div className="mx-auto max-w-7xl px-4 sm:px-6">
+      <div className="lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-10 xl:grid-cols-[15rem_minmax(0,1fr)_14rem] xl:gap-12">
+        <aside className="hidden lg:block">
+          <Sidebar groups={groupNav(nav)} currentSlug={slug} />
+        </aside>
+
+        <main className="min-w-0 py-8 lg:py-10">
+          <article className="prose max-w-[72ch]">
+            <h1>{doc.title}</h1>
+            {doc.description && <p className="doc-lede">{doc.description}</p>}
+            <div dangerouslySetInnerHTML={{ __html: html }} />
+          </article>
+          <div className="max-w-[72ch]">
+            <PrevNext nav={nav} currentSlug={slug} />
+          </div>
+          <CodeCopy />
+        </main>
+
+        <div className="hidden xl:block">
+          <Toc toc={toc} />
+        </div>
+      </div>
     </div>
   );
 }

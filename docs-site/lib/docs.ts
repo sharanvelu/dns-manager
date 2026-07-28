@@ -1,9 +1,20 @@
 import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
-import { remark } from "remark";
+import rehypeAutolinkHeadings from "rehype-autolink-headings";
+import rehypeSlug from "rehype-slug";
+import rehypeStringify from "rehype-stringify";
 import remarkGfm from "remark-gfm";
-import remarkHtml from "remark-html";
+import remarkParse from "remark-parse";
+import remarkRehype from "remark-rehype";
+import rehypeShiki from "@shikijs/rehype";
+import { unified } from "unified";
+import remarkAlerts from "./markdown/remark-alerts";
+import rehypeCodeFrame from "./markdown/rehype-code-frame";
+import rehypeExtractToc, { type TocItem } from "./markdown/rehype-extract-toc";
+import rehypeLinks from "./markdown/rehype-links";
+
+export type { TocItem } from "./markdown/rehype-extract-toc";
 
 /**
  * Single source of truth shared with the Laravel app's in-app /docs endpoint:
@@ -24,6 +35,11 @@ export interface DocMeta {
 export interface Doc extends DocMeta {
   /** Raw markdown body (frontmatter stripped). */
   markdown: string;
+}
+
+export interface RenderedDoc {
+  html: string;
+  toc: TocItem[];
 }
 
 export interface FeatureCard {
@@ -96,29 +112,70 @@ export function getNav(): DocMeta[] {
 }
 
 /**
- * Rewrite relative slug links (e.g. href="providers" or "providers#zones",
- * optionally with a .md extension) to root-relative trailing-slash URLs that
- * the static export serves. External, absolute, anchor and mailto links are
- * left untouched. `index` points at the landing page.
+ * Strip a leading `# Heading` so pages can render their own title block
+ * (h1 + description lede) with layout control. No-op when the document
+ * does not start with an H1.
  */
-function rewriteRelativeLinks(html: string): string {
-  return html.replace(/href="([^"]+)"/g, (full, href: string) => {
-    if (/^(?:[a-zA-Z][a-zA-Z0-9+.-]*:|\/|#)/.test(href)) {
-      return full; // http(s):, mailto:, absolute path, in-page anchor
-    }
-    const [target, hash] = href.split("#", 2);
-    const slug = target.replace(/\.md$/, "").replace(/\/+$/, "");
-    const base = slug === "" || slug === "index" ? "/" : `/${slug}/`;
-    return `href="${base}${hash ? `#${hash}` : ""}"`;
-  });
+export function stripLeadingH1(markdown: string): string {
+  return markdown.replace(/^\s*#[ \t]+.*(?:\r?\n|$)/, "");
+}
+
+/**
+ * Markdown → HTML pipeline shared by docs pages, the landing page and the
+ * search index:
+ *
+ * remark-parse → remark-gfm → remark-alerts (GitHub-style callouts) →
+ * remark-rehype → rehype-slug → rehype-autolink-headings (hover `#`) →
+ * rehype-extract-toc (h2/h3) → rehype-links (relative slug links →
+ * /{slug}/#hash) → @shikijs/rehype (dual github-light/dark themes via
+ * CSS `light-dark()`) → rehype-code-frame (figure + language label +
+ * copy button) → rehype-stringify.
+ *
+ * Shiki's highlighter is a process-wide singleton, so building a
+ * processor per call is cheap.
+ */
+export async function renderDoc(markdown: string): Promise<RenderedDoc> {
+  let toc: TocItem[] = [];
+  const file = await unified()
+    .use(remarkParse)
+    .use(remarkGfm)
+    .use(remarkAlerts)
+    .use(remarkRehype)
+    .use(rehypeSlug)
+    .use(rehypeAutolinkHeadings, {
+      behavior: "append",
+      test: ["h2", "h3", "h4"],
+      properties: {
+        className: ["heading-anchor"],
+        ariaHidden: "true",
+        tabIndex: -1,
+      },
+      content: { type: "text", value: "#" },
+    })
+    .use(rehypeExtractToc, {
+      collect: (items) => {
+        toc = items;
+      },
+    })
+    .use(rehypeLinks)
+    .use(rehypeShiki, {
+      themes: {
+        light: "github-light-default",
+        dark: "github-dark-default",
+      },
+      defaultColor: "light-dark()",
+      addLanguageClass: true,
+      defaultLanguage: "text",
+      fallbackLanguage: "text",
+    })
+    .use(rehypeCodeFrame)
+    .use(rehypeStringify)
+    .process(markdown);
+  return { html: String(file), toc };
 }
 
 export async function markdownToHtml(markdown: string): Promise<string> {
-  const processed = await remark()
-    .use(remarkGfm)
-    .use(remarkHtml, { sanitize: false })
-    .process(markdown);
-  return rewriteRelativeLinks(String(processed));
+  return (await renderDoc(markdown)).html;
 }
 
 /** Split a markdown document into H2 sections, keyed by lowercased heading text. */

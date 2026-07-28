@@ -111,11 +111,13 @@ description: One-liner    # meta/description
 ```
 
 Consumers:
-1. **In-app endpoint** `GET /docs[/{slug}]` (public, Blade-rendered) — serves the docs for *the installed version*, with a banner linking to the latest-version site (`config('app.docs_site_url')`).
-2. **`docs-site/`** (Next.js, static export) — public site for *the latest version*, with a banner telling users on older versions to open `/docs` on their own instance. Deployed on **Vercel** straight from the repo (root directory `docs-site`); there is deliberately no Dockerfile, nginx config, k8s manifest, or CI build for it.
+1. **In-app endpoint** `GET /docs[/{slug}]` (public, Inertia page `docs/show` with its own guest shell) — serves the docs for *the installed version*. Rendered server-side by `App\Support\DocsRepository`: CommonMark env with GFM + heading permalinks (ids on h2–h3) + Phiki dual-theme syntax highlighting + GitHub-style callouts (`> [!NOTE|TIP|IMPORTANT|WARNING|CAUTION]`) + relative-link rewriting to `/docs/...`; renders are cached by content hash (bump `DocsRepository::PIPELINE_REV` when the pipeline changes). The sidebar links to the latest-version site (`config('app.docs_site_url')`).
+2. **`docs-site/`** (Next.js, static export) — public site for *the latest version*, with a header pill telling users on older versions to open `/docs` on their own instance. Same markdown feature set (unified/remark + Shiki + callouts). Deployed on **Vercel** straight from the repo (root directory `docs-site`); there is deliberately no Dockerfile, nginx config, k8s manifest, or CI build for it.
 3. Humans reading the repo.
 
 When app behavior changes, update the relevant `docs/content` page — both consumers pick it up automatically (endpoint at runtime, site at next build).
+
+Docs UI accent colors are **pluggable**: every accent flows through the semantic tokens in `resources/css/docs-palette.css` (in-app) and `docs-site/app/palette.css` (public site — same token names). To re-theme the docs, edit those two files only; never hard-code accent colors in docs components or prose CSS.
 
 ## Adding a DNS provider connector
 

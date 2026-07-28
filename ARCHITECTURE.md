@@ -137,8 +137,10 @@ Enums live in `app/Enums`: `RecordType`, `SyncStatus`, `HealthStatus`, `Provider
 ## Documentation system
 
 `docs/content/*.md` (frontmatter: `title`, `nav_order`, `description`) is the single source rendered by:
-1. `GET /docs[/{slug}]` — public in-app endpoint (Blade + CommonMark), banner: "docs for installed version vX; latest at DOCS_SITE_URL".
-2. `docs-site/` — standalone Next.js static site for the latest version (deployed on Vercel directly from the repo — no Docker image), banner: "for your installed version, open /docs on your instance".
+1. `GET /docs[/{slug}]` — public in-app endpoint, an Inertia page (`docs/show`) with its own guest-accessible shell. `App\Support\DocsRepository` renders markdown server-side (CommonMark: GFM + heading permalinks + Phiki dual-theme highlighting + GitHub-style callouts + relative-link rewriting) and ships the page HTML, an h2/h3 outline for the "On this page" rail, and a plain-text search index for the ⌘K dialog; renders are cached by content hash + `PIPELINE_REV` + app version. Sidebar links to the latest docs at DOCS_SITE_URL.
+2. `docs-site/` — standalone Next.js static site for the latest version (deployed on Vercel directly from the repo — no Docker image), same markdown feature set via unified/remark + Shiki; header pill: "for your installed version, open /docs on your instance".
+
+Docs accent theming is centralized in `resources/css/docs-palette.css` and `docs-site/app/palette.css` (identical semantic token names) — a docs re-theme edits only those two files.
 
 `VERSION` (repo root) → `config('app.version')` and the docs-site build. `DOCS_SITE_URL` env → `config('app.docs_site_url')`.
 

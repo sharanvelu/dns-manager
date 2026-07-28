@@ -14,6 +14,7 @@
         "kovah/laravel-socialite-oidc": "^0.8.0",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
+        "phiki/phiki": "^2.2",
         "predis/predis": "^3.5",
         "spatie/laravel-activitylog": "^5.0",
         "tightenco/ziggy": "^2.4"

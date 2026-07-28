@@ -75,5 +75,8 @@ Page-local components live in the page's folder — **except** these, promoted b
 
 ## Docs surfaces
 
-- In-app `/docs`: minimal Blade layout consistent with the app (same font, muted palette), version banner pinned at top.
-- `docs-site/` (Next.js): same visual language; landing page presents the feature set; persistent "latest version" banner.
+Both docs UIs follow the benchmark three-column docs pattern (Fumadocs/VitePress-style) in the app's restrained visual language.
+
+- **Pluggable palette (rule)**: every docs accent color flows through the semantic tokens in `resources/css/docs-palette.css` (in-app) and `docs-site/app/palette.css` (public site) — identical token names (`--docs-accent`, `--docs-gradient-from/-via/-to`, `--docs-callout-*`, `--docs-card-*`), one file per surface, `:root` + `.dark` blocks. Re-theming the docs = editing those two files; never hard-code an accent color in docs components or prose CSS. Current identity: "emerald evolved" (emerald→teal→cyan gradients).
+- **In-app `/docs`**: Inertia page `resources/js/pages/docs/show.tsx` with its own guest-accessible shell (NOT `AppLayout`): sticky translucent header (`DnsLogo`, gradient "Docs" wordmark, version `Badge`, ⌘K search trigger, GitHub link, theme toggle via `useAppearance` — docs follow the user's stored appearance exactly like the app), left sidebar nav (mobile: `Sheet`), article column (`.docs-prose`, max-w-3xl), "On this page" scroll-spy rail (xl+), prev/next pager. Code frames get client-injected copy buttons + language labels; callouts render from `> [!NOTE|TIP|IMPORTANT|WARNING|CAUTION]` (blue/emerald/violet/amber/red via palette tokens). Structural CSS lives in `resources/css/docs.css` (tokens only, no raw colors).
+- **`docs-site/`** (Next.js): same visual language, layout, and markdown feature set; landing page presents the feature set with per-hue feature cards and a gradient hero; header version pill links latest ↔ installed docs.
