@@ -47,6 +47,7 @@ jobs:
               - 'Dockerfile'
               - '.dockerignore'
               - 'docker/**'
+              - 'docs-site/**'
               - '.github/workflows/build-check.yml'
 
   frontend:

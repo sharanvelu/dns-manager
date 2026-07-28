@@ -1,0 +1,672 @@
+/*
+ * Prose + component-kit layer. `.prose` styles the bare JSX docs pages
+ * write (h2/h3/p/ul/ol/table/a/code); the kit classes below it
+ * (.callout, .code-frame, .card-grid, .steps, .screenshot) are UNSCOPED
+ * so the components work anywhere (docs pages, docs home, landing).
+ * Structure and neutrals only; every accent color is a palette token.
+ */
+
+.prose {
+  font-size: 0.9375rem;
+  line-height: 1.8;
+  color: var(--foreground);
+}
+
+/* ── Title block ───────────────────────────────────────────────────── */
+
+/* Group eyebrow above the h1 — hue set inline via --group-hue. */
+.doc-eyebrow {
+  margin: 0 0 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--group-hue, var(--docs-accent));
+}
+
+.doc-lede {
+  margin: -0.25rem 0 2rem;
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+/* ── Headings ──────────────────────────────────────────────────────── */
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4 {
+  color: var(--foreground);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  scroll-margin-top: 5.5rem; /* sticky header + breathing room */
+  text-wrap: balance;
+}
+
+.prose h1 {
+  font-size: 2.125rem;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  margin: 0 0 1rem;
+}
+
+.prose h2 {
+  position: relative;
+  font-size: 1.4375rem;
+  line-height: 1.3;
+  margin: 3.25rem 0 1.125rem;
+  padding-top: 1.75rem;
+}
+
+/* Gradient hairline above each h2 — section divider. */
+.prose h2::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--docs-gradient-from) 45%, transparent),
+    color-mix(in srgb, var(--docs-gradient-to) 20%, transparent) 60%,
+    transparent
+  );
+}
+
+.prose h3 {
+  font-size: 1.125rem;
+  line-height: 1.4;
+  margin: 2.25rem 0 0.875rem;
+}
+
+.prose h4 {
+  font-size: 1rem;
+  margin: 1.75rem 0 0.5rem;
+}
+
+/* Hover `#` anchors (H2/H3/Step helpers). */
+.heading-anchor {
+  margin-left: 0.375em;
+  color: var(--docs-accent);
+  font-weight: 500;
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+h2:hover .heading-anchor,
+h3:hover .heading-anchor,
+h4:hover .heading-anchor,
+.heading-anchor:focus-visible {
+  opacity: 1;
+}
+
+/* ── Body copy ─────────────────────────────────────────────────────── */
+
+.prose p {
+  margin: 0 0 1.25rem;
+}
+
+.prose a:not(.heading-anchor):not(.doc-card) {
+  color: var(--docs-accent);
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--docs-accent) 35%, transparent);
+  text-underline-offset: 3px;
+  transition: text-decoration-color 120ms ease;
+}
+
+.prose a:not(.heading-anchor):not(.doc-card):hover {
+  text-decoration-color: var(--docs-accent);
+}
+
+.prose strong {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.prose ul,
+.prose ol {
+  margin: 0 0 1.25rem;
+  padding-left: 1.5rem;
+}
+
+.prose ul {
+  list-style: disc;
+}
+
+.prose ol {
+  list-style: decimal;
+}
+
+.prose li {
+  margin: 0.45rem 0;
+}
+
+.prose li::marker {
+  color: var(--faint);
+}
+
+.prose hr {
+  margin: 2.75rem 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.prose img {
+  max-width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+}
+
+.prose blockquote {
+  margin: 0 0 1.25rem;
+  padding: 0.125rem 0 0.125rem 1rem;
+  border-left: 3px solid var(--border);
+  color: var(--muted);
+}
+
+.prose blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+/* ── Inline code ───────────────────────────────────────────────────── */
+
+.prose :not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.8125em;
+  background-color: var(--background-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: 0.375rem;
+  padding: 0.125rem 0.375rem;
+  overflow-wrap: break-word;
+}
+
+.prose h1 :not(pre) > code,
+.prose h2 code,
+.prose h3 code {
+  font-size: 0.85em;
+}
+
+/* ── Tables ────────────────────────────────────────────────────────── */
+
+.prose table {
+  width: 100%;
+  margin: 0 0 1.75rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.625rem;
+  overflow: hidden;
+  font-size: 0.875rem;
+  line-height: 1.65;
+  display: block;
+  overflow-x: auto;
+}
+
+@media (min-width: 640px) {
+  .prose table {
+    display: table;
+  }
+}
+
+.prose th {
+  background-color: var(--background-soft);
+  text-align: left;
+  font-weight: 600;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.prose td {
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--border-soft);
+  vertical-align: top;
+}
+
+.prose tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Zebra + hover polish. */
+.prose tbody tr:nth-child(even) td {
+  background-color: color-mix(in srgb, var(--background-soft) 55%, transparent);
+}
+
+/* ═══ COMPONENT KIT (unscoped — works outside .prose too) ═══════════ */
+
+/* ── Code frames (components/docs/CodeBlock.tsx) ───────────────────── */
+
+.code-frame {
+  margin: 0 0 1.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background-color: var(--background-soft);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.03);
+}
+
+.code-frame-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.375rem 0.5rem 0.375rem 1rem;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.code-frame-lang {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.code-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.375rem;
+  color: var(--faint);
+  cursor: pointer;
+  transition:
+    color 120ms ease,
+    background-color 120ms ease;
+}
+
+.code-copy:hover {
+  color: var(--foreground);
+  background-color: var(--border-soft);
+}
+
+.code-copy .code-check-icon {
+  display: none;
+}
+
+.code-copy.copied {
+  color: var(--docs-accent);
+}
+
+.code-copy.copied .code-copy-icon {
+  display: none;
+}
+
+.code-copy.copied .code-check-icon {
+  display: block;
+}
+
+pre.shiki {
+  margin: 0;
+  padding: 0.9375rem 1rem;
+  overflow-x: auto;
+  font-size: 0.8125rem;
+  line-height: 1.7;
+}
+
+pre.shiki code {
+  font-family: var(--font-mono);
+  display: block;
+  min-width: max-content;
+}
+
+/*
+ * Shiki emits `light-dark(#light, #dark)` colors (defaultColor:
+ * "light-dark()"), resolved by the color-scheme set on :root/.dark in
+ * globals.css — no per-token overrides needed here.
+ */
+
+/* ── Callouts (components/docs/Callout.tsx) ────────────────────────── */
+
+.callout {
+  --callout-color: var(--docs-callout-note);
+  --callout-bg: var(--docs-callout-note-bg);
+  margin: 0 0 1.75rem;
+  padding: 0.9375rem 1.0625rem;
+  border: 1px solid color-mix(in srgb, var(--callout-color) 25%, transparent);
+  border-left: 3px solid var(--callout-color);
+  border-radius: 0.75rem;
+  background-color: var(--callout-bg);
+}
+
+.callout-body > :last-child,
+.callout > :last-child {
+  margin-bottom: 0;
+}
+
+.callout-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--callout-color);
+}
+
+.callout-title::before {
+  content: "";
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  background-color: currentColor;
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+}
+
+.callout-note {
+  --callout-color: var(--docs-callout-note);
+  --callout-bg: var(--docs-callout-note-bg);
+}
+
+.callout-tip {
+  --callout-color: var(--docs-callout-tip);
+  --callout-bg: var(--docs-callout-tip-bg);
+}
+
+.callout-important {
+  --callout-color: var(--docs-callout-important);
+  --callout-bg: var(--docs-callout-important-bg);
+}
+
+.callout-warning {
+  --callout-color: var(--docs-callout-warning);
+  --callout-bg: var(--docs-callout-warning-bg);
+}
+
+.callout-caution {
+  --callout-color: var(--docs-callout-caution);
+  --callout-bg: var(--docs-callout-caution-bg);
+}
+
+/* Lucide icon masks: info / lightbulb / message-square-warning /
+   triangle-alert / octagon-alert. */
+.callout-note .callout-title::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 16v-4'/%3E%3Cpath d='M12 8h.01'/%3E%3C/svg%3E");
+}
+
+.callout-tip .callout-title::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5'/%3E%3Cpath d='M9 18h6'/%3E%3Cpath d='M10 22h4'/%3E%3C/svg%3E");
+}
+
+.callout-important .callout-title::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'/%3E%3Cpath d='M12 7v2'/%3E%3Cpath d='M12 13h.01'/%3E%3C/svg%3E");
+}
+
+.callout-warning .callout-title::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'/%3E%3Cpath d='M12 9v4'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E");
+}
+
+.callout-caution .callout-title::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 16h.01'/%3E%3Cpath d='M12 8v4'/%3E%3Cpath d='M15.312 2a2 2 0 0 1 1.414.586l4.688 4.688A2 2 0 0 1 22 8.688v6.624a2 2 0 0 1-.586 1.414l-4.688 4.688a2 2 0 0 1-1.414.586H8.688a2 2 0 0 1-1.414-.586l-4.688-4.688A2 2 0 0 1 2 15.312V8.688a2 2 0 0 1 .586-1.414l4.688-4.688A2 2 0 0 1 8.688 2z'/%3E%3C/svg%3E");
+}
+
+/* ── Card grid (components/docs/Cards.tsx) ─────────────────────────── */
+
+.card-grid {
+  display: grid;
+  gap: 0.875rem;
+  margin: 0 0 1.75rem;
+}
+
+@media (min-width: 640px) {
+  .card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.doc-card {
+  --card-hue: var(--docs-accent);
+  position: relative;
+  display: flex;
+  gap: 0.875rem;
+  padding: 1.125rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background-color: var(--surface);
+  text-decoration: none;
+  color: inherit;
+  overflow: hidden;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+/* Soft hue wash in the card's corner. */
+.doc-card::before {
+  content: "";
+  position: absolute;
+  top: -3rem;
+  right: -3rem;
+  width: 8rem;
+  height: 8rem;
+  border-radius: 9999px;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--card-hue) 14%, transparent),
+    transparent
+  );
+  opacity: 0;
+  transition: opacity 160ms ease;
+  pointer-events: none;
+}
+
+.doc-card-link:hover,
+.doc-card:has(.doc-card-cover:hover) {
+  border-color: color-mix(in srgb, var(--card-hue) 45%, var(--border));
+  box-shadow: 0 4px 16px -6px color-mix(in srgb, var(--card-hue) 25%, transparent);
+  transform: translateY(-1px);
+}
+
+.doc-card-link:hover::before,
+.doc-card:has(.doc-card-cover:hover)::before {
+  opacity: 1;
+}
+
+.doc-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.375rem;
+  height: 2.375rem;
+  flex-shrink: 0;
+  border-radius: 0.625rem;
+  color: var(--card-hue);
+  background-color: color-mix(in srgb, var(--card-hue) 11%, transparent);
+}
+
+.doc-card-body {
+  display: block;
+  min-width: 0;
+}
+
+.doc-card-title {
+  display: block;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--foreground);
+  text-decoration: none;
+}
+
+.doc-card-link .doc-card-title::after {
+  content: " →";
+  color: var(--card-hue);
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.doc-card-link:hover .doc-card-title::after {
+  opacity: 1;
+}
+
+.doc-card-text {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.doc-card-text p {
+  margin: 0 0 0.5rem;
+}
+
+.doc-card-text p:last-child {
+  margin-bottom: 0;
+}
+
+/* Stretched-link variant (docs home group cards): the title covers the
+   card; sibling links stay clickable via z-index. */
+.doc-card-cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+/* ── Steps (components/docs/Steps.tsx) ─────────────────────────────── */
+
+.steps {
+  counter-reset: step;
+  margin: 0 0 1.75rem;
+}
+
+.step {
+  counter-increment: step;
+  position: relative;
+  padding: 0 0 1.75rem 3.25rem;
+}
+
+/* Number badge. */
+.step::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: -0.1875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--docs-accent-fg);
+  background: linear-gradient(
+    135deg,
+    var(--docs-gradient-from),
+    var(--docs-gradient-via) 60%,
+    var(--docs-gradient-to)
+  );
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.1);
+}
+
+/* Connector line between badges. */
+.step::after {
+  content: "";
+  position: absolute;
+  left: 0.96875rem;
+  top: 2.125rem;
+  bottom: 0.25rem;
+  width: 1.5px;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--docs-gradient-via) 35%, var(--border)),
+    var(--border-soft)
+  );
+}
+
+.step:last-child {
+  padding-bottom: 0.25rem;
+}
+
+.step:last-child::after {
+  display: none;
+}
+
+.step-title {
+  margin: 0 0 0.625rem !important;
+  padding-top: 0.125rem;
+  font-size: 1.0625rem !important;
+}
+
+.step-body > :last-child {
+  margin-bottom: 0;
+}
+
+/* ── Screenshots (components/docs/Screenshot.tsx) ──────────────────── */
+
+.screenshot {
+  margin: 0 0 1.75rem;
+}
+
+.screenshot-frame {
+  border: 1px solid var(--border);
+  border-radius: 0.875rem;
+  overflow: hidden;
+  background-color: var(--background-soft);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.04),
+    0 8px 24px -12px rgb(0 0 0 / 0.12);
+}
+
+.screenshot-frame img {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+}
+
+/* Theme pair: light image in light mode, dark image in dark mode. */
+.screenshot-dark {
+  display: none !important;
+}
+
+.dark .screenshot-light {
+  display: none !important;
+}
+
+.dark .screenshot-dark {
+  display: block !important;
+}
+
+.screenshot-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 12rem;
+  padding: 2rem;
+  font-size: 0.8125rem;
+  color: var(--faint);
+  border: 1px dashed var(--border);
+  border-radius: 0.875rem;
+  margin: -1px; /* sit inside the frame border */
+  text-align: center;
+}
+
+.screenshot-caption {
+  margin-top: 0.625rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--faint);
+  text-align: center;
+}
+
+/* Landing hero variant — larger radius, deeper shadow, no caption gap. */
+.landing-shot .screenshot {
+  margin: 0;
+}
+
+.landing-shot .screenshot-frame {
+  border-radius: 1.25rem;
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.05),
+    0 24px 60px -24px rgb(0 0 0 / 0.25);
+}

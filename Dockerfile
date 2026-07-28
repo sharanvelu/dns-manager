@@ -22,7 +22,27 @@ COPY resources/ resources/
 RUN npm run build
 
 # ---------------------------------------------------------------------------
-# Stage 2: install PHP dependencies (Composer)
+# Stage 2: build the static documentation site (Next.js export)
+# ---------------------------------------------------------------------------
+FROM node:22-alpine AS docs
+
+WORKDIR /app
+
+# Dependencies first for layer caching. docs-site ships its own .npmrc
+# (ignore-scripts=false) so Next.js/SWC install scripts run normally.
+COPY docs-site/package.json docs-site/package-lock.json docs-site/.npmrc docs-site/
+RUN npm ci --prefix docs-site
+
+# The build resolves ../VERSION relative to docs-site/ (version pill), so
+# the repo-relative layout must be reproduced inside the stage.
+COPY VERSION ./
+COPY docs-site/ docs-site/
+
+# Static export: docs-site/out/docs/ is the complete site (basePath /docs).
+RUN npm run build --prefix docs-site
+
+# ---------------------------------------------------------------------------
+# Stage 3: install PHP dependencies (Composer)
 # ---------------------------------------------------------------------------
 FROM composer:2 AS vendor
 
@@ -49,7 +69,7 @@ RUN composer dump-autoload \
     --no-scripts
 
 # ---------------------------------------------------------------------------
-# Stage 3: runtime (php-fpm + nginx under supervisord, non-root)
+# Stage 4: runtime (php-fpm + nginx under supervisord, non-root)
 # ---------------------------------------------------------------------------
 FROM php:8.4-fpm-alpine AS runtime
 
@@ -68,9 +88,12 @@ COPY docker/nginx.conf     /etc/nginx/nginx.conf
 COPY docker/supervisord.conf /etc/supervisord.conf
 COPY docker/entrypoint.sh  /usr/local/bin/docker-entrypoint
 
-# Application code + vendor from stage 2, built assets from stage 1
+# Application code + vendor from the composer stage, built assets from the
+# assets stage, static documentation site (served by nginx at /docs) from
+# the docs stage.
 COPY --from=vendor --chown=www-data:www-data /app /var/www/html
 COPY --from=assets --chown=www-data:www-data /app/public/build /var/www/html/public/build
+COPY --from=docs --chown=www-data:www-data /app/docs-site/out/docs /var/www/html/public/docs
 
 # Ensure writable runtime directories exist and everything nginx/php needs
 # is accessible to www-data (container runs fully non-root).
