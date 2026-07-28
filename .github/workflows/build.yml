@@ -1,8 +1,12 @@
-# Image build: runs only on `v*` tag pushes. tag.yml tags every merge to
-# master that touches app code, so each release builds exactly once with
-# the bumped VERSION in the tree; meta-only merges produce no tag and no
-# image. The PR gates (code-style, tests, static analysis, build-check)
-# are required checks, so the tagged commit already passed them.
+# Image build: normally started by tag.yml, which tags a master push only
+# when it changes the VERSION file and then dispatches this workflow on
+# the new tag (tag.yml pushes tags with GITHUB_TOKEN, and GITHUB_TOKEN
+# pushes never trigger the tag-push event — the `v*` push trigger below
+# only fires for manually pushed tags). Each release builds exactly once
+# with the new VERSION in the tree; pushes that don't bump VERSION produce
+# no tag and no image. The PR gates (code-style, tests, static analysis,
+# build-check) are required checks, so the tagged commit already passed
+# them.
 #
 # Architecture: each platform builds natively (amd64 on ubuntu-latest,
 # arm64 on ubuntu-24.04-arm — no QEMU emulation) and pushes an untagged
