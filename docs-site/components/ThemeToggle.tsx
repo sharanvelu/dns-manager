@@ -17,6 +17,25 @@ const LABELS: Record<Theme, string> = {
   system: "Theme: system",
 };
 
+function isTheme(value: string | null): value is Theme {
+  return value === "light" || value === "dark" || value === "system";
+}
+
+/**
+ * Same-origin theme sync with the DNS Manager app: the app stores its
+ * theme in localStorage("appearance") — read that first, fall back to the
+ * docs site's own "theme" key, and write BOTH on change so app and docs
+ * stay in lockstep when served together. Keep in sync with
+ * components/ThemeScript.tsx.
+ */
+function readStoredTheme(): Theme {
+  const app = localStorage.getItem("appearance");
+  if (isTheme(app)) return app;
+  const own = localStorage.getItem("theme");
+  if (isTheme(own)) return own;
+  return "system";
+}
+
 function isDark(theme: Theme): boolean {
   return (
     theme === "dark" ||
@@ -35,10 +54,7 @@ export default function ThemeToggle() {
 
   useEffect(() => {
     setMounted(true);
-    const stored = localStorage.getItem("theme");
-    if (stored === "light" || stored === "dark" || stored === "system") {
-      setTheme(stored);
-    }
+    setTheme(readStoredTheme());
   }, []);
 
   useEffect(() => {
@@ -56,6 +72,7 @@ export default function ThemeToggle() {
     const next = CYCLE[theme];
     setTheme(next);
     localStorage.setItem("theme", next);
+    localStorage.setItem("appearance", next);
   };
 
   const Icon = !mounted || theme === "system" ? Monitor : theme === "light" ? Sun : Moon;

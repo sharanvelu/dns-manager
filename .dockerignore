@@ -33,6 +33,9 @@ database/database.sqlite
 tests
 phpunit.xml
 .npmrc
+# docs-site's own .npmrc must ship: it re-enables install scripts that the
+# root .npmrc turns off (Next.js/SWC need them in the docs build stage).
+!docs-site/.npmrc
 .prettierrc
 .prettierignore
 .editorconfig
@@ -43,14 +46,16 @@ Dockerfile
 .dockerignore
 docker-compose*.yml
 
-# The standalone docs website builds its own image (docs-site/Dockerfile)
-docs-site
+# The docs site source is needed (its static export is built in the docs
+# stage and served at /docs) — only its build/install output is excluded.
+docs-site/node_modules
+docs-site/.next
+docs-site/out
+docs-site/*.tsbuildinfo
 
-# Docs / editor cruft
-# NOTE: docs/content/*.md is re-included below — the in-app /docs endpoint
-# renders those files at runtime. Do not remove the exception.
+# Docs / editor cruft (the docs stage copies docs-site/ explicitly; the
+# runtime image needs no markdown)
 *.md
-!docs/content/*.md
 .vscode
 .idea
 .DS_Store

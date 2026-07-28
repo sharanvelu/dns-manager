@@ -2,40 +2,25 @@
 
 import { CornerDownLeft, FileText, Hash, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { SearchDocEntry } from "@/lib/search";
-import { docHref } from "@/lib/site";
+import type { DocPage } from "@/lib/registry";
+import { orderedPages, pageUrl, groupConfig } from "@/lib/registry";
+import { slugify } from "@/lib/slug";
 
 /**
- * ⌘K search over the build-time index (/search-index.json), fetched
- * lazily on first open and cached for the session. Field-weighted
- * scoring: title > headings > description > body. Heading hits deep-link
- * to their anchors.
+ * ⌘K search over the page registry (lib/registry.ts — statically
+ * imported, no fetch). Field-weighted scoring: title > headings >
+ * description. Heading hits deep-link to their anchors (ids derived with
+ * the same slugger the <H2>/<H3> helpers use). Results show their group
+ * as context.
  */
 
 interface SearchResult {
   url: string;
   title: string;
+  group: string;
   context: string;
   kind: "page" | "heading";
   score: number;
-}
-
-let indexCache: SearchDocEntry[] | null = null;
-let indexPromise: Promise<SearchDocEntry[]> | null = null;
-
-function loadIndex(): Promise<SearchDocEntry[]> {
-  if (indexCache) return Promise.resolve(indexCache);
-  indexPromise ??= fetch("/search-index.json")
-    .then((res) => (res.ok ? res.json() : []))
-    .then((data: SearchDocEntry[]) => {
-      indexCache = Array.isArray(data) ? data : [];
-      return indexCache;
-    })
-    .catch(() => {
-      indexPromise = null;
-      return [];
-    });
-  return indexPromise;
 }
 
 function tokenize(query: string): string[] {
@@ -55,56 +40,41 @@ function fieldScore(field: string, tokens: string[], weight: number): number {
   return score;
 }
 
-function bodySnippet(text: string, token: string): string {
-  const at = text.toLowerCase().indexOf(token);
-  if (at === -1) return text.slice(0, 120);
-  const start = Math.max(0, at - 40);
-  const end = Math.min(text.length, at + 90);
-  return `${start > 0 ? "…" : ""}${text.slice(start, end).trim()}${end < text.length ? "…" : ""}`;
-}
-
-export function searchDocs(index: SearchDocEntry[], query: string): SearchResult[] {
+export function searchDocs(pages: DocPage[], query: string): SearchResult[] {
   const tokens = tokenize(query);
   if (tokens.length === 0) return [];
 
   const results: SearchResult[] = [];
-  for (const doc of index) {
-    const url = docHref(doc.slug);
-    const titleScore = fieldScore(doc.title, tokens, 40);
-    const descriptionScore = fieldScore(doc.description, tokens, 12);
+  for (const page of pages) {
+    const url = pageUrl(page);
+    const group = groupConfig(page.group).label;
+    const titleScore = fieldScore(page.title, tokens, 40);
+    const groupScore = fieldScore(group, tokens, 10);
+    const descriptionScore = fieldScore(page.description, tokens, 12);
 
-    let bodyScore = 0;
-    const body = doc.plainText.toLowerCase();
-    if (tokens.every((token) => body.includes(token))) {
-      bodyScore = 4;
-      for (const token of tokens) {
-        bodyScore += Math.min(3, body.split(token).length - 1);
-      }
-    }
-
-    const pageScore = titleScore + descriptionScore + bodyScore;
+    const pageScore = titleScore + groupScore + descriptionScore;
     if (pageScore > 0) {
       results.push({
         url,
-        title: doc.title,
-        context:
-          doc.description ||
-          (bodyScore > 0 ? bodySnippet(doc.plainText, tokens[0]) : ""),
+        title: page.title,
+        group,
+        context: page.description,
         kind: "page",
         score: pageScore,
       });
     }
 
     let headingHits = 0;
-    for (const heading of doc.headings) {
+    for (const heading of page.headings) {
       if (headingHits >= 3) break;
-      const headingScore = fieldScore(heading.text, tokens, 20);
+      const headingScore = fieldScore(heading, tokens, 20);
       if (headingScore === 0) continue;
       headingHits += 1;
       results.push({
-        url: `${url}#${heading.id}`,
-        title: heading.text,
-        context: doc.title,
+        url: `${url}#${slugify(heading)}`,
+        title: heading,
+        group,
+        context: page.title,
         kind: "heading",
         score: headingScore + titleScore / 4,
       });
@@ -117,16 +87,13 @@ export function searchDocs(index: SearchDocEntry[], query: string): SearchResult
 export default function SearchDialog() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [index, setIndex] = useState<SearchDocEntry[] | null>(null);
   const [active, setActive] = useState(0);
   const [isMac, setIsMac] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const pages = useMemo(() => orderedPages(), []);
 
-  const openDialog = useCallback(() => {
-    setOpen(true);
-    loadIndex().then(setIndex);
-  }, []);
+  const openDialog = useCallback(() => setOpen(true), []);
 
   const closeDialog = useCallback(() => {
     setOpen(false);
@@ -177,8 +144,8 @@ export default function SearchDialog() {
   }, [open]);
 
   const results = useMemo(
-    () => (index && query.trim() !== "" ? searchDocs(index, query) : []),
-    [index, query],
+    () => (query.trim() !== "" ? searchDocs(pages, query) : []),
+    [pages, query],
   );
 
   useEffect(() => setActive(0), [query]);
@@ -266,7 +233,7 @@ export default function SearchDialog() {
             <div className="max-h-[50vh] overflow-y-auto overscroll-contain p-2">
               {query.trim() === "" ? (
                 <p className="px-3 py-8 text-center text-sm text-faint">
-                  Search titles, headings and content…
+                  Search titles, headings and descriptions…
                 </p>
               ) : results.length === 0 ? (
                 <p className="px-3 py-8 text-center text-sm text-faint">
@@ -299,13 +266,18 @@ export default function SearchDialog() {
                           )}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span
-                            className={[
-                              "block truncate text-sm font-medium",
-                              i === active ? "text-accent" : "text-foreground",
-                            ].join(" ")}
-                          >
-                            {result.title}
+                          <span className="flex items-baseline gap-2">
+                            <span
+                              className={[
+                                "truncate text-sm font-medium",
+                                i === active ? "text-accent" : "text-foreground",
+                              ].join(" ")}
+                            >
+                              {result.title}
+                            </span>
+                            <span className="shrink-0 rounded-full border border-border bg-background-soft px-1.5 py-px text-[10px] font-medium text-faint">
+                              {result.group}
+                            </span>
                           </span>
                           {result.context && (
                             <span className="mt-0.5 block truncate text-xs text-muted">

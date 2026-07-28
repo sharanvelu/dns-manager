@@ -1,13 +1,46 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import type { TocItem } from "@/lib/docs";
 
 /**
- * "On this page" outline (xl+ only) with IntersectionObserver scroll-spy.
+ * "On this page" outline (xl+ only). Headings are extracted from the
+ * rendered DOM (the [data-doc-article] article's h2/h3 with ids — exactly
+ * what the <H2>/<H3>/<Step> helpers emit), with IntersectionObserver
+ * scroll-spy.
  */
-export default function Toc({ toc }: { toc: TocItem[] }) {
+
+interface TocItem {
+  depth: 2 | 3;
+  id: string;
+  text: string;
+}
+
+export default function Toc() {
+  const pathname = usePathname();
+  const [toc, setToc] = useState<TocItem[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+
+  // Extract headings from the DOM after every navigation.
+  useEffect(() => {
+    const article = document.querySelector("[data-doc-article]");
+    if (!article) {
+      setToc([]);
+      return;
+    }
+    const items: TocItem[] = [];
+    for (const el of article.querySelectorAll<HTMLElement>("h2[id], h3[id]")) {
+      const clone = el.cloneNode(true) as HTMLElement;
+      clone.querySelectorAll(".heading-anchor").forEach((anchor) => anchor.remove());
+      items.push({
+        depth: el.tagName === "H2" ? 2 : 3,
+        id: el.id,
+        text: clone.textContent?.trim() ?? "",
+      });
+    }
+    setToc(items);
+    setActiveId(null);
+  }, [pathname]);
 
   useEffect(() => {
     if (toc.length === 0) return;
@@ -43,7 +76,7 @@ export default function Toc({ toc }: { toc: TocItem[] }) {
   return (
     <nav
       aria-label="On this page"
-      className="sticky top-14 max-h-[calc(100vh-3.5rem)] overflow-y-auto py-10 pl-2"
+      className="sticky top-14 max-h-[calc(100vh-3.5rem)] overflow-y-auto py-12 pl-2"
     >
       <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-faint">
         On this page

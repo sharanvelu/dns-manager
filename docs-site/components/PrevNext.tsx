@@ -1,34 +1,30 @@
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import Link from "next/link";
-import type { DocMeta } from "@/lib/docs";
-import { docHref } from "@/lib/site";
+import { adjacentPages, pageUrl } from "@/lib/registry";
 
 /**
- * Previous / next pagination from the shared nav_order (nav arrives
- * already sorted by getNav()).
+ * Previous / next pagination in the registry's canonical order (group
+ * order, then page order within the group).
  */
 export default function PrevNext({
-  nav,
-  currentSlug,
+  group,
+  slug = "",
 }: {
-  nav: DocMeta[];
-  currentSlug: string;
+  group: string;
+  slug?: string;
 }) {
-  const index = nav.findIndex((doc) => doc.slug === currentSlug);
-  if (index === -1) return null;
-  const prev = index > 0 ? nav[index - 1] : undefined;
-  const next = index < nav.length - 1 ? nav[index + 1] : undefined;
+  const { prev, next } = adjacentPages(group, slug);
   if (!prev && !next) return null;
 
   return (
     <nav
       aria-label="Pagination"
-      className="mt-12 grid gap-3 border-t border-border-soft pt-6 sm:grid-cols-2"
+      className="mt-14 grid gap-3 border-t border-border-soft pt-6 sm:grid-cols-2"
     >
       {prev ? (
         <Link
-          href={docHref(prev.slug)}
-          className="group flex flex-col gap-1 rounded-xl border border-border p-4 transition-colors hover:border-accent/50 hover:bg-background-soft"
+          href={pageUrl(prev)}
+          className="group flex flex-col gap-1 rounded-xl border border-border p-4 transition-all hover:-translate-y-px hover:border-accent/50 hover:bg-background-soft hover:shadow-sm"
         >
           <span className="flex items-center gap-1 text-xs text-faint">
             <ArrowLeft size={13} strokeWidth={1.5} />
@@ -43,8 +39,8 @@ export default function PrevNext({
       )}
       {next && (
         <Link
-          href={docHref(next.slug)}
-          className="group flex flex-col items-end gap-1 rounded-xl border border-border p-4 text-right transition-colors hover:border-accent/50 hover:bg-background-soft"
+          href={pageUrl(next)}
+          className="group flex flex-col items-end gap-1 rounded-xl border border-border p-4 text-right transition-all hover:-translate-y-px hover:border-accent/50 hover:bg-background-soft hover:shadow-sm"
         >
           <span className="flex items-center gap-1 text-xs text-faint">
             Next

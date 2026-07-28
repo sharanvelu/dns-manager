@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Header from "@/components/Header";
 import ThemeScript from "@/components/ThemeScript";
-import { getNav, getVersion } from "@/lib/docs";
-import { groupNav, siteConfig } from "@/lib/site";
+import { getVersion } from "@/lib/version";
+import { siteConfig } from "@/lib/site";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -13,7 +13,6 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   const version = getVersion();
-  const groups = groupNav(getNav());
 
   return (
     // suppressHydrationWarning: ThemeScript mutates <html> before hydration.
@@ -27,7 +26,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         />
       </head>
       <body className="min-h-screen">
-        <Header version={version} groups={groups} />
+        <Header version={version} />
         {children}
       </body>
     </html>

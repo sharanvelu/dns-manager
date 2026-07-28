@@ -30,18 +30,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Documentation Site URL
-    |--------------------------------------------------------------------------
-    |
-    | Public site hosting docs for the LATEST version. The in-app /docs
-    | endpoint links here from its version banner.
-    |
-    */
-
-    'docs_site_url' => env('DOCS_SITE_URL', 'https://dns-manager-docs.example.com'),
-
-    /*
-    |--------------------------------------------------------------------------
     | Force HTTPS
     |--------------------------------------------------------------------------
     |

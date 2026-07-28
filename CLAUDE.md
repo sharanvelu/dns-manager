@@ -3,7 +3,7 @@
 Read **[AGENTS.md](AGENTS.md)** first — it is the canonical agent guide (commands, conventions, gotchas, docs contract). [ARCHITECTURE.md](ARCHITECTURE.md) covers system design; [DESIGN.md](DESIGN.md) covers UI conventions.
 
 > ## ⚠️ Documentation sync rule
-> `AGENTS.md`, `CLAUDE.md`, `ARCHITECTURE.md`, `DESIGN.md`, and `docs/content/*.md` MUST be updated in the same change set as any application change they describe. Never finish a task leaving these files stale. Bump `VERSION` on releases.
+> `AGENTS.md`, `CLAUDE.md`, `ARCHITECTURE.md`, `DESIGN.md`, and the docs-site pages (`docs-site/app/docs/**/page.tsx` + `docs-site/lib/registry.ts`) MUST be updated in the same change set as any application change they describe. Never finish a task leaving these files stale. Bump `VERSION` on releases.
 
 ## Quick reference
 
@@ -21,7 +21,7 @@ npm run analyze && npm run build    # tsc --noEmit + Vite build
 - Secrets: `encrypted:array` cast on `providers.config` (credentials) AND `zone_providers.config` (per-zone settings) — never expose either raw in Inertia props.
 - Tests run on sqlite `:memory:` → keep SQL portable (no `ilike`).
 - Vite preloading is deliberately disabled (nginx 502 via oversized `Link` header) — see AGENTS.md gotchas before touching.
-- User docs live in `docs/content/` and are served by BOTH the in-app `/docs` endpoint (installed version) and `docs-site/` (Next.js, latest version). Behavior changes ⇒ update the matching `docs/content` page.
+- User docs live in `docs-site/` (Next.js; content authored as TSX pages under `app/docs/**` + `lib/registry.ts`). One build serves both deployments: baked into the Docker image at `/docs` (installed version) and Vercel (`/` landing + `/docs` latest). Behavior changes ⇒ update the matching docs-site page.
 
 ## Claude-specific notes
 

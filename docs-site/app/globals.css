@@ -59,13 +59,6 @@
   --color-accent: var(--docs-accent);
   --color-accent-soft: var(--docs-accent-soft);
   --color-accent-fg: var(--docs-accent-fg);
-
-  --color-card-1: var(--docs-card-1);
-  --color-card-2: var(--docs-card-2);
-  --color-card-3: var(--docs-card-3);
-  --color-card-4: var(--docs-card-4);
-  --color-card-5: var(--docs-card-5);
-  --color-card-6: var(--docs-card-6);
 }
 
 @layer base {
@@ -91,4 +84,64 @@
     outline: 2px solid var(--docs-accent);
     outline-offset: 2px;
   }
+}
+
+/* ── Gradient helpers (structural gradient tokens only) ─────────────── */
+
+/* Gradient-filled text (hero headline, 404, closing CTA). */
+.gradient-text {
+  background-image: linear-gradient(
+    100deg,
+    var(--docs-gradient-from),
+    var(--docs-gradient-via) 55%,
+    var(--docs-gradient-to)
+  );
+  background-clip: text;
+  color: transparent;
+}
+
+/* Solid gradient chip/mark (logo, step badges, provider marks). */
+.gradient-mark {
+  background: linear-gradient(
+    135deg,
+    var(--docs-gradient-from),
+    var(--docs-gradient-via) 55%,
+    var(--docs-gradient-to)
+  );
+}
+
+/* Primary CTA button surface. */
+.gradient-cta {
+  background: linear-gradient(
+    100deg,
+    var(--docs-gradient-from),
+    var(--docs-gradient-via) 55%,
+    var(--docs-gradient-to)
+  );
+}
+
+/* 1px gradient rule (header underline, section dividers). */
+.gradient-hairline {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--docs-gradient-from) 25%,
+    var(--docs-gradient-via) 50%,
+    var(--docs-gradient-to) 75%,
+    transparent
+  );
+  opacity: 0.35;
+}
+
+/* ── Sidebar active state (per-group hue via --group-hue) ───────────── */
+
+.sidebar-link-active {
+  color: var(--group-hue, var(--docs-accent));
+  background-color: color-mix(
+    in srgb,
+    var(--group-hue, var(--docs-accent)) 10%,
+    transparent
+  );
+  box-shadow: inset 2px 0 0 var(--group-hue, var(--docs-accent));
 }

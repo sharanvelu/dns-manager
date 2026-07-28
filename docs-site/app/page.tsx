@@ -1,70 +1,35 @@
 import type { Metadata } from "next";
-import FeatureCard from "@/components/landing/FeatureCard";
+import Features from "@/components/landing/Features";
 import Footer from "@/components/landing/Footer";
 import Hero from "@/components/landing/Hero";
-import Providers from "@/components/landing/Providers";
-import {
-  getDoc,
-  getFeatureCards,
-  getNav,
-  getSection,
-  getVersion,
-  markdownToHtml,
-} from "@/lib/docs";
-import { docHref } from "@/lib/site";
+import HowItWorks from "@/components/landing/HowItWorks";
+import ProviderShowcase from "@/components/landing/ProviderShowcase";
+import { getVersion } from "@/lib/version";
+import { siteConfig } from "@/lib/site";
 
-const FALLBACK_PITCH =
-  "Manage DNS entries across multiple providers from one place.";
+/**
+ * Product landing page, served at `/` (Vercel deployment only — the
+ * Docker image mounts out/docs/ alone, where `/` remains the Laravel
+ * app). All claims sourced from the docs overview, README.md and
+ * ARCHITECTURE.md.
+ */
 
-export function generateMetadata(): Metadata {
-  const index = getDoc("index");
-  return {
-    title: "DNS Manager Docs",
-    description: index?.description || FALLBACK_PITCH,
-  };
-}
+export const metadata: Metadata = {
+  title: `${siteConfig.name} — self-hosted multi-provider DNS`,
+  description:
+    "Manage DNS entries across Cloudflare, Pi-hole and Technitium from one place — zones, automatic pushes, drift detection, RBAC and a full audit trail.",
+};
 
-export default async function LandingPage() {
+export default function LandingPage() {
   const version = getVersion();
-  const index = getDoc("index");
-  const nav = getNav();
-
-  const pitch = index?.description || FALLBACK_PITCH;
-  const features = index ? await getFeatureCards(index.markdown) : [];
-  const providersMd = index
-    ? getSection(index.markdown, "supported providers")
-    : undefined;
-  const providersHtml = providersMd ? await markdownToHtml(providersMd) : "";
-
-  const getStartedHref = nav.some((d) => d.slug === "installation")
-    ? "/installation/"
-    : nav.find((d) => d.slug !== "index")
-      ? docHref(nav.find((d) => d.slug !== "index")!.slug)
-      : "/";
 
   return (
     <>
-      <Hero version={version} pitch={pitch} getStartedHref={getStartedHref} />
-
-      {features.length > 0 && (
-        <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-6">
-          <p className="mb-2 text-center text-xs font-semibold uppercase tracking-[0.1em] text-accent">
-            Features
-          </p>
-          <h2 className="mb-10 text-center text-2xl font-semibold tracking-tight">
-            Everything your homelab DNS needs
-          </h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {features.map((feature, i) => (
-              <FeatureCard key={i} feature={feature} index={i} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {providersHtml && <Providers html={providersHtml} />}
-
-      <Footer version={version} getStartedHref={getStartedHref} />
+      <Hero version={version} />
+      <HowItWorks />
+      <Features />
+      <ProviderShowcase />
+      <Footer version={version} />
     </>
   );
 }

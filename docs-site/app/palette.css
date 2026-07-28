@@ -3,15 +3,12 @@
  *
  * Every accent color on the docs site flows through the tokens below.
  * Re-theming the site is a ONE-FILE edit: change these values and nothing
- * else. No component, page, or prose rule may use a raw accent color
+ * else. No component, page, or CSS rule may use a raw accent color
  * literal — they reference these tokens only. (The neutral zinc scale
  * lives in globals.css.)
  *
- * Mirrors the in-app docs palette (resources/css/docs-palette.css in the
- * main repo) — keep token names and values in sync.
- *
  * Current identity: "emerald evolved" — emerald accent with an
- * emerald → teal → cyan structural gradient.
+ * emerald → teal → cyan structural gradient, plus one hue per docs group.
  */
 
 :root {
@@ -20,10 +17,20 @@
   --docs-accent-soft: rgb(5 150 105 / 0.11); /* tinted fills behind accent text */
   --docs-accent-fg: #ffffff; /* text on solid accent surfaces */
 
-  /* Structural gradient — hero glow, logo mark, decorative edges. */
+  /* Structural gradient — hero glow, logo mark, CTAs, section accents. */
   --docs-gradient-from: #10b981; /* emerald-500 */
   --docs-gradient-via: #14b8a6; /* teal-500 */
   --docs-gradient-to: #06b6d4; /* cyan-500 */
+
+  /* Per-group hues — sidebar chips, card icons, group accents. */
+  --docs-group-installation: #059669; /* emerald-600 */
+  --docs-group-authentication: #7c3aed; /* violet-600 */
+  --docs-group-dashboard: #2563eb; /* blue-600 */
+  --docs-group-zones: #0d9488; /* teal-600 */
+  --docs-group-dns-entries: #0891b2; /* cyan-600 */
+  --docs-group-providers: #d97706; /* amber-600 */
+  --docs-group-users: #e11d48; /* rose-600 */
+  --docs-group-activity: #4f46e5; /* indigo-600 */
 
   /* Callouts — GitHub's five-alert vocabulary. */
   --docs-callout-note: #2563eb; /* blue-600 */
@@ -36,14 +43,6 @@
   --docs-callout-warning-bg: rgb(217 119 6 / 0.07);
   --docs-callout-caution: #dc2626; /* red-600 */
   --docs-callout-caution-bg: rgb(220 38 38 / 0.06);
-
-  /* Feature-card hues — landing page cards cycle through these. */
-  --docs-card-1: #059669; /* emerald-600 */
-  --docs-card-2: #0891b2; /* cyan-600 */
-  --docs-card-3: #7c3aed; /* violet-600 */
-  --docs-card-4: #d97706; /* amber-600 */
-  --docs-card-5: #e11d48; /* rose-600 */
-  --docs-card-6: #2563eb; /* blue-600 */
 }
 
 .dark {
@@ -55,6 +54,15 @@
   --docs-gradient-via: #2dd4bf; /* teal-400 */
   --docs-gradient-to: #22d3ee; /* cyan-400 */
 
+  --docs-group-installation: #34d399; /* emerald-400 */
+  --docs-group-authentication: #a78bfa; /* violet-400 */
+  --docs-group-dashboard: #60a5fa; /* blue-400 */
+  --docs-group-zones: #2dd4bf; /* teal-400 */
+  --docs-group-dns-entries: #22d3ee; /* cyan-400 */
+  --docs-group-providers: #fbbf24; /* amber-400 */
+  --docs-group-users: #fb7185; /* rose-400 */
+  --docs-group-activity: #818cf8; /* indigo-400 */
+
   --docs-callout-note: #60a5fa; /* blue-400 */
   --docs-callout-note-bg: rgb(96 165 250 / 0.09);
   --docs-callout-tip: #34d399; /* emerald-400 */
@@ -65,11 +73,4 @@
   --docs-callout-warning-bg: rgb(251 191 36 / 0.08);
   --docs-callout-caution: #f87171; /* red-400 */
   --docs-callout-caution-bg: rgb(248 113 113 / 0.09);
-
-  --docs-card-1: #34d399; /* emerald-400 */
-  --docs-card-2: #22d3ee; /* cyan-400 */
-  --docs-card-3: #a78bfa; /* violet-400 */
-  --docs-card-4: #fbbf24; /* amber-400 */
-  --docs-card-5: #fb7185; /* rose-400 */
-  --docs-card-6: #60a5fa; /* blue-400 */
 }

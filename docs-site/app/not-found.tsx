@@ -9,13 +9,7 @@ export const metadata: Metadata = {
 export default function NotFound() {
   return (
     <div className="flex min-h-[70vh] flex-col items-center justify-center px-4 text-center">
-      <p
-        className="bg-clip-text text-7xl font-semibold tracking-tighter text-transparent sm:text-8xl"
-        style={{
-          backgroundImage:
-            "linear-gradient(100deg, var(--docs-gradient-from), var(--docs-gradient-via) 55%, var(--docs-gradient-to))",
-        }}
-      >
+      <p className="gradient-text text-7xl font-semibold tracking-tighter sm:text-8xl">
         404
       </p>
       <h1 className="mt-4 text-xl font-semibold tracking-tight">
@@ -25,8 +19,8 @@ export default function NotFound() {
         This page does not exist in the DNS Manager documentation.
       </p>
       <Link
-        href="/"
-        className="mt-6 inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-5 text-sm font-medium text-accent-fg shadow-sm transition-opacity hover:opacity-90"
+        href="/docs/"
+        className="gradient-cta mt-6 inline-flex h-10 items-center gap-2 rounded-lg px-5 text-sm font-medium text-accent-fg shadow-sm transition-opacity hover:opacity-90"
       >
         <ArrowLeft size={15} strokeWidth={1.75} />
         Back to the docs

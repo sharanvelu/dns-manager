@@ -1,7 +1,7 @@
 # AGENTS.md — Guide for AI Agents
 
 Canonical orientation file for any AI agent working in this repository.
-Companion files: [ARCHITECTURE.md](ARCHITECTURE.md) (system design), [DESIGN.md](DESIGN.md) (UI/UX conventions), [docs/content/](docs/content/) (user-facing documentation).
+Companion files: [ARCHITECTURE.md](ARCHITECTURE.md) (system design), [DESIGN.md](DESIGN.md) (UI/UX conventions), [docs-site/](docs-site/) (user-facing documentation — Next.js, content authored as TSX pages).
 
 > ## ⚠️ Documentation sync rule (read this first)
 >
@@ -10,7 +10,7 @@ Companion files: [ARCHITECTURE.md](ARCHITECTURE.md) (system design), [DESIGN.md]
 > - `AGENTS.md`, `CLAUDE.md` — commands, conventions, gotchas
 > - `ARCHITECTURE.md` — data model, connectors, sync engine, deployment
 > - `DESIGN.md` — UI patterns, components, status colors
-> - `docs/content/*.md` — user-facing docs (rendered at the in-app `/docs` endpoint AND built into the public docs site)
+> - `docs-site/app/docs/**/page.tsx` — user-facing docs (one Next.js site: baked into the Docker image at `/docs` AND deployed to Vercel; content lives IN the TSX pages + `docs-site/lib/registry.ts`)
 > - `VERSION` — bump on every release
 >
 > If you add a route, change a form, alter sync semantics, add a connector, or modify deployment — update the matching doc before finishing. Do not leave documentation drift behind.
@@ -49,7 +49,7 @@ app/Connectors/          # provider integrations — see ARCHITECTURE.md
 app/Jobs/                # SyncEntryToProvider, DeleteEntryFromProvider, CheckProviderDrift, CheckProviderHealth
 app/Services/            # SyncService (attachment targeting + push/delete), ZoneAttachmentService (zoneless auto-attach), DnsEntryImporter (CSV)
 app/Policies/            # DnsZonePolicy — every zone-scoped ability (see RBAC convention below)
-app/Support/             # shared pipelines: EntryQuery + EntryPresenter (global entries page AND zone records page), ActivityQuery (settings + zone activity), ZonePermissions (zoneCan props), DnsEntryRules, DocsRepository, Gravatar
+app/Support/             # shared pipelines: EntryQuery + EntryPresenter (global entries page AND zone records page), ActivityQuery (settings + zone activity), ZonePermissions (zoneCan props), DnsEntryRules, Gravatar
 app/Http/Controllers/    # Dashboard, DnsEntry(+Bulk), Zone, ZoneProvider, Provider, ProviderImport, User, ZoneAccess (grants), ActivityLog (thin delegate to ActivityQuery), Auth\Oidc, Settings
 resources/js/pages/      # Inertia React pages (dashboard, entries/, zones/{index,records,providers,activity,access}, providers/, users/{index,show}, auth/, settings/)
 resources/js/components/entries/   # shared EntriesView + dialogs — serves /entries AND /zones/{id}/records via EntriesScope
@@ -57,8 +57,7 @@ resources/js/components/activity/  # shared ActivityTable — serves settings ac
 resources/js/components/zones/     # zone dialogs (form/delete/attach/detach/attachment-config/import-records); zone-tabs.tsx header lives one level up
 resources/js/components/users/     # GrantDialog — shared zone-access grant/edit dialog (user detail page AND zone Access tab); nav-group.tsx (collapsible sidebar group) lives one level up
 resources/js/components/icons/     # custom SVG icon set (original artwork; provider marks are real brand logos — see DESIGN.md)
-docs/content/            # user documentation source (markdown + frontmatter) — single source
-docs-site/               # standalone Next.js docs site (latest-version docs; deployed via Vercel, not Docker)
+docs-site/               # THE documentation (Next.js static export): / = product landing, /docs = docs; content authored as TSX pages (app/docs/**), page metadata in lib/registry.ts; baked into the Docker image at /docs AND deployed to Vercel
 k8s/                     # Kubernetes manifests; docker/ holds nginx/fpm/supervisor configs
 routes/web.php           # all app routes; routes/auth.php OIDC; routes/api.php automation hooks
 routes/console.php       # the schedule (Laravel 12 has no console Kernel — this file IS the scheduler)
@@ -98,26 +97,22 @@ routes/console.php       # the schedule (Laravel 12 has no console Kernel — th
 - **Bulk actions silently shrink the selection**: ids in zones where the actor lacks a record-managing grant (and ids that no longer exist) are dropped, not 403'd (`DnsEntryBulkController::selectedEntries()`). Note it pins to zone-admin/zone-dns-manager grants directly — `accessibleZoneIds()` would wrongly treat Super Viewer as unrestricted here.
 - **The dashboard never 403s**: every persona can load `/dashboard`; it scopes its stats/zones/feed via `accessibleZoneIds()` and renders a no-access state off the `noAccess` prop instead of aborting. Don't add auth middleware or aborts to it.
 
-## The documentation system (three consumers, one source)
+## The documentation system (one Next.js site, two deployments)
 
-`docs/content/*.md` is the single source. Frontmatter contract:
+`docs-site/` is THE documentation — a Next.js 15 static export with **all content authored as TSX pages** (no markdown, no external content files):
 
-```yaml
----
-title: DNS Entries        # nav + page title
-nav_order: 3              # sidebar ordering (index.md = 1)
-description: One-liner    # meta/description
----
-```
+- **Routes**: `/` = product landing page; `/docs` = docs home; `/docs/<group>/<page>/` = content pages, real static routes under `docs-site/app/docs/`. Groups (order): Installation, Authentication, Dashboard, Zones, DNS Entries, Providers, Users, Activity.
+- **Adding/editing a docs page** = edit the page's TSX (`app/docs/<group>/<page>/page.tsx`, pattern: `export const metadata = docMetadata(group, slug)` + `<DocArticle group slug>…JSX prose…</DocArticle>`) AND its entry in `docs-site/lib/registry.ts` ({group, slug, title, description, order, headings} — drives the sidebar, prev/next, and ⌘K search).
+- **Component kit** (`docs-site/components/docs/`): `DocArticle` (page shell: sidebar/TOC/pager), `Cards`/`Card`, `Steps`/`Step`, `Screenshot` (theme-aware pair from `public/docs/images/screenshots/<src>-{light,dark}.png`), `Callout`, `CodeBlock` (build-time Shiki, dual themes), `H2`/`H3` (auto GitHub-style anchor ids). Bare `<p>/<ul>/<table>/<a>` inside `DocArticle` are styled by the prose layer.
+- **Asset layout**: no basePath; `assetPrefix: '/docs'` + `scripts/finalize-export.mjs` keep every runtime asset under the `/docs/` URL space, so `out/docs/` is fully self-contained.
 
-Consumers:
-1. **In-app endpoint** `GET /docs[/{slug}]` (public, Inertia page `docs/show` with its own guest shell) — serves the docs for *the installed version*. Rendered server-side by `App\Support\DocsRepository`: CommonMark env with GFM + heading permalinks (ids on h2–h3) + Phiki dual-theme syntax highlighting + GitHub-style callouts (`> [!NOTE|TIP|IMPORTANT|WARNING|CAUTION]`) + relative-link rewriting to `/docs/...`; renders are cached by content hash (bump `DocsRepository::PIPELINE_REV` when the pipeline changes). The sidebar links to the latest-version site (`config('app.docs_site_url')`).
-2. **`docs-site/`** (Next.js, static export) — public site for *the latest version*, with a header pill telling users on older versions to open `/docs` on their own instance. Same markdown feature set (unified/remark + Shiki + callouts). Deployed on **Vercel** straight from the repo (root directory `docs-site`); there is deliberately no Dockerfile, nginx config, k8s manifest, or CI build for it.
-3. Humans reading the repo.
+Two deployments of the same build:
+1. **In the Docker image**: the Dockerfile's `docs` stage builds docs-site and copies `out/docs` → `public/docs`; nginx serves it statically at `/docs` (and ONLY `/docs` — the landing page is not exposed in-container). Docs are baked at image build time → an installed instance's `/docs` always matches its version. There is no PHP/Laravel involvement.
+2. **Vercel** (project root `docs-site`, serves all of `out/`): `/` landing + `/docs` latest docs.
 
-When app behavior changes, update the relevant `docs/content` page — both consumers pick it up automatically (endpoint at runtime, site at next build).
+When app behavior changes, update the matching `docs-site/app/docs/**/page.tsx` in the same change set.
 
-Docs UI accent colors are **pluggable**: every accent flows through the semantic tokens in `resources/css/docs-palette.css` (in-app) and `docs-site/app/palette.css` (public site — same token names). To re-theme the docs, edit those two files only; never hard-code accent colors in docs components or prose CSS.
+Docs accent colors are **pluggable**: every accent flows through the semantic tokens in `docs-site/app/palette.css` (single file, `:root` + `.dark`). To re-theme the docs, edit that file only; never hard-code accent colors in docs components or prose CSS. The docs-site intentionally does NOT follow the app's restrained design language (user decision, 2026-07-29).
 
 ## Adding a DNS provider connector
 

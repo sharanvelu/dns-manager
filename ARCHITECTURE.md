@@ -136,11 +136,13 @@ Enums live in `app/Enums`: `RecordType`, `SyncStatus`, `HealthStatus`, `Provider
 
 ## Documentation system
 
-`docs/content/*.md` (frontmatter: `title`, `nav_order`, `description`) is the single source rendered by:
-1. `GET /docs[/{slug}]` — public in-app endpoint, an Inertia page (`docs/show`) with its own guest-accessible shell. `App\Support\DocsRepository` renders markdown server-side (CommonMark: GFM + heading permalinks + Phiki dual-theme highlighting + GitHub-style callouts + relative-link rewriting) and ships the page HTML, an h2/h3 outline for the "On this page" rail, and a plain-text search index for the ⌘K dialog; renders are cached by content hash + `PIPELINE_REV` + app version. Sidebar links to the latest docs at DOCS_SITE_URL.
-2. `docs-site/` — standalone Next.js static site for the latest version (deployed on Vercel directly from the repo — no Docker image), same markdown feature set via unified/remark + Shiki; header pill: "for your installed version, open /docs on your instance".
+All documentation is `docs-site/` — a Next.js 15 static export whose content is authored as TSX pages (`app/docs/<group>/<page>/page.tsx` + metadata in `lib/registry.ts`); there are no markdown content files and no server-side rendering. Routes: `/` product landing, `/docs` documentation (8 groups: Installation, Authentication, Dashboard, Zones, DNS Entries, Providers, Users, Activity). `assetPrefix: '/docs'` plus a post-export step make `out/docs/` fully self-contained.
 
-Docs accent theming is centralized in `resources/css/docs-palette.css` and `docs-site/app/palette.css` (identical semantic token names) — a docs re-theme edits only those two files.
+One build, two deployments:
+1. **Docker image**: the Dockerfile's `docs` stage builds docs-site and copies `out/docs` into `public/docs`; nginx serves it statically at `/docs` only (`absolute_redirect off` keeps redirects ingress-safe). Docs are baked at build time, so an installed instance's `/docs` always documents its own version. The Laravel app has no docs code.
+2. **Vercel** (project root `docs-site`): serves all of `out/` — `/` landing + `/docs` latest docs.
+
+`VERSION` (repo root) → `config('app.version')` and the docs-site version pill. Docs accent theming is centralized in `docs-site/app/palette.css` (single pluggable palette file).
 
 `VERSION` (repo root) → `config('app.version')` and the docs-site build. `DOCS_SITE_URL` env → `config('app.docs_site_url')`.
 

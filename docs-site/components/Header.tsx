@@ -1,34 +1,28 @@
-import { Globe } from "lucide-react";
 import Link from "next/link";
-import type { NavGroup } from "@/lib/site";
-import { siteConfig } from "@/lib/site";
+import DocIcon from "@/components/DocIcon";
+import { navGroups } from "@/lib/registry";
+import { DOCS_HOME_URL, siteConfig } from "@/lib/site";
 import GitHubIcon from "./GitHubIcon";
 import MobileNav from "./MobileNav";
 import SearchDialog from "./SearchDialog";
 import ThemeToggle from "./ThemeToggle";
 
-export default function Header({
-  version,
-  groups,
-}: {
-  version: string;
-  groups: NavGroup[];
-}) {
+export default function Header({ version }: { version: string }) {
+  const groups = navGroups();
+
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-md">
+      {/* Gradient hairline under the header. */}
+      <div aria-hidden="true" className="gradient-hairline absolute inset-x-0 bottom-0" />
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4 sm:px-6">
         <MobileNav groups={groups} version={version} />
 
         <Link href="/" className="flex min-w-0 items-center gap-2.5">
           <span
             aria-hidden="true"
-            className="flex size-7 shrink-0 items-center justify-center rounded-lg text-accent-fg shadow-sm"
-            style={{
-              background:
-                "linear-gradient(135deg, var(--docs-gradient-from), var(--docs-gradient-via) 55%, var(--docs-gradient-to))",
-            }}
+            className="gradient-mark flex size-7 shrink-0 items-center justify-center rounded-lg text-accent-fg shadow-sm"
           >
-            <Globe size={15} strokeWidth={1.75} />
+            <DocIcon name="globe" size={15} />
           </span>
           <span className="truncate text-[15px] font-semibold tracking-tight">
             {siteConfig.name}
@@ -40,6 +34,15 @@ export default function Header({
             v{version}
           </span>
         </Link>
+
+        <nav className="ml-4 hidden items-center gap-1 lg:flex" aria-label="Primary">
+          <Link
+            href={DOCS_HOME_URL}
+            className="rounded-md px-2.5 py-1.5 text-[13px] font-medium text-muted transition-colors hover:bg-background-soft hover:text-foreground"
+          >
+            Documentation
+          </Link>
+        </nav>
 
         <div className="ml-auto flex items-center gap-1">
           <SearchDialog />

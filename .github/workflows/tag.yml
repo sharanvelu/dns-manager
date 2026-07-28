@@ -54,9 +54,10 @@ jobs:
           changed=$(git diff --name-only "$before" HEAD)
           echo "Changed files:"; echo "$changed"
 
-          # Meta-only merges (docs, workflows, k8s manifests, markdown)
-          # don't cut a release.
-          code=$(grep -vE '^(\.github/|docs-site/|k8s/|graphify-out/)|\.md$' <<< "$changed" || true)
+          # Meta-only merges (workflows, k8s manifests, markdown) don't cut
+          # a release. docs-site/ is NOT excluded: the docs static export
+          # ships inside the image, so docs-site changes are releases.
+          code=$(grep -vE '^(\.github/|k8s/|graphify-out/)|\.md$' <<< "$changed" || true)
           if [ -z "$code" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "No app-code changes — skipping release."

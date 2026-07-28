@@ -39,7 +39,6 @@ jobs:
               - 'composer.lock'
               - 'phpunit.xml'
               - '.env.example'
-              - 'docs/content/**'
               - '.github/workflows/tests.yml'
               - '.github/actions/setup/**'
             js:

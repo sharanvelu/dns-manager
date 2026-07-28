@@ -3,7 +3,6 @@
 declare(strict_types = 1);
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\DocsController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ZoneController;
 use App\Http\Controllers\ProfileController;
@@ -18,10 +17,8 @@ use App\Http\Controllers\ProviderImportController;
 
 Route::redirect('/', '/dashboard')->name('home');
 
-// Public: documentation for the INSTALLED version (see docs/content).
-Route::get('docs/{page?}', DocsController::class)
-    ->where('page', '[a-z0-9\-]+')
-    ->name('docs');
+// Documentation is a static site served by nginx at /docs (built from
+// docs-site/ into public/docs at image build time) — no Laravel route.
 
 Route::middleware(['auth'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');

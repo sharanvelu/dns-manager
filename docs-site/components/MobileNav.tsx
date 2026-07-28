@@ -3,9 +3,12 @@
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
-import type { NavGroup } from "@/lib/site";
-import { docHref, siteConfig } from "@/lib/site";
+import DocIcon from "@/components/DocIcon";
+import type { NavGroup } from "@/lib/registry";
+import { pageUrl } from "@/lib/registry";
+import { siteConfig } from "@/lib/site";
 import GitHubIcon from "./GitHubIcon";
 
 export default function MobileNav({
@@ -17,6 +20,7 @@ export default function MobileNav({
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const normalized = pathname.endsWith("/") ? pathname : `${pathname}/`;
 
   // Close on navigation.
   useEffect(() => {
@@ -77,29 +81,53 @@ export default function MobileNav({
 
             <nav
               aria-label="Documentation"
-              className="flex-1 space-y-7 overflow-y-auto px-3 py-5"
+              className="flex-1 space-y-6 overflow-y-auto px-3 py-5"
             >
+              <Link
+                href="/docs/"
+                className={
+                  normalized === "/docs/"
+                    ? "block rounded-md bg-accent-soft px-2.5 py-1.5 text-sm font-medium text-accent"
+                    : "block rounded-md px-2.5 py-1.5 text-sm text-muted transition-colors hover:bg-background-soft hover:text-foreground"
+                }
+              >
+                Docs home
+              </Link>
               {groups.map((group) => (
-                <div key={group.title}>
-                  <p className="mb-2 px-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-faint">
-                    {group.title}
+                <div
+                  key={group.dir}
+                  style={{ "--group-hue": `var(${group.hue})` } as CSSProperties}
+                >
+                  <p className="mb-1.5 flex items-center gap-2 px-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-faint">
+                    <span
+                      aria-hidden="true"
+                      className="flex size-5 items-center justify-center rounded-md"
+                      style={{
+                        color: "var(--group-hue)",
+                        backgroundColor:
+                          "color-mix(in srgb, var(--group-hue) 12%, transparent)",
+                      }}
+                    >
+                      <DocIcon name={group.icon} size={12} strokeWidth={2} />
+                    </span>
+                    {group.label}
                   </p>
                   <ul className="space-y-0.5">
                     {group.items.map((item) => {
-                      const href = docHref(item.slug);
-                      const active = pathname === href;
+                      const href = pageUrl(item);
+                      const active = normalized === href;
                       return (
-                        <li key={item.slug}>
+                        <li key={href}>
                           <Link
                             href={href}
                             aria-current={active ? "page" : undefined}
                             className={
                               active
-                                ? "block rounded-md bg-accent-soft px-2.5 py-1.5 text-sm font-medium text-accent"
+                                ? "sidebar-link sidebar-link-active block rounded-md px-2.5 py-1.5 text-sm font-medium"
                                 : "block rounded-md px-2.5 py-1.5 text-sm text-muted transition-colors hover:bg-background-soft hover:text-foreground"
                             }
                           >
-                            {item.title}
+                            {item.slug === "" ? "Overview" : item.title}
                           </Link>
                         </li>
                       );
