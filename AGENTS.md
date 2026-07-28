@@ -124,4 +124,4 @@ Docs accent colors are **pluggable**: every accent flows through the semantic to
 3. Register in `ConnectorRegistry::$connectors` — nothing else needs registering; both config schemas, capabilities, and auto-attachment flow from the class via `descriptors()`.
 4. Add a provider mark icon in `resources/js/components/icons/` and map it in `resources/js/components/entries/helpers.tsx` + `pages/providers/lib.ts`.
 5. Pest tests with `Http::fake()` fixtures of real API payloads (include `testZone`/`discoverZoneConfig` cases for zoned connectors).
-6. Update `ARCHITECTURE.md`, `docs/content/providers.md`, and this file's layout section if needed.
+6. Update `ARCHITECTURE.md`, the docs-site Providers pages (`docs-site/app/docs/providers/` — add a connector page + registry entry, and extend the capability matrix on the group index), and this file's layout section if needed.

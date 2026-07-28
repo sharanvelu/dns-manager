@@ -117,6 +117,13 @@ export const PAGES: DocPage[] = [
       "Scheduler",
       "External automation (webhooks)",
       "Activity retention",
+      "Advanced & framework variables",
+      "Application extras",
+      "Database & Redis extras",
+      "Queue behavior",
+      "Cache & sessions",
+      "Logging",
+      "Maintenance, mail & unused drivers",
     ],
   },
   {

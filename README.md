@@ -6,7 +6,7 @@ Manage DNS entries across multiple providers from one place. Records live in **D
 
 ## Documentation
 
-- **User docs**: source of truth in [`docs/content/`](docs/content/) — served by your running instance at **`/docs`** (matching your installed version) and published for the latest version by the standalone [`docs-site/`](docs-site/) (Next.js, deployed on Vercel).
+- **User docs**: [`docs-site/`](docs-site/) (Next.js, content authored as TSX pages) — served by your running instance at **`/docs`** (baked into the image, matching your installed version) and deployed on Vercel for the latest version (with the product landing at `/`).
 - **Agent/contributor docs**: [AGENTS.md](AGENTS.md) (start here), [ARCHITECTURE.md](ARCHITECTURE.md), [DESIGN.md](DESIGN.md), [CLAUDE.md](CLAUDE.md).
 
 > ⚠️ These docs are kept in sync with the code as a hard rule: any change to the application must update the matching documentation in the same change set. See AGENTS.md.
