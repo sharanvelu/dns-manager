@@ -71,7 +71,7 @@ RUN composer dump-autoload \
 # ---------------------------------------------------------------------------
 # Stage 4: runtime (php-fpm + nginx under supervisord, non-root)
 # ---------------------------------------------------------------------------
-FROM php:8.4-fpm-alpine AS runtime
+FROM php:8.4.27-fpm-alpine AS runtime
 
 # PHP extensions via mlocati/php-extension-installer.
 # Redis client is predis (pure PHP) -> no redis extension needed.
