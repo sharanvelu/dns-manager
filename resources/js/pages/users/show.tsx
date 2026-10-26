@@ -9,12 +9,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ForcePasswordResetButton } from '@/components/users/force-password-reset-button';
 import { GrantDialog } from '@/components/users/grant-dialog';
+import { SsoOnlyToggle } from '@/components/users/sso-only-toggle';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { LoaderCircle, MailPlus, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
+import { LoaderCircle, MailPlus, MoreHorizontal, Pencil, Plus, ShieldCheck, ShieldOff, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { timeAgo, type ManagedUser, type RoleOption, type ZoneGrantItem } from './types';
 
@@ -26,23 +28,50 @@ interface UserShowProps {
     grantableZones: Array<{ id: number; name: string }>;
     canManage: boolean;
     basicEnabled: boolean;
+    ssoEnabled: boolean;
 }
 
 function sameRoles(a: string[], b: string[]): boolean {
     return a.length === b.length && [...a].sort().every((role, index) => role === [...b].sort()[index]);
 }
 
-function DetailsCard({ user, canManage, basicEnabled }: { user: ManagedUser; canManage: boolean; basicEnabled: boolean }) {
+function DetailsCard({
+    user,
+    canManage,
+    basicEnabled,
+    ssoEnabled,
+    isSelf,
+}: {
+    user: ManagedUser;
+    canManage: boolean;
+    basicEnabled: boolean;
+    ssoEnabled: boolean;
+    isSelf: boolean;
+}) {
     const { data, setData, put, processing, errors, isDirty } = useForm({ name: user.name, email: user.email, roles: user.roles });
     const [resending, setResending] = useState(false);
+    const [resettingTwoFactor, setResettingTwoFactor] = useState(false);
+    const [resetBusy, setResetBusy] = useState(false);
     const { errors: pageErrors } = usePage().props as unknown as { errors: Record<string, string> };
 
     // SSO users' name/email are refreshed from the identity provider on every login.
     const editable = canManage && !user.ssoLinked;
 
-    const methods = [user.ssoLinked ? 'Single sign-on' : null, user.hasPassword ? 'Password' : null].filter(Boolean);
+    const methods =
+        user.ssoOnly && ssoEnabled
+            ? ['Single sign-on only']
+            : [user.ssoLinked ? 'Single sign-on' : null, user.hasPassword ? 'Password' : null].filter(Boolean);
 
     const save = () => put(route('users.update', user.id), { preserveScroll: true });
+
+    const resetTwoFactor = () => {
+        setResetBusy(true);
+        router.delete(route('users.two-factor.reset', user.id), {
+            preserveScroll: true,
+            onSuccess: () => setResettingTwoFactor(false),
+            onFinish: () => setResetBusy(false),
+        });
+    };
 
     const resend = () => {
         setResending(true);
@@ -98,14 +127,55 @@ function DetailsCard({ user, canManage, basicEnabled }: { user: ManagedUser; can
                             </Badge>
                         ))
                     )}
+                    {!user.invitePending && user.mustChangePassword && (
+                        <Badge variant="outline" className="border-amber-500/40 text-amber-700 dark:text-amber-400">
+                            Password reset required
+                        </Badge>
+                    )}
+                    {user.twoFactorEnabled && (
+                        <Badge variant="secondary" className="gap-1">
+                            <ShieldCheck className="size-3" />
+                            Two-factor
+                        </Badge>
+                    )}
                     {user.invitePending && canManage && basicEnabled && (
                         <Button size="sm" variant="outline" onClick={resend} disabled={resending}>
                             {resending ? <LoaderCircle className="size-3.5 animate-spin" /> : <MailPlus className="size-3.5" />}
                             Resend invite
                         </Button>
                     )}
+                    {user.twoFactorEnabled && canManage && basicEnabled && !isSelf && (
+                        <Button size="sm" variant="outline" onClick={() => setResettingTwoFactor(true)}>
+                            <ShieldOff className="size-3.5" />
+                            Reset two-factor
+                        </Button>
+                    )}
                 </div>
+
+                {ssoEnabled && canManage && <SsoOnlyToggle user={user} canManage={canManage} />}
+
                 <InputError message={pageErrors.user} />
+
+                <Dialog open={resettingTwoFactor} onOpenChange={setResettingTwoFactor}>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>Reset two-factor authentication for {user.name}?</DialogTitle>
+                            <DialogDescription>
+                                Their authenticator app and recovery codes stop working and all of their sessions end. They can sign in with their
+                                password alone and set two-factor up again from their profile.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter className="gap-2">
+                            <Button variant="outline" onClick={() => setResettingTwoFactor(false)}>
+                                Cancel
+                            </Button>
+                            <Button variant="destructive" onClick={resetTwoFactor} disabled={resetBusy}>
+                                {resetBusy && <LoaderCircle className="size-3.5 animate-spin" />}
+                                Reset two-factor
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </div>
         </Card>
     );
@@ -323,10 +393,11 @@ function ZoneAccessCard({
     );
 }
 
-function DangerZoneCard({ user }: { user: ManagedUser }) {
+function DangerZoneCard({ user, basicEnabled, ssoEnabled }: { user: ManagedUser; basicEnabled: boolean; ssoEnabled: boolean }) {
     const [confirming, setConfirming] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const { errors } = usePage().props as unknown as { errors: Record<string, string> };
+    const canForceReset = basicEnabled && user.hasPassword && !(user.ssoOnly && ssoEnabled);
 
     const destroy = () => {
         setDeleting(true);
@@ -346,12 +417,16 @@ function DangerZoneCard({ user }: { user: ManagedUser }) {
                     <p className="text-muted-foreground text-xs">
                         Deleting {user.name} removes their roles and zone grants. It does not block them from signing in again via your identity
                         provider — remove them there too.
+                        {canForceReset && ' Forcing a password reset signs them out everywhere and emails a reset link.'}
                     </p>
                 </div>
-                <Button variant="destructive" size="sm" onClick={() => setConfirming(true)}>
-                    <Trash2 className="size-3.5" />
-                    Delete user
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                    {canForceReset && <ForcePasswordResetButton user={user} />}
+                    <Button variant="destructive" size="sm" onClick={() => setConfirming(true)}>
+                        <Trash2 className="size-3.5" />
+                        Delete user
+                    </Button>
+                </div>
             </div>
 
             <InputError className="mt-2" message={errors.user} />
@@ -380,7 +455,16 @@ function DangerZoneCard({ user }: { user: ManagedUser }) {
     );
 }
 
-export default function UserShow({ managedUser, grants, roleOptions, zoneRoleOptions, grantableZones, canManage, basicEnabled }: UserShowProps) {
+export default function UserShow({
+    managedUser,
+    grants,
+    roleOptions,
+    zoneRoleOptions,
+    grantableZones,
+    canManage,
+    basicEnabled,
+    ssoEnabled,
+}: UserShowProps) {
     const getInitials = useInitials();
     const { auth } = usePage<SharedData>().props;
     const isSelf = managedUser.id === auth.user.id;
@@ -418,7 +502,14 @@ export default function UserShow({ managedUser, grants, roleOptions, zoneRoleOpt
                     </div>
                 </div>
 
-                <DetailsCard key={`${managedUser.name}|${managedUser.email}`} user={managedUser} canManage={canManage} basicEnabled={basicEnabled} />
+                <DetailsCard
+                    key={`${managedUser.name}|${managedUser.email}|${managedUser.ssoOnly}`}
+                    user={managedUser}
+                    canManage={canManage}
+                    basicEnabled={basicEnabled}
+                    ssoEnabled={ssoEnabled}
+                    isSelf={isSelf}
+                />
 
                 {/* key resyncs the checkbox state after a successful save. */}
                 <GlobalRolesCard key={managedUser.roles.join('|')} user={managedUser} roleOptions={roleOptions} canManage={canManage} />
@@ -431,7 +522,7 @@ export default function UserShow({ managedUser, grants, roleOptions, zoneRoleOpt
                     canManage={canManage}
                 />
 
-                {canManage && !isSelf && <DangerZoneCard user={managedUser} />}
+                {canManage && !isSelf && <DangerZoneCard user={managedUser} basicEnabled={basicEnabled} ssoEnabled={ssoEnabled} />}
             </div>
 
             <FlashToast />

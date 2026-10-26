@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\Role;
 use App\Enums\ZoneRole;
 use Illuminate\Support\Str;
+use App\Support\AuthMethods;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Database\Factories\UserFactory;
@@ -47,6 +48,7 @@ class User extends Authenticatable
         'oidc_sub',
         'avatar_url',
         'roles',
+        'sso_only',
     ];
 
     /**
@@ -57,13 +59,15 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
     ];
 
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
             ->useLogName('users')
-            ->logOnly(['name', 'email', 'roles'])
+            ->logOnly(['name', 'email', 'roles', 'sso_only'])
             ->logOnlyDirty()
             ->dontLogEmptyChanges();
     }
@@ -76,7 +80,24 @@ class User extends Authenticatable
     /** Admin-created account that has neither set a password nor signed in via SSO yet. */
     public function isPendingInvite(): bool
     {
-        return $this->password === null && $this->oidc_sub === null;
+        return $this->password === null && $this->oidc_sub === null && $this->passwordLoginAllowed();
+    }
+
+    /** Secret issued but never confirmed with a code — enrollment abandoned or in progress. */
+    public function hasPendingTwoFactor(): bool
+    {
+        return $this->two_factor_secret !== null && $this->two_factor_confirmed_at === null;
+    }
+
+    public function hasTwoFactorEnabled(): bool
+    {
+        return $this->two_factor_confirmed_at !== null;
+    }
+
+    /** SSO-only users never use a password — but the flag is inert while SSO itself is off (no lockout). */
+    public function passwordLoginAllowed(): bool
+    {
+        return ! ($this->sso_only && AuthMethods::sso());
     }
 
     public function sendPasswordResetNotification($token): void
@@ -206,6 +227,11 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'roles' => 'array',
+            'two_factor_secret' => 'encrypted',
+            'two_factor_recovery_codes' => 'encrypted:array',
+            'two_factor_confirmed_at' => 'datetime',
+            'sso_only' => 'boolean',
+            'must_change_password' => 'boolean',
         ];
     }
 }

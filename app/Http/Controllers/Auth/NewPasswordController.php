@@ -42,20 +42,10 @@ class NewPasswordController extends Controller
 
         $invite = $this->isInvite($request);
 
-        $status = Password::broker($request->route('broker'))->reset(
-            $request->only('email', 'password', 'password_confirmation', 'token'),
-            function (User $user, string $password) use ($invite) {
-                $user->forceFill(['password' => $password]);
+        $target = User::query()->where('email', $request->string('email')->toString())->first();
 
-                $user->email_verified_at ??= now();
-                $user->save();
-
-                $user->signOutOtherSessions();
-
-                $event = $invite ? 'password-set' : 'password-reset';
-                activity('auth')->causedBy($user)->performedOn($user)->event($event)->log($event);
-            },
-        );
+        // SSO-only accounts cannot gain a password through any outstanding token.
+        $status = $target && ! $target->passwordLoginAllowed() ? Password::INVALID_TOKEN : $this->resetPassword($request, $invite);
 
         if ($status !== Password::PASSWORD_RESET) {
             throw ValidationException::withMessages([
@@ -68,6 +58,24 @@ class NewPasswordController extends Controller
         return redirect()->route('login')->with('status', $invite
             ? 'Your password is set. You can sign in now.'
             : 'Your password has been reset. You can sign in now.');
+    }
+
+    private function resetPassword(Request $request, bool $invite): string
+    {
+        return Password::broker($request->route('broker'))->reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function (User $user, string $password) use ($invite) {
+                $user->forceFill(['password' => $password, 'must_change_password' => false]);
+
+                $user->email_verified_at ??= now();
+                $user->save();
+
+                $user->signOutOtherSessions();
+
+                $event = $invite ? 'password-set' : 'password-reset';
+                activity('auth')->causedBy($user)->performedOn($user)->event($event)->log($event);
+            },
+        );
     }
 
     private function isInvite(Request $request): bool

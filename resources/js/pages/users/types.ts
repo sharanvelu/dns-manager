@@ -5,6 +5,8 @@ export interface UserListItem {
     avatarUrl: string | null;
     roles: string[];
     invitePending: boolean;
+    ssoOnly: boolean;
+    mustChangePassword: boolean;
     zoneGrantsCount: number;
     createdAt: string;
 }
@@ -19,6 +21,9 @@ export interface ManagedUser {
     invitePending: boolean;
     hasPassword: boolean;
     ssoLinked: boolean;
+    ssoOnly: boolean;
+    mustChangePassword: boolean;
+    twoFactorEnabled: boolean;
 }
 
 export interface RoleOption {

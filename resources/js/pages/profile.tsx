@@ -4,8 +4,10 @@ import { Head, useForm, usePage } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
 
 import AppearanceTabs from '@/components/appearance-tabs';
+import { FlashToast } from '@/components/flash-toast';
 import HeadingSmall from '@/components/heading-small';
 import InputError from '@/components/input-error';
+import { TwoFactorSection, type TwoFactorState } from '@/components/profile/two-factor-section';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,6 +25,8 @@ interface ProfileProps {
     basicEnabled: boolean;
     hasPassword: boolean;
     ssoLinked: boolean;
+    ssoOnly: boolean;
+    twoFactor: TwoFactorState;
 }
 
 function PasswordSection({ hasPassword, ssoLinked }: { hasPassword: boolean; ssoLinked: boolean }) {
@@ -111,7 +115,7 @@ function PasswordSection({ hasPassword, ssoLinked }: { hasPassword: boolean; sso
     );
 }
 
-export default function Profile({ basicEnabled, hasPassword, ssoLinked }: ProfileProps) {
+export default function Profile({ basicEnabled, hasPassword, ssoLinked, ssoOnly, twoFactor }: ProfileProps) {
     const { auth } = usePage<SharedData>().props;
 
     const { data, setData, patch, errors, processing, recentlySuccessful } = useForm({
@@ -180,10 +184,29 @@ export default function Profile({ basicEnabled, hasPassword, ssoLinked }: Profil
                     </form>
                 </div>
 
-                {basicEnabled && (
+                {basicEnabled && !ssoOnly && (
                     <>
                         <Separator className="max-w-xl" />
                         <PasswordSection hasPassword={hasPassword} ssoLinked={ssoLinked} />
+                    </>
+                )}
+
+                {basicEnabled && ssoOnly && (
+                    <>
+                        <Separator className="max-w-xl" />
+                        <div className="max-w-xl">
+                            <HeadingSmall
+                                title="Password"
+                                description="Your administrator has set this account to sign in with single sign-on only."
+                            />
+                        </div>
+                    </>
+                )}
+
+                {basicEnabled && hasPassword && !ssoOnly && (
+                    <>
+                        <Separator className="max-w-xl" />
+                        <TwoFactorSection twoFactor={twoFactor} />
                     </>
                 )}
 
@@ -194,6 +217,8 @@ export default function Profile({ basicEnabled, hasPassword, ssoLinked }: Profil
                     <AppearanceTabs />
                 </div>
             </div>
+
+            <FlashToast />
         </AppLayout>
     );
 }

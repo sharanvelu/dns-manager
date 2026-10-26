@@ -35,12 +35,15 @@ class UserController extends Controller
                     'avatarUrl' => $user->avatar_url,
                     'roles' => $user->roles ?? [],
                     'invitePending' => $user->isPendingInvite(),
+                    'ssoOnly' => $user->sso_only,
+                    'mustChangePassword' => $user->must_change_password,
                     'zoneGrantsCount' => $user->zone_grants_count,
                     'createdAt' => $user->created_at->toIso8601String(),
                 ]),
             'canManage' => Gate::allows('manage-users'),
             'roleOptions' => $this->roleOptions(),
             'basicEnabled' => AuthMethods::basic(),
+            'ssoEnabled' => AuthMethods::sso(),
             'canCreate' => AuthMethods::canCreateUsers(),
         ]);
     }
@@ -56,9 +59,11 @@ class UserController extends Controller
             'email' => ['required', 'email:rfc', 'max:255', 'unique:users,email'],
             'roles' => ['present', 'array'],
             'roles.*' => [Rule::enum(Role::class)],
+            'sso_only' => ['sometimes', 'boolean'],
         ]);
 
         $roles = array_values(array_unique($validated['roles']));
+        $ssoOnly = AuthMethods::sso() && $request->boolean('sso_only');
 
         if (! $request->user()->isSuperAdmin() && in_array(Role::SuperAdmin->value, $roles, true)) {
             return back()->withErrors([
@@ -71,9 +76,10 @@ class UserController extends Controller
             'email' => $validated['email'],
             'roles' => $roles,
             'avatar_url' => Gravatar::url($validated['email']),
+            'sso_only' => $ssoOnly,
         ]);
 
-        if (AuthMethods::basic()) {
+        if (AuthMethods::basic() && ! $ssoOnly) {
             $user->sendInvite();
             activity('auth')->causedBy($request->user())->performedOn($user)->event('invite-sent')->log('invite-sent');
             $message = "{$user->name} created — an email with a link to set their password was sent to {$user->email}.";
@@ -86,6 +92,10 @@ class UserController extends Controller
 
     public function resendInvite(Request $request, User $user): RedirectResponse
     {
+        if (! $user->passwordLoginAllowed()) {
+            return back()->withErrors(['user' => "{$user->name} signs in with single sign-on only — there is no invite to send."]);
+        }
+
         if (! $user->isPendingInvite()) {
             return back()->withErrors(['user' => "{$user->name} has already signed in or set a password."]);
         }
@@ -118,7 +128,11 @@ class UserController extends Controller
                 'invitePending' => $user->isPendingInvite(),
                 'hasPassword' => $user->password !== null,
                 'ssoLinked' => $user->oidc_sub !== null,
+                'ssoOnly' => $user->sso_only,
+                'mustChangePassword' => $user->must_change_password,
+                'twoFactorEnabled' => $user->hasTwoFactorEnabled(),
             ],
+            'ssoEnabled' => AuthMethods::sso(),
             'basicEnabled' => AuthMethods::basic(),
             'grants' => $grants->map(fn (ZoneUser $grant) => [
                 'zoneId' => $grant->dns_zone_id,

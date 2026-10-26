@@ -16,6 +16,7 @@ interface UsersIndexProps {
     canManage: boolean;
     roleOptions: RoleOption[];
     basicEnabled: boolean;
+    ssoEnabled: boolean;
     canCreate: boolean;
 }
 
@@ -26,7 +27,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-function UserRow({ user, isSelf }: { user: UserListItem; isSelf: boolean }) {
+function UserRow({ user, isSelf, ssoEnabled }: { user: UserListItem; isSelf: boolean; ssoEnabled: boolean }) {
     const getInitials = useInitials();
 
     return (
@@ -44,6 +45,16 @@ function UserRow({ user, isSelf }: { user: UserListItem; isSelf: boolean }) {
                     {user.invitePending && (
                         <Badge variant="outline" className="text-[10px]">
                             Invite pending
+                        </Badge>
+                    )}
+                    {user.mustChangePassword && (
+                        <Badge variant="outline" className="border-amber-500/40 text-[10px] text-amber-700 dark:text-amber-400">
+                            Password reset required
+                        </Badge>
+                    )}
+                    {user.ssoOnly && ssoEnabled && (
+                        <Badge variant="secondary" className="text-[10px]">
+                            SSO only
                         </Badge>
                     )}
                     {isSelf && (
@@ -77,7 +88,7 @@ function UserRow({ user, isSelf }: { user: UserListItem; isSelf: boolean }) {
     );
 }
 
-export default function UsersIndex({ users, canManage, roleOptions, basicEnabled, canCreate }: UsersIndexProps) {
+export default function UsersIndex({ users, canManage, roleOptions, basicEnabled, ssoEnabled, canCreate }: UsersIndexProps) {
     const { auth } = usePage<SharedData>().props;
     const [creating, setCreating] = useState(false);
 
@@ -108,7 +119,7 @@ export default function UsersIndex({ users, canManage, roleOptions, basicEnabled
 
                 <div className="divide-border divide-y rounded-lg border">
                     {users.map((user) => (
-                        <UserRow key={user.id} user={user} isSelf={user.id === auth.user.id} />
+                        <UserRow key={user.id} user={user} isSelf={user.id === auth.user.id} ssoEnabled={ssoEnabled} />
                     ))}
                 </div>
 
@@ -118,7 +129,15 @@ export default function UsersIndex({ users, canManage, roleOptions, basicEnabled
                 </p>
             </div>
 
-            {canCreate && <CreateUserDialog open={creating} onOpenChange={setCreating} roleOptions={roleOptions} basicEnabled={basicEnabled} />}
+            {canCreate && (
+                <CreateUserDialog
+                    open={creating}
+                    onOpenChange={setCreating}
+                    roleOptions={roleOptions}
+                    basicEnabled={basicEnabled}
+                    ssoEnabled={ssoEnabled}
+                />
+            )}
 
             <FlashToast />
         </AppLayout>

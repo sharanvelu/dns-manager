@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\User;
 use Illuminate\Support\Str;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Support\Facades\Auth;
@@ -30,7 +31,9 @@ class PasswordLoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+        $candidate = User::query()->where('email', $this->string('email')->toString())->first();
+
+        if (($candidate && ! $candidate->passwordLoginAllowed()) || ! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
             activity('auth')

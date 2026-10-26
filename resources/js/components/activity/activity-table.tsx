@@ -51,9 +51,14 @@ function eventBadgeClass(event: string | null): string {
             return 'border-transparent bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400';
         case 'updated':
         case 'providers-changed':
+        case 'password-reset-forced':
+        case 'two-factor-reset':
+        case 'sso-only-changed':
             return 'border-transparent bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-400';
         case 'deleted':
         case 'delete-requested':
+        case 'login-failed':
+        case 'two-factor-challenge-failed':
             return 'border-transparent bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-400';
         default:
             return 'border-transparent bg-muted text-muted-foreground';

@@ -85,3 +85,11 @@ The documentation is a single Next.js site (`docs-site/`) serving `/` (product l
 ## Sign-in pages
 
 `auth/login` renders from the `ssoEnabled` / `basicEnabled` props: password form first, an "or" divider, then the SSO button (outline variant when both are shown; default variant when SSO is the only method). `forgot-password` and `reset-password` (also the admin-invite "Create your password" screen, via `mode`) use `AuthLayout` with the same field/`InputError` pattern. Users list shows an outline "Invite pending" badge; the user detail "Account" card hosts name/email edit (non-SSO users only) and "Resend invite".
+
+### Account credential controls
+
+- **Badges** (users list + detail Sign-in row): outline "Invite pending"; amber-outlined "Password reset required"; secondary "SSO only" (list) / "Single sign-on only" (detail); secondary "Two-factor" with a `ShieldCheck` icon.
+- **SSO-only** is a role-style bordered `Checkbox` row (Account card, and in the Add-user dialog when both methods are on), immediate-apply with a spinner and an amber hint when the user has not yet signed in via SSO.
+- **Force password reset** is an outline `KeyRound` button beside the destructive Delete in the Danger zone, behind a confirm Dialog. **Reset two-factor** is an outline `ShieldOff` button in the Account card with a destructive-confirm Dialog.
+- **Two-factor challenge** reuses `AuthLayout`: one centered numeric input (`inputMode="numeric"`, `autoComplete="one-time-code"`, mono, wide tracking) with a text-link toggle to a recovery-code field.
+- **Profile `TwoFactorSection`** (Off / Pending / Enabled): the QR sits on a white tile even in dark mode so it stays scannable; the manual key is mono; enabled shows an emerald status line; disable/regenerate use a current-password Dialog; recovery codes appear once in a two-column mono grid with a Copy button.

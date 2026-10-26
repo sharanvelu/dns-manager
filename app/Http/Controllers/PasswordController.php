@@ -14,6 +14,13 @@ class PasswordController extends Controller
     public function update(Request $request): RedirectResponse
     {
         $user = $request->user();
+
+        if (! $user->passwordLoginAllowed()) {
+            return back()->withErrors([
+                'password' => 'This account signs in with single sign-on only. Ask an administrator if you need a password.',
+            ]);
+        }
+
         $hadPassword = $user->password !== null;
 
         $rules = ['password' => ['required', 'confirmed', AuthMethods::passwordRule()]];
@@ -24,7 +31,7 @@ class PasswordController extends Controller
 
         $validated = $request->validate($rules);
 
-        $user->forceFill(['password' => $validated['password']])->save();
+        $user->forceFill(['password' => $validated['password'], 'must_change_password' => false])->save();
         $user->signOutOtherSessions($request->session()->getId());
 
         $event = $hadPassword ? 'password-changed' : 'password-set';

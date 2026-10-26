@@ -10,11 +10,15 @@ use App\Http\Controllers\DnsEntryController;
 use App\Http\Controllers\PasswordController;
 use App\Http\Controllers\ProviderController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\TwoFactorController;
+use App\Http\Controllers\UserSignInController;
 use App\Http\Controllers\ZoneAccessController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\DnsEntryBulkController;
 use App\Http\Controllers\ZoneProviderController;
 use App\Http\Controllers\ProviderImportController;
+use App\Http\Controllers\TwoFactorResetController;
+use App\Http\Controllers\ForcePasswordResetController;
 
 Route::redirect('/', '/dashboard')->name('home');
 
@@ -30,6 +34,14 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('profile', [ProfileController::class, 'update'])->name('profile.update');
 
     Route::put('profile/password', [PasswordController::class, 'update'])->name('profile.password')->middleware('auth.method:basic');
+
+    // Two-factor (TOTP) self-service — password users only, so basic auth must be on.
+    Route::middleware('auth.method:basic')->group(function () {
+        Route::post('profile/two-factor', [TwoFactorController::class, 'enable'])->name('two-factor.enable');
+        Route::post('profile/two-factor/confirm', [TwoFactorController::class, 'confirm'])->name('two-factor.confirm');
+        Route::delete('profile/two-factor', [TwoFactorController::class, 'disable'])->name('two-factor.disable');
+        Route::post('profile/two-factor/recovery-codes', [TwoFactorController::class, 'recoveryCodes'])->name('two-factor.recovery-codes');
+    });
 
     // Listings scope themselves to the user's accessible zones inside the
     // controller — any authenticated user may load them.
@@ -127,6 +139,9 @@ Route::middleware(['auth'])->group(function () {
 
     Route::middleware('can:manage-users')->group(function () {
         Route::post('users', [UserController::class, 'store'])->name('users.store');
+        Route::patch('users/{user}/sso-only', [UserSignInController::class, 'update'])->name('users.sso-only')->middleware('auth.method:sso');
+        Route::post('users/{user}/force-password-reset', [ForcePasswordResetController::class, 'store'])->name('users.force-reset')->middleware('auth.method:basic');
+        Route::delete('users/{user}/two-factor', [TwoFactorResetController::class, 'destroy'])->name('users.two-factor.reset')->middleware('auth.method:basic');
         Route::post('users/{user}/invite', [UserController::class, 'resendInvite'])->name('users.invite')->middleware('auth.method:basic');
         Route::put('users/{user}', [UserController::class, 'update'])->name('users.update');
         Route::delete('users/{user}', [UserController::class, 'destroy'])->name('users.destroy');

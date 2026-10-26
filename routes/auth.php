@@ -7,6 +7,7 @@ use App\Http\Controllers\Auth\OidcController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordLoginController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
+use App\Http\Controllers\Auth\TwoFactorChallengeController;
 
 Route::middleware('guest')->group(function () {
     Route::get('login', [OidcController::class, 'show'])->name('login');
@@ -21,6 +22,9 @@ Route::middleware('guest')->group(function () {
     // invite routes use the separate `invites` broker (own table + expiry).
     Route::middleware('auth.method:basic')->group(function () {
         Route::post('login', [PasswordLoginController::class, 'store'])->name('login.store');
+
+        Route::get('two-factor-challenge', [TwoFactorChallengeController::class, 'show'])->name('two-factor.challenge');
+        Route::post('two-factor-challenge', [TwoFactorChallengeController::class, 'store'])->middleware('throttle:10,1')->name('two-factor.verify');
 
         Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])->name('password.request');
         Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])->middleware('throttle:6,1')->name('password.email');

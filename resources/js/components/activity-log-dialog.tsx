@@ -69,9 +69,12 @@ function relativeTime(iso: string): string {
 
 /** Event → badge tint, following the status color language in DESIGN.md. */
 function eventBadgeClass(event: string): string {
-    if (event === 'created') return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400';
-    if (event === 'updated') return 'bg-amber-500/10 text-amber-700 dark:text-amber-400';
-    if (event === 'deleted' || event.includes('delete')) return 'bg-red-500/10 text-red-700 dark:text-red-400';
+    if (event === 'created' || event === 'login') return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400';
+    if (event === 'updated' || ['password-reset-forced', 'two-factor-reset', 'sso-only-changed'].includes(event)) {
+        return 'bg-amber-500/10 text-amber-700 dark:text-amber-400';
+    }
+    if (event === 'deleted' || event.includes('delete') || event === 'login-failed' || event === 'two-factor-challenge-failed')
+        return 'bg-red-500/10 text-red-700 dark:text-red-400';
 
     return 'text-muted-foreground';
 }

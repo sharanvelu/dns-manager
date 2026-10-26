@@ -23,13 +23,17 @@ class PasswordResetLinkController extends Controller
     {
         $validated = $request->validate(['email' => ['required', 'email']]);
 
-        $status = Password::sendResetLink($validated);
+        $user = User::query()->where('email', $validated['email'])->first();
 
-        if ($status === Password::RESET_LINK_SENT && $user = User::query()->where('email', $validated['email'])->first()) {
-            activity('auth')->performedOn($user)->event('password-reset-requested')->log('password-reset-requested');
+        if ($user?->passwordLoginAllowed() !== false) {
+            $status = Password::sendResetLink($validated);
+
+            if ($status === Password::RESET_LINK_SENT && $user) {
+                activity('auth')->performedOn($user)->event('password-reset-requested')->log('password-reset-requested');
+            }
         }
 
-        // Identical response whether or not the address exists — no account enumeration.
+        // Identical response whether or not the address exists or the account is SSO-only — no enumeration.
         return back()->with('status', 'If an account exists for that email address, a password reset link is on its way.');
     }
 }

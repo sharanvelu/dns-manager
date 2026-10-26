@@ -2,6 +2,7 @@ import Callout from "@/components/docs/Callout";
 import CodeBlock from "@/components/docs/CodeBlock";
 import DocArticle, { docMetadata } from "@/components/docs/DocArticle";
 import { H2 } from "@/components/docs/Heading";
+import { Step, Steps } from "@/components/docs/Steps";
 
 export const metadata = docMetadata("authentication", "passwords");
 
@@ -137,6 +138,28 @@ export default function Page() {
         other session.
       </p>
 
+      <H2>Forcing a password reset</H2>
+
+      <p>
+        A Super Admin or User Admin can force a reset from a user&apos;s page
+        (<strong>Danger zone → Force password reset</strong>). The user is
+        signed out everywhere, emailed a reset link, and cannot sign in with
+        their current password until they set a new one. If they try first,
+        they see &quot;An administrator requires you to reset your
+        password&quot; and a fresh link is emailed. Their stored password is
+        kept until then, and the flag clears once they complete the reset or
+        change their password. A reset email sent less than a minute earlier
+        is not repeated — the user is still flagged and signed out.
+      </p>
+
+      <Callout type="note">
+        The button is hidden when password sign-in is disabled, when the user
+        has no password (a pending invite — use <strong>Resend invite</strong>
+        ), and for SSO-only users while SSO is on. You cannot force a reset on
+        your own account; change your password from your profile. Single
+        sign-on is never affected by the flag.
+      </Callout>
+
       <H2>Users created by an administrator</H2>
 
       <p>
@@ -159,10 +182,76 @@ export default function Page() {
         sessions.
       </p>
 
+      <H2>Requiring SSO for a user</H2>
+
+      <p>
+        When SSO is enabled, an administrator can tick{" "}
+        <strong>Single sign-on only</strong> on a user&apos;s page (or while
+        creating the user). That account can then no longer use email and
+        password: the sign-in form rejects it exactly like a wrong password,
+        forgot-password sends nothing, and any outstanding reset or invite
+        link stops working. Their existing password is kept, so unticking the
+        box restores password sign-in. Active sessions are not signed out.
+      </p>
+
       <Callout type="note">
-        Sign-ins, failed sign-ins, resets, password changes and invites are
-        recorded in the <a href="/docs/activity/">activity log</a> as{" "}
-        <code>auth</code> events. Passwords are never logged.
+        The flag has no effect while <code>SSO_ENABLED</code> is off, so you
+        can never lock everyone out by disabling SSO. Make sure the person has
+        signed in with SSO before, or that their identity provider email
+        matches their address here.
+      </Callout>
+
+      <H2>Two-factor authentication</H2>
+
+      <p>
+        Password accounts can add an optional second step: a 6-digit code from
+        an authenticator app (1Password, Authy, Google Authenticator, …). It
+        applies to email + password sign-in only — single sign-on is governed
+        by your identity provider. Two-factor is never enforced.
+      </p>
+
+      <Steps>
+        <Step title="Open your Profile">
+          Scroll to <strong>Two-factor authentication</strong> and click{" "}
+          <strong>Set up two-factor</strong>. You need a password on the
+          account.
+        </Step>
+        <Step title="Scan the QR code">
+          Scan it with your authenticator app, or type the manual key shown
+          under it.
+        </Step>
+        <Step title="Confirm with a code">
+          Enter the current 6-digit code and click{" "}
+          <strong>Confirm and enable</strong>. Two-factor stays off until this
+          succeeds.
+        </Step>
+        <Step title="Save your recovery codes">
+          Eight single-use recovery codes are shown once. Store them
+          somewhere safe — each one works in place of an authenticator code.
+        </Step>
+      </Steps>
+
+      <p>
+        After that, signing in with your password takes you to a second page
+        where you enter a code (or switch to a recovery code). You are not
+        signed in until it passes; the pending sign-in expires after 10
+        minutes, and the code page allows 10 attempts per minute. A code can
+        only be used once. From your profile you can regenerate recovery
+        codes or turn two-factor off — both ask for your current password.
+      </p>
+
+      <Callout type="warning">
+        If you lose your device <em>and</em> your recovery codes, an
+        administrator must reset your two-factor authentication (see{" "}
+        <a href="/docs/users/managing/">Managing users</a>). Resetting also
+        signs you out everywhere; you can then set it up again.
+      </Callout>
+
+      <Callout type="note">
+        Sign-ins, failed sign-ins, resets, forced resets, password changes,
+        invites, SSO-only changes and two-factor events are recorded in the{" "}
+        <a href="/docs/activity/">activity log</a> as <code>auth</code>{" "}
+        events. Passwords, secrets and recovery codes are never logged.
       </Callout>
     </DocArticle>
   );
