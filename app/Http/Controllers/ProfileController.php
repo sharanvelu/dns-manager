@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Support\AuthMethods;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use App\Http\Requests\ProfileUpdateRequest;
@@ -19,12 +20,15 @@ class ProfileController extends Controller
     {
         return Inertia::render('profile', [
             'status' => $request->session()->get('status'),
+            'basicEnabled' => AuthMethods::basic(),
+            'hasPassword' => $request->user()->password !== null,
+            'ssoLinked' => $request->user()->oidc_sub !== null,
         ]);
     }
 
     /**
-     * Update the user's display name. Email and identity come from the
-     * OIDC provider and are refreshed on every login.
+     * Update the user's display name. Email is fixed; for SSO users
+     * identity comes from the OIDC provider and is refreshed on every login.
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {

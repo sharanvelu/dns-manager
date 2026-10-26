@@ -11,9 +11,29 @@ export default function Page() {
     <DocArticle group="users" slug="managing">
       <H2>How users are created</H2>
       <p>
-        There is no registration form. Users are provisioned automatically on their{" "}
-        <strong>first OIDC sign-in</strong> — see{" "}
-        <a href="/docs/authentication/first-login/">First login</a>:
+        There is no public registration form. Users are created in one of two ways:
+      </p>
+      <ul>
+        <li>
+          <strong>By an administrator</strong> — <strong>Settings → Users → Add user</strong>{" "}
+          takes a name, email and optional global roles. When password sign-in is enabled the new
+          user is emailed a link to create their password (valid for{" "}
+          <code>INVITE_EXPIRE_HOURS</code>) and is sent to the sign-in page afterwards. Until then
+          they show an <strong>Invite pending</strong> badge and the <strong>Resend invite</strong>{" "}
+          button on their detail page re-sends the email. With SSO, the user simply signs in using
+          that email. A User Admin cannot create Super Admins. The button is hidden when
+          SSO is the only sign-in method and <code>SSO_AUTO_PROVISION</code> is on, since accounts
+          appear on first sign-in anyway.
+        </li>
+        <li>
+          <strong>Automatically on first OIDC sign-in</strong> — see{" "}
+          <a href="/docs/authentication/first-login/">First login</a>:
+        </li>
+      </ul>
+      <p>
+        On a user&apos;s detail page, <strong>Account</strong> lets admins edit the name and email
+        of users who do not sign in through SSO (SSO users&apos; details come from the identity
+        provider). Admins can delete users from the <strong>Danger zone</strong>.
       </p>
       <ul>
         <li>

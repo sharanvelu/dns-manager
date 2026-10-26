@@ -141,7 +141,7 @@ export const PAGES: DocPage[] = [
     slug: "",
     title: "Authentication",
     description:
-      "DNS Manager is OIDC-only — no local passwords, users auto-provisioned on first sign-in, sessions and sign-ins audited.",
+      "Sign in with OIDC single sign-on, email + password, or both — configurable per deployment; sessions and sign-ins audited.",
     order: 0,
     headings: ["How sessions work", "Set it up"],
   },
@@ -165,10 +165,24 @@ export const PAGES: DocPage[] = [
   },
   {
     group: "authentication",
+    slug: "passwords",
+    title: "Password sign-in",
+    description: "Enable or disable password and SSO sign-in, forgot-password, invites, and using both on one account.",
+    order: 2,
+    headings: [
+      "Choosing sign-in methods",
+      "Creating the first admin without SSO",
+      "Forgot password",
+      "Users created by an administrator",
+      "Can an SSO user also use a password?",
+    ],
+  },
+  {
+    group: "authentication",
     slug: "first-login",
     title: "First login",
     description: "How the first Super Admin is bootstrapped, how users are provisioned and matched, and what to do next.",
-    order: 2,
+    order: 3,
     headings: ["Who becomes the first admin", "How accounts are matched", "What to do next"],
   },
 

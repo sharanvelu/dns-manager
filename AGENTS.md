@@ -36,6 +36,7 @@ npm run build             # Vite production build
 php artisan migrate       # run migrations (Postgres in dev/prod)
 php artisan dns:check-drift [--provider=ID]   # queue drift checks (what the schedule runs)
 php artisan dns:check-provider-health [--provider=ID]  # queue provider connectivity health checks
+php artisan dns:create-user [--name= --email= --password= --super-admin]  # bootstrap a password user (first admin when SSO is off)
 php artisan dns:flush-activities [--days=N] [--force]  # wipe the audit trail (also scheduled daily when ACTIVITY_LOGS_RETENTION_DAYS is set)
 docker build -t dns-manager:dev .   # production image (web+worker+scheduler roles)
 ```
@@ -50,7 +51,7 @@ app/Jobs/                # SyncEntryToProvider, DeleteEntryFromProvider, CheckPr
 app/Services/            # SyncService (attachment targeting + push/delete), ZoneAttachmentService (zoneless auto-attach), DnsEntryImporter (CSV)
 app/Policies/            # DnsZonePolicy — every zone-scoped ability (see RBAC convention below)
 app/Support/             # shared pipelines: EntryQuery + EntryPresenter (global entries page AND zone records page), ActivityQuery (settings + zone activity), ZonePermissions (zoneCan props), DnsEntryRules, Gravatar
-app/Http/Controllers/    # Dashboard, DnsEntry(+Bulk), Zone, ZoneProvider, Provider, ProviderImport, User, ZoneAccess (grants), ActivityLog (thin delegate to ActivityQuery), Auth\Oidc, Settings
+app/Http/Controllers/    # Dashboard, DnsEntry(+Bulk), Zone, ZoneProvider, Provider, ProviderImport, User (CRUD + invites), ZoneAccess (grants), ActivityLog (thin delegate to ActivityQuery), Password (profile), Auth\{Oidc,PasswordLogin,PasswordResetLink,NewPassword}, Settings
 resources/js/pages/      # Inertia React pages (dashboard, entries/, zones/{index,records,providers,activity,access}, providers/, users/{index,show}, auth/, settings/)
 resources/js/components/entries/   # shared EntriesView + dialogs — serves /entries AND /zones/{id}/records via EntriesScope
 resources/js/components/activity/  # shared ActivityTable — serves settings activity AND zone activity via baseUrl
@@ -59,7 +60,7 @@ resources/js/components/users/     # GrantDialog — shared zone-access grant/ed
 resources/js/components/icons/     # custom SVG icon set (original artwork; provider marks are real brand logos — see DESIGN.md)
 docs-site/               # THE documentation (Next.js static export): / = product landing, /docs = docs; content authored as TSX pages (app/docs/**), page metadata in lib/registry.ts; baked into the Docker image at /docs AND deployed to Vercel
 k8s/                     # Kubernetes manifests; docker/ holds nginx/fpm/supervisor configs
-routes/web.php           # all app routes; routes/auth.php OIDC; routes/api.php automation hooks
+routes/web.php           # all app routes; routes/auth.php OIDC + password login/reset/invite; routes/api.php automation hooks
 routes/console.php       # the schedule (Laravel 12 has no console Kernel — this file IS the scheduler)
 ```
 
@@ -96,6 +97,8 @@ routes/console.php       # the schedule (Laravel 12 has no console Kernel — th
 - **Escalation guard invariant** (`UserController::update`): a non-Super-Admin may never change whether a user holds `super-admin` — in either direction. Do not weaken this when touching role updates; it is what stops a User Admin from minting (or demoting) Super Admins. Companions: User Admins cannot touch their own account; the last Super Admin can be neither demoted nor deleted.
 - **Bulk actions silently shrink the selection**: ids in zones where the actor lacks a record-managing grant (and ids that no longer exist) are dropped, not 403'd (`DnsEntryBulkController::selectedEntries()`). Note it pins to zone-admin/zone-dns-manager grants directly — `accessibleZoneIds()` would wrongly treat Super Viewer as unrestricted here.
 - **The dashboard never 403s**: every persona can load `/dashboard`; it scopes its stats/zones/feed via `accessibleZoneIds()` and renders a no-access state off the `noAccess` prop instead of aborting. Don't add auth middleware or aborts to it.
+
+- **Sign-in methods**: `SSO_ENABLED` / `BASIC_AUTH_ENABLED` resolve through `App\Support\AuthMethods` — never read `config('auth.basic_enabled')` directly (it must be forced on when SSO is off). Password routes carry `auth.method:basic`, OIDC routes `auth.method:sso`; the UI branches off `ssoEnabled`/`basicEnabled` props. The `invites` and `users` password brokers are separate (own tables/expiry) and `NewPasswordController` picks one via a route **default** — don't make it request input. Login/forgot responses must not reveal whether an email exists. Tests set `SSO_ENABLED=true` in `phpunit.xml`.
 
 ## The documentation system (one Next.js site, two deployments)
 

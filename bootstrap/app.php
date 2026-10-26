@@ -3,6 +3,7 @@
 declare(strict_types = 1);
 
 use Illuminate\Foundation\Application;
+use App\Http\Middleware\EnsureAuthMethod;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -23,6 +24,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // and client IP. FORCE_HTTPS covers generator-built URLs; this
         // covers the request side.
         $middleware->trustProxies(at: '*');
+
+        $middleware->alias(['auth.method' => EnsureAuthMethod::class]);
 
         $middleware->web(append: [
             HandleInertiaRequests::class,

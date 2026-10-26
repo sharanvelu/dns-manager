@@ -49,6 +49,17 @@ export default function Page() {
         <tbody>
           <tr>
             <td>
+              <code>SSO_ENABLED</code>
+            </td>
+            <td>
+              Master switch for SSO. Defaults to <code>true</code> whenever{" "}
+              <code>OIDC_BASE_URL</code> is set; <code>false</code> hides the
+              button and disables the OIDC routes. See{" "}
+              <a href="/docs/authentication/passwords/">Password sign-in</a>.
+            </td>
+          </tr>
+          <tr>
+            <td>
               <code>OIDC_BASE_URL</code>
             </td>
             <td>

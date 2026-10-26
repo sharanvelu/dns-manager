@@ -18,7 +18,7 @@ export default function Page() {
       <Screenshot
         src="login"
         alt="The DNS Manager sign-in page"
-        caption="One button — sign-in goes through your identity provider. The label comes from OIDC_PROVIDER_LABEL."
+        caption="With SSO only: one button through your identity provider (label from OIDC_PROVIDER_LABEL). With password sign-in enabled, an email/password form appears too."
       />
 
       <H2>Who becomes the first admin</H2>
@@ -37,6 +37,13 @@ export default function Page() {
           <a href="/docs/users/">Users</a>.
         </li>
       </ul>
+
+      <Callout type="note">
+        Running <strong>without SSO</strong>? Nobody can sign in yet, so
+        create the first Super Admin with{" "}
+        <code>php artisan dns:create-user --super-admin</code> — see{" "}
+        <a href="/docs/authentication/passwords/">Password sign-in</a>.
+      </Callout>
 
       <H2>How accounts are matched</H2>
 

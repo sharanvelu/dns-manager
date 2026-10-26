@@ -7,12 +7,14 @@ import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { GrantDialog } from '@/components/users/grant-dialog';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Head, Link, router, usePage } from '@inertiajs/react';
-import { LoaderCircle, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { LoaderCircle, MailPlus, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { timeAgo, type ManagedUser, type RoleOption, type ZoneGrantItem } from './types';
 
@@ -23,10 +25,90 @@ interface UserShowProps {
     zoneRoleOptions: RoleOption[];
     grantableZones: Array<{ id: number; name: string }>;
     canManage: boolean;
+    basicEnabled: boolean;
 }
 
 function sameRoles(a: string[], b: string[]): boolean {
     return a.length === b.length && [...a].sort().every((role, index) => role === [...b].sort()[index]);
+}
+
+function DetailsCard({ user, canManage, basicEnabled }: { user: ManagedUser; canManage: boolean; basicEnabled: boolean }) {
+    const { data, setData, put, processing, errors, isDirty } = useForm({ name: user.name, email: user.email, roles: user.roles });
+    const [resending, setResending] = useState(false);
+    const { errors: pageErrors } = usePage().props as unknown as { errors: Record<string, string> };
+
+    // SSO users' name/email are refreshed from the identity provider on every login.
+    const editable = canManage && !user.ssoLinked;
+
+    const methods = [user.ssoLinked ? 'Single sign-on' : null, user.hasPassword ? 'Password' : null].filter(Boolean);
+
+    const save = () => put(route('users.update', user.id), { preserveScroll: true });
+
+    const resend = () => {
+        setResending(true);
+        router.post(route('users.invite', user.id), {}, { preserveScroll: true, onFinish: () => setResending(false) });
+    };
+
+    return (
+        <Card className="p-5">
+            <div className="flex flex-col gap-4">
+                <div>
+                    <h2 className="text-sm font-medium">Account</h2>
+                    <p className="text-muted-foreground text-xs">
+                        {user.ssoLinked ? 'Name and email are managed by the identity provider.' : 'Name and email address.'}
+                    </p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-2">
+                        <Label htmlFor="user-name">Name</Label>
+                        <Input id="user-name" value={data.name} disabled={!editable} onChange={(e) => setData('name', e.target.value)} />
+                        <InputError message={errors.name} />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="user-email">Email address</Label>
+                        <Input
+                            id="user-email"
+                            type="email"
+                            value={data.email}
+                            disabled={!editable}
+                            onChange={(e) => setData('email', e.target.value)}
+                        />
+                        <InputError message={errors.email} />
+                    </div>
+                </div>
+
+                {editable && isDirty && (
+                    <div>
+                        <Button size="sm" onClick={save} disabled={processing}>
+                            {processing && <LoaderCircle className="size-3.5 animate-spin" />}
+                            Save changes
+                        </Button>
+                    </div>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="text-muted-foreground">Sign-in:</span>
+                    {user.invitePending ? (
+                        <Badge variant="outline">Invite pending</Badge>
+                    ) : (
+                        methods.map((method) => (
+                            <Badge key={method} variant="secondary">
+                                {method}
+                            </Badge>
+                        ))
+                    )}
+                    {user.invitePending && canManage && basicEnabled && (
+                        <Button size="sm" variant="outline" onClick={resend} disabled={resending}>
+                            {resending ? <LoaderCircle className="size-3.5 animate-spin" /> : <MailPlus className="size-3.5" />}
+                            Resend invite
+                        </Button>
+                    )}
+                </div>
+                <InputError message={pageErrors.user} />
+            </div>
+        </Card>
+    );
 }
 
 function GlobalRolesCard({ user, roleOptions, canManage }: { user: ManagedUser; roleOptions: RoleOption[]; canManage: boolean }) {
@@ -298,7 +380,7 @@ function DangerZoneCard({ user }: { user: ManagedUser }) {
     );
 }
 
-export default function UserShow({ managedUser, grants, roleOptions, zoneRoleOptions, grantableZones, canManage }: UserShowProps) {
+export default function UserShow({ managedUser, grants, roleOptions, zoneRoleOptions, grantableZones, canManage, basicEnabled }: UserShowProps) {
     const getInitials = useInitials();
     const { auth } = usePage<SharedData>().props;
     const isSelf = managedUser.id === auth.user.id;
@@ -335,6 +417,8 @@ export default function UserShow({ managedUser, grants, roleOptions, zoneRoleOpt
                         </p>
                     </div>
                 </div>
+
+                <DetailsCard key={`${managedUser.name}|${managedUser.email}`} user={managedUser} canManage={canManage} basicEnabled={basicEnabled} />
 
                 {/* key resyncs the checkbox state after a successful save. */}
                 <GlobalRolesCard key={managedUser.roles.join('|')} user={managedUser} roleOptions={roleOptions} canManage={canManage} />

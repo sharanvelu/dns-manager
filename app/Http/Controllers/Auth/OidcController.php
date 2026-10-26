@@ -9,6 +9,7 @@ use App\Models\User;
 use Inertia\Inertia;
 use Inertia\Response;
 use App\Support\Gravatar;
+use App\Support\AuthMethods;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
@@ -18,10 +19,13 @@ use Laravel\Socialite\Two\InvalidStateException;
 
 class OidcController extends Controller
 {
-    public function show(): Response
+    public function show(Request $request): Response
     {
         return Inertia::render('auth/login', [
             'providerLabel' => config('services.oidc.label'),
+            'ssoEnabled' => AuthMethods::sso(),
+            'basicEnabled' => AuthMethods::basic(),
+            'status' => $request->session()->get('status'),
         ]);
     }
 
@@ -52,6 +56,12 @@ class OidcController extends Controller
             ->where('oidc_sub', $oidcUser->getId())
             ->orWhere('email', $email)
             ->first();
+
+        if (! $user && User::count() > 0 && ! AuthMethods::autoProvision()) {
+            return redirect()->route('login')->withErrors([
+                'oidc' => 'No account exists for this email address. Ask an administrator to add you.',
+            ]);
+        }
 
         $attributes = [
             'name' => $oidcUser->getName() ?: ($oidcUser->getNickname() ?: $email),

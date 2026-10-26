@@ -7,6 +7,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\ZoneController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\DnsEntryController;
+use App\Http\Controllers\PasswordController;
 use App\Http\Controllers\ProviderController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ZoneAccessController;
@@ -27,6 +28,8 @@ Route::middleware(['auth'])->group(function () {
     // appearance preference. No settings section exists beyond this.
     Route::get('profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('profile', [ProfileController::class, 'update'])->name('profile.update');
+
+    Route::put('profile/password', [PasswordController::class, 'update'])->name('profile.password')->middleware('auth.method:basic');
 
     // Listings scope themselves to the user's accessible zones inside the
     // controller — any authenticated user may load them.
@@ -123,6 +126,8 @@ Route::middleware(['auth'])->group(function () {
     });
 
     Route::middleware('can:manage-users')->group(function () {
+        Route::post('users', [UserController::class, 'store'])->name('users.store');
+        Route::post('users/{user}/invite', [UserController::class, 'resendInvite'])->name('users.invite')->middleware('auth.method:basic');
         Route::put('users/{user}', [UserController::class, 'update'])->name('users.update');
         Route::delete('users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
     });

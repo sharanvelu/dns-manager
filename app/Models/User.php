@@ -6,10 +6,15 @@ namespace App\Models;
 
 use App\Enums\Role;
 use App\Enums\ZoneRole;
+use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Database\Factories\UserFactory;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Password;
+use App\Notifications\InviteNotification;
 use Spatie\Activitylog\Support\LogOptions;
+use App\Notifications\ResetPasswordNotification;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -66,6 +71,39 @@ class User extends Authenticatable
     public function zoneGrants(): HasMany
     {
         return $this->hasMany(ZoneUser::class);
+    }
+
+    /** Admin-created account that has neither set a password nor signed in via SSO yet. */
+    public function isPendingInvite(): bool
+    {
+        return $this->password === null && $this->oidc_sub === null;
+    }
+
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new ResetPasswordNotification($token));
+    }
+
+    /** Email a fresh first-time "create your password" link (invalidates any earlier one). */
+    public function sendInvite(): void
+    {
+        $this->notify(new InviteNotification(Password::broker('invites')->createToken($this)));
+    }
+
+    /**
+     * Invalidate remember-me tokens and database sessions — used whenever the
+     * password changes. Pass the current session id to keep that one alive.
+     */
+    public function signOutOtherSessions(?string $exceptSessionId = null): void
+    {
+        $this->forceFill(['remember_token' => Str::random(60)])->save();
+
+        if (config('session.driver') === 'database') {
+            DB::table(config('session.table', 'sessions'))
+                ->where('user_id', $this->getKey())
+                ->when($exceptSessionId, fn ($query) => $query->where('id', '!=', $exceptSessionId))
+                ->delete();
+        }
     }
 
     public function hasRole(Role $role): bool

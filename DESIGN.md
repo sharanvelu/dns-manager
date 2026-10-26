@@ -81,3 +81,7 @@ The documentation is a single Next.js site (`docs-site/`) serving `/` (product l
 - **Layout**: three-column (grouped sidebar / article / scroll-spy TOC), sticky header, ⌘K search over `lib/registry.ts`, light/dark/system toggle (reads the app's `appearance` localStorage key when served same-origin, so in-app docs match the user's app theme).
 - **Content pattern**: TSX pages composed from the kit in `docs-site/components/docs/` — `DocArticle`, `Cards`/`Card`, `Steps`/`Step`, `Screenshot` (theme-aware light/dark pairs from `public/docs/images/screenshots/`), `Callout` (note/tip/important/warning/caution = blue/emerald/violet/amber/red), `CodeBlock` (build-time Shiki dual themes, copy button), `H2`/`H3` (auto anchor ids). Visual-first writing: cards for navigation, steps for procedures, tables for reference, screenshots for orientation — not walls of paragraphs.
 - The in-app sidebar footer links to `/docs` as a plain full-page anchor (the docs are a static site outside Inertia).
+
+## Sign-in pages
+
+`auth/login` renders from the `ssoEnabled` / `basicEnabled` props: password form first, an "or" divider, then the SSO button (outline variant when both are shown; default variant when SSO is the only method). `forgot-password` and `reset-password` (also the admin-invite "Create your password" screen, via `mode`) use `AuthLayout` with the same field/`InputError` pattern. Users list shows an outline "Invite pending" badge; the user detail "Account" card hosts name/email edit (non-SSO users only) and "Resend invite".
