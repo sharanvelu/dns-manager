@@ -136,7 +136,7 @@ Enums live in `app/Enums`: `RecordType`, `SyncStatus`, `HealthStatus`, `Provider
 
 ## Documentation system
 
-All documentation is `docs-site/` — a Next.js 15 static export whose content is authored as TSX pages (`app/docs/<group>/<page>/page.tsx` + metadata in `lib/registry.ts`); there are no markdown content files and no server-side rendering. Routes: `/` product landing, `/docs` documentation (8 groups: Installation, Authentication, Dashboard, Zones, DNS Entries, Providers, Users, Activity). `assetPrefix: '/docs'` plus a post-export step make `out/docs/` fully self-contained.
+All documentation is `docs-site/` — a Next.js 16 static export whose content is authored as TSX pages (`app/docs/<group>/<page>/page.tsx` + metadata in `lib/registry.ts`); there are no markdown content files and no server-side rendering. Routes: `/` product landing, `/docs` documentation (8 groups: Installation, Authentication, Dashboard, Zones, DNS Entries, Providers, Users, Activity). `assetPrefix: '/docs'` plus a post-export step make `out/docs/` fully self-contained.
 
 One build, two deployments:
 1. **Docker image**: the Dockerfile's `docs` stage builds docs-site and copies `out/docs` into `public/docs`; nginx serves it statically at `/docs` only (`absolute_redirect off` keeps redirects ingress-safe). Docs are baked at build time, so an installed instance's `/docs` always documents its own version. The Laravel app has no docs code.
