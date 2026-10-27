@@ -17,7 +17,7 @@ npm run test                # Vitest (resources/js/tests/)
 npm run analyze && npm run build    # tsc --noEmit + Vite build
 ```
 
-- Laravel 12 + Inertia 2 + React 19 + TS + Tailwind 4; Postgres; Redis queue (predis).
+- Laravel 12 + Inertia 3 + React 19 + TS + Tailwind 4; Postgres; Redis queue (predis).
 - Secrets: `encrypted:array` cast on `providers.config` (credentials) AND `zone_providers.config` (per-zone settings) — never expose either raw in Inertia props.
 - Tests run on sqlite `:memory:` → keep SQL portable (no `ilike`).
 - Vite preloading is deliberately disabled (nginx 502 via oversized `Link` header) — see AGENTS.md gotchas before touching.
