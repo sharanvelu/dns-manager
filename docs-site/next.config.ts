@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "node:path";
 
 const isProd = process.env.NODE_ENV === "production";
 
@@ -22,14 +23,15 @@ const nextConfig: NextConfig = {
   // Every page becomes /{route}/index.html so links resolve cleanly on
   // any static host.
   trailingSlash: true,
+  // docs-site is an independent npm project nested inside the Laravel repo
+  // (which has its own package-lock.json). Without an explicit root, Turbopack
+  // infers the repo root as the workspace root locally but docs-site/ inside
+  // the Docker stage and on Vercel — pin it so every build resolves the same.
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
   images: {
     unoptimized: true,
-  },
-  // docs-site has no ESLint setup of its own (`npm run typecheck` is the
-  // gate); without this, Next's build-time lint step errors on Vercel
-  // where no parent node_modules provides eslint.
-  eslint: {
-    ignoreDuringBuilds: true,
   },
 };
 

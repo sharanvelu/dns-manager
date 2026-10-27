@@ -16,7 +16,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
   return (
     // suppressHydrationWarning: ThemeScript mutates <html> before hydration.
-    <html lang="en" suppressHydrationWarning>
+    // data-scroll-behavior: globals.css sets `scroll-behavior: smooth`; Next 16
+    // stops overriding it on route changes unless this opts back in, so pages
+    // would otherwise glide to the top instead of jumping.
+    <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
         <ThemeScript />
         <link rel="preconnect" href="https://fonts.bunny.net" />

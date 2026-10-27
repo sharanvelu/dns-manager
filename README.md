@@ -21,7 +21,7 @@ Manage DNS entries across multiple providers from one place. Records live in **D
 
 ## Local development
 
-Requirements: PHP 8.4, Composer, Node 22+, PostgreSQL 16, Redis.
+Requirements: PHP 8.4, Composer, Node 24+, PostgreSQL 16, Redis.
 
 ```sh
 composer install

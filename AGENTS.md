@@ -77,6 +77,8 @@ routes/console.php       # the schedule (Laravel 12 has no console Kernel — th
 
 ## Key gotchas (learned the hard way — keep current)
 
+- **Node 24 is pinned in four places — bump them together**: both `FROM node:…-alpine` stages in `Dockerfile` (assets + docs; Node exists only in these build stages, the runtime image is PHP), `node-version` in `.github/actions/setup/action.yml` (every CI workflow), `engines.node` in `docs-site/package.json` (Vercel reads it and overrides the dashboard's Node setting; Vercel only offers 24.x/22.x as of its docs), and the README requirement. Vitest 5 (`^22.12 || ^24 || >=26`) and ESLint 10 (`^22.13 || >=24`) set the floor for the root toolchain.
+
 - Provider `config` cast requires a valid `APP_KEY`; tests inherit it from `.env`.
 - Postgres-only SQL (`ilike`) breaks the sqlite test DB — use portable `LOWER(x) LIKE ?`.
 - Vite preloading is **disabled** (`Vite::usePreloadTagAttributes(false)` in `AppServiceProvider`): the preload `Link` header (~4KB+) overflowed default nginx `fastcgi_buffer_size` (4KB) causing 502s on full-page refreshes. `docker/nginx.conf` also raises the buffers. Do not re-enable preloading without checking both.
@@ -103,12 +105,13 @@ routes/console.php       # the schedule (Laravel 12 has no console Kernel — th
 
 ## The documentation system (one Next.js site, two deployments)
 
-`docs-site/` is THE documentation — a Next.js 15 static export with **all content authored as TSX pages** (no markdown, no external content files):
+`docs-site/` is THE documentation — a Next.js 16 static export with **all content authored as TSX pages** (no markdown, no external content files):
 
 - **Routes**: `/` = product landing page; `/docs` = docs home; `/docs/<group>/<page>/` = content pages, real static routes under `docs-site/app/docs/`. Groups (order): Installation, Authentication, Dashboard, Zones, DNS Entries, Providers, Users, Activity.
 - **Adding/editing a docs page** = edit the page's TSX (`app/docs/<group>/<page>/page.tsx`, pattern: `export const metadata = docMetadata(group, slug)` + `<DocArticle group slug>…JSX prose…</DocArticle>`) AND its entry in `docs-site/lib/registry.ts` ({group, slug, title, description, order, headings} — drives the sidebar, prev/next, and ⌘K search).
 - **Component kit** (`docs-site/components/docs/`): `DocArticle` (page shell: sidebar/TOC/pager), `Cards`/`Card`, `Steps`/`Step`, `Screenshot` (theme-aware pair from `public/docs/images/screenshots/<src>-{light,dark}.png`), `Callout`, `CodeBlock` (build-time Shiki, dual themes), `H2`/`H3` (auto GitHub-style anchor ids). Bare `<p>/<ul>/<table>/<a>` inside `DocArticle` are styled by the prose layer.
 - **Asset layout**: no basePath; `assetPrefix: '/docs'` + `scripts/finalize-export.mjs` keep every runtime asset under the `/docs/` URL space, so `out/docs/` is fully self-contained.
+- **Next 16 specifics** (docs-site is its own npm project — independent of the root toolchain): `next build` uses **Turbopack** by default. `next.config.ts` pins `turbopack.root` to `docs-site/` because the repo root has its own lockfile (otherwise the workspace root is inferred differently locally vs in the Docker stage/Vercel). Next 16 no longer overrides `scroll-behavior: smooth` during client navigations, so `<html data-scroll-behavior="smooth">` in `app/layout.tsx` is what keeps page changes instant — don't drop it. The `eslint` config option no longer exists (`next build` doesn't lint; `npm run typecheck` is the gate). `next build` owns `tsconfig.json` (`jsx: react-jsx`, `.next/dev/types` include) — let it, don't revert. If you change the export setup, re-check the contract `finalize-export.mjs` documents (every `/docs/_next/…` URL in `out/**/*.html` must resolve to a file; `out/_next` must not exist afterwards). docs-site runs **TypeScript 7** (native, works with Next 16.4); the root project stays on TypeScript 6 only because `typescript-eslint` caps at `<6.1`.
 
 Two deployments of the same build:
 1. **In the Docker image**: the Dockerfile's `docs` stage builds docs-site and copies `out/docs` → `public/docs`; nginx serves it statically at `/docs` (and ONLY `/docs` — the landing page is not exposed in-container). Docs are baked at image build time → an installed instance's `/docs` always matches its version. There is no PHP/Laravel involvement.
