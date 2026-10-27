@@ -9,10 +9,11 @@ export default function Page() {
   return (
     <DocArticle group="authentication">
       <p>
-        DNS Manager has <strong>no local accounts</strong>: there is no
-        registration form and no password to set — sign-in is{" "}
-        <strong>OpenID Connect only</strong>, through the identity provider
-        you already run.
+        There is no public registration form. Users sign in with{" "}
+        <strong>OpenID Connect single sign-on</strong>, with{" "}
+        <strong>email + password</strong>, or with both — each method can be
+        switched on or off with environment variables (see{" "}
+        <a href="/docs/authentication/passwords/">Password sign-in</a>).
       </p>
 
       <Cards>
@@ -21,9 +22,14 @@ export default function Page() {
           discovery via your issuer&apos;s{" "}
           <code>/.well-known/openid-configuration</code>.
         </Card>
-        <Card title="No passwords to manage" icon="authentication">
-          The app never stores or checks a password. Access lifecycle (MFA,
-          offboarding) lives at your identity provider.
+        <Card
+          title="Optional passwords"
+          icon="authentication"
+          href="/docs/authentication/passwords/"
+        >
+          Admin-created users get an email to set a password; forgot-password
+          is built in. Turn it off entirely while SSO is on if you prefer SSO
+          only.
         </Card>
         <Card
           title="Auto-provisioned users"
@@ -70,6 +76,14 @@ export default function Page() {
         >
           Register the client, set the redirect URI, and configure the{" "}
           <code>OIDC_*</code> environment variables.
+        </Card>
+        <Card
+          title="Password sign-in"
+          icon="authentication"
+          href="/docs/authentication/passwords/"
+        >
+          Enable or disable password and SSO sign-in, and bootstrap the first
+          admin without SSO.
         </Card>
         <Card
           title="First login"

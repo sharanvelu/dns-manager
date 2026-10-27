@@ -90,3 +90,33 @@ test('users can log out', function () {
     $this->actingAs($user)->post('/logout')->assertRedirect('/login');
     $this->assertGuest();
 });
+
+test('with auto-provisioning off, an unknown SSO user is rejected', function () {
+    config(['auth.sso_auto_provision' => false]);
+    User::factory()->create(['email' => 'admin@example.com']);
+    Socialite::shouldReceive('driver->user')->andReturn(fakeOidcUser());
+
+    $this->get('/auth/callback?code=abc&state=xyz')->assertRedirect(route('login'))->assertSessionHasErrors('oidc');
+
+    $this->assertGuest();
+    expect(User::count())->toBe(1);
+});
+
+test('with auto-provisioning off, the first user still becomes super admin', function () {
+    config(['auth.sso_auto_provision' => false]);
+    Socialite::shouldReceive('driver->user')->andReturn(fakeOidcUser());
+
+    $this->get('/auth/callback?code=abc&state=xyz')->assertRedirect(route('dashboard'));
+
+    expect(User::sole()->isSuperAdmin())->toBeTrue();
+});
+
+test('with auto-provisioning off, a pre-created user can sign in via SSO', function () {
+    config(['auth.sso_auto_provision' => false]);
+    $pre = User::factory()->noRoles()->create(['email' => 'jane@example.com', 'password' => null]);
+    Socialite::shouldReceive('driver->user')->andReturn(fakeOidcUser());
+
+    $this->get('/auth/callback?code=abc&state=xyz')->assertRedirect(route('dashboard'));
+
+    expect($pre->refresh()->oidc_sub)->toBe('sub-123');
+});

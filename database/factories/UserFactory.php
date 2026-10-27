@@ -63,6 +63,18 @@ class UserFactory extends Factory
         return $this->withRoles(Role::UserAdmin);
     }
 
+    /**
+     * @param  list<string>  $recoveryCodes
+     */
+    public function withTwoFactor(string $secret, array $recoveryCodes = ['AAAAAAAAAA-BBBBBBBBBB', 'CCCCCCCCCC-DDDDDDDDDD']): static
+    {
+        return $this->state(fn () => [
+            'two_factor_secret' => $secret,
+            'two_factor_recovery_codes' => $recoveryCodes,
+            'two_factor_confirmed_at' => now(),
+        ]);
+    }
+
     public function noRoles(): static
     {
         return $this->state(fn () => ['roles' => []]);

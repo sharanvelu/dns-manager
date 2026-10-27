@@ -130,6 +130,21 @@ export default function Page() {
         </tbody>
       </table>
 
+      <H2>Sign-in methods</H2>
+
+      <p>
+        <code>SSO_ENABLED</code>, <code>BASIC_AUTH_ENABLED</code>,{" "}
+        <code>PASSWORD_MIN_LENGTH</code>,{" "}
+        <code>PASSWORD_RESET_EXPIRE_MINUTES</code>,{" "}
+        <code>INVITE_EXPIRE_HOURS</code> and <code>LOGIN_MAX_ATTEMPTS</code>{" "}
+        are documented in{" "}
+        <a href="/docs/authentication/passwords/">
+          Authentication → Password sign-in
+        </a>
+        . Password emails (reset links, invites) are sent with your{" "}
+        <code>MAIL_*</code> settings through the queue worker.
+      </p>
+
       <H2>Authentication (OIDC)</H2>
 
       <p>
@@ -463,8 +478,7 @@ export default function Page() {
               <code>12</code>
             </td>
             <td>
-              Bcrypt cost factor. Barely relevant here — sign-in is OIDC-only
-              with no local passwords.
+              Bcrypt cost factor. Cost factor for hashing local passwords.
             </td>
           </tr>
           <tr>

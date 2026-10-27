@@ -11,9 +11,31 @@ export default function Page() {
     <DocArticle group="users" slug="managing">
       <H2>How users are created</H2>
       <p>
-        There is no registration form. Users are provisioned automatically on their{" "}
-        <strong>first OIDC sign-in</strong> — see{" "}
-        <a href="/docs/authentication/first-login/">First login</a>:
+        There is no public registration form. Users are created in one of two ways:
+      </p>
+      <ul>
+        <li>
+          <strong>By an administrator</strong> — <strong>Settings → Users → Add user</strong>{" "}
+          takes a name, email and optional global roles. When password sign-in is enabled the new
+          user is emailed a link to create their password (valid for{" "}
+          <code>INVITE_EXPIRE_HOURS</code>) and is sent to the sign-in page afterwards. Until then
+          they show an <strong>Invite pending</strong> badge and the <strong>Resend invite</strong>{" "}
+          button on their detail page re-sends the email. With SSO, the user simply signs in using
+          that email. Tick <strong>Single sign-on only</strong> to skip the invite — they sign in with SSO
+          and cannot use a password (offered only when both SSO and password sign-in are enabled).
+          A User Admin cannot create Super Admins. The button is hidden when
+          SSO is the only sign-in method and <code>SSO_AUTO_PROVISION</code> is on, since accounts
+          appear on first sign-in anyway.
+        </li>
+        <li>
+          <strong>Automatically on first OIDC sign-in</strong> — see{" "}
+          <a href="/docs/authentication/first-login/">First login</a>:
+        </li>
+      </ul>
+      <p>
+        On a user&apos;s detail page, <strong>Account</strong> lets admins edit the name and email
+        of users who do not sign in through SSO (SSO users&apos; details come from the identity
+        provider). Admins can delete users from the <strong>Danger zone</strong>.
       </p>
       <ul>
         <li>
@@ -129,6 +151,14 @@ export default function Page() {
           is read-only to them.
         </li>
         <li>
+          <strong>No self-reset</strong> — you cannot force a password reset or reset two-factor on
+          your own account; use your profile.
+        </li>
+        <li>
+          <strong>SSO only is admin-controlled</strong> — users cannot change it themselves, and a
+          User Admin cannot change it on their own account.
+        </li>
+        <li>
           <strong>No self-deletion</strong> — nobody can delete their own account, whatever their
           roles.
         </li>
@@ -140,10 +170,26 @@ export default function Page() {
         </li>
       </ul>
 
-      <H2>Deleting a user</H2>
+      <H2>Resetting two-factor authentication</H2>
       <p>
-        The <strong>Danger zone</strong> card holds <strong>Delete user</strong> (hidden on your
-        own account). Deleting removes the account, its global roles, and all of its zone grants.
+        If a user lost their authenticator <em>and</em> their recovery codes, open their page and
+        click <strong>Reset two-factor</strong> on the Account card. It clears their authenticator
+        and recovery codes (including an unfinished setup) and signs them out of every session. Their
+        password is unchanged, so they can sign in and enrol again from their profile. You cannot
+        reset your own — manage that from your profile. Recorded as <code>two-factor-reset</code>{" "}
+        in the activity log. Accounts with two-factor enabled show a <strong>Two-factor</strong>{" "}
+        badge.
+      </p>
+
+      <H2>Danger zone</H2>
+      <p>
+        The <strong>Danger zone</strong> card (hidden on your own account) holds{" "}
+        <strong>Force password reset</strong> and <strong>Delete user</strong>. Forcing a reset signs
+        the user out everywhere, emails them a reset link and blocks password sign-in until they set
+        a new one — see <a href="/docs/authentication/passwords/">Password sign-in</a>. Users
+        awaiting a reset show a <strong>Password reset required</strong> badge, and users restricted
+        to SSO show an <strong>SSO only</strong> badge, in the list and on their page. Deleting
+        removes the account, its global roles, and all of its zone grants.
       </p>
       <Callout type="warning">
         Deleting a user does <strong>not</strong> block the person at your identity provider —

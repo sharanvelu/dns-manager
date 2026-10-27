@@ -88,8 +88,16 @@ export default function Page() {
               <strong>Sign-ins</strong>
             </td>
             <td>
-              A <strong>login</strong> and <strong>logout</strong> event per user (via your OIDC
-              provider).
+              A <strong>login</strong> and <strong>logout</strong> event per user (SSO or password —
+              the login records which), plus <strong>login-failed</strong> for bad passwords.
+              Password and account events are recorded as well: <strong>password-reset-requested</strong>,{" "}
+              <strong>password-reset</strong>, <strong>password-set</strong>,{" "}
+              <strong>password-changed</strong>, <strong>invite-sent</strong>,{" "}
+              <strong>password-reset-forced</strong>, <strong>sso-only-changed</strong>, and the
+              two-factor events <strong>two-factor-enabled</strong>, <strong>two-factor-disabled</strong>,{" "}
+              <strong>two-factor-recovery-codes-regenerated</strong>,{" "}
+              <strong>two-factor-challenge-failed</strong>, and <strong>two-factor-reset</strong>.
+              Passwords, secrets, and recovery codes are never logged.
             </td>
           </tr>
         </tbody>
@@ -174,7 +182,7 @@ export default function Page() {
           <strong>Specific record</strong> — narrow to one entry, provider, user, or zone.
         </li>
         <li>
-          <strong>Event</strong> — created, updated, deleted, provider-attached, login, and so
+          <strong>Event</strong> — created, updated, deleted, provider-attached, login, login-failed, and so
           on.
         </li>
         <li>

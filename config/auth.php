@@ -97,8 +97,17 @@ return [
         'users' => [
             'provider' => 'users',
             'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
-            'expire' => 60,
+            'expire' => (int) env('PASSWORD_RESET_EXPIRE_MINUTES', 60),
             'throttle' => 60,
+        ],
+
+        // First-time "create your password" links sent to admin-created
+        // users. Separate table so an invite never collides with a reset.
+        'invites' => [
+            'provider' => 'users',
+            'table' => 'password_invite_tokens',
+            'expire' => (int) env('INVITE_EXPIRE_HOURS', 72) * 60,
+            'throttle' => 0,
         ],
     ],
 
@@ -114,4 +123,22 @@ return [
     */
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Sign-in methods
+    |--------------------------------------------------------------------------
+    |
+    | SSO (OIDC) defaults to on whenever OIDC_BASE_URL is configured. Basic
+    | (email + password) auth can only be switched off while SSO is on —
+    | see App\Support\AuthMethods, which forces it on otherwise so nobody
+    | is locked out.
+    |
+    */
+
+    'sso_enabled' => filter_var(env('SSO_ENABLED', filled(env('OIDC_BASE_URL'))), FILTER_VALIDATE_BOOLEAN),
+    'sso_auto_provision' => filter_var(env('SSO_AUTO_PROVISION', true), FILTER_VALIDATE_BOOLEAN),
+    'basic_enabled' => filter_var(env('BASIC_AUTH_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+    'password_min_length' => (int) env('PASSWORD_MIN_LENGTH', 8),
+    'login_max_attempts' => (int) env('LOGIN_MAX_ATTEMPTS', 5),
 ];

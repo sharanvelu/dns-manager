@@ -312,3 +312,87 @@ test('mutations stay behind manage-users', function () {
     $this->put("/users/{$target->id}", ['roles' => ['super-viewer']])->assertForbidden();
     $this->delete("/users/{$target->id}")->assertForbidden();
 });
+
+test('admin creates a user and an invite email is sent', function () {
+    \Illuminate\Support\Facades\Notification::fake();
+    $admin = User::factory()->create();
+
+    $this->actingAs($admin)->post('/users', ['name' => 'New Person', 'email' => 'New@Example.com', 'roles' => ['super-viewer']])
+        ->assertSessionHasNoErrors();
+
+    $user = User::where('email', 'new@example.com')->sole();
+    expect($user->isPendingInvite())->toBeTrue()->and($user->roles)->toBe(['super-viewer']);
+    \Illuminate\Support\Facades\Notification::assertSentTo($user, \App\Notifications\InviteNotification::class);
+});
+
+test('no invite is sent when basic auth is disabled', function () {
+    \Illuminate\Support\Facades\Notification::fake();
+    config(['auth.basic_enabled' => false]);
+    $admin = User::factory()->create();
+
+    $this->actingAs($admin)->post('/users', ['name' => 'Sso Person', 'email' => 'sso@example.com', 'roles' => []])
+        ->assertSessionHasNoErrors();
+
+    \Illuminate\Support\Facades\Notification::assertNothingSent();
+});
+
+test('duplicate emails are rejected on create', function () {
+    $admin = User::factory()->create();
+
+    $this->actingAs($admin)->post('/users', ['name' => 'Dup', 'email' => $admin->email, 'roles' => []])
+        ->assertSessionHasErrors('email');
+});
+
+test('a user admin cannot create a super admin', function () {
+    $actor = User::factory()->userAdmin()->create();
+
+    $this->actingAs($actor)->post('/users', ['name' => 'X', 'email' => 'x@example.com', 'roles' => ['super-admin']])
+        ->assertSessionHasErrors('roles');
+    expect(User::where('email', 'x@example.com')->exists())->toBeFalse();
+});
+
+test('viewers cannot create users', function () {
+    $viewer = User::factory()->superViewer()->create();
+
+    $this->actingAs($viewer)->post('/users', ['name' => 'X', 'email' => 'x@example.com', 'roles' => []])->assertForbidden();
+});
+
+test('admin can edit name and email of a non-SSO user but not an SSO user', function () {
+    $admin = User::factory()->create();
+    $local = User::factory()->noRoles()->create(['password' => null]);
+    $sso = User::factory()->noRoles()->create(['oidc_sub' => 'sub-9', 'name' => 'Sso', 'email' => 'sso@example.com']);
+
+    $this->actingAs($admin)->put("/users/{$local->id}", ['name' => 'Renamed', 'email' => 'renamed@example.com', 'roles' => []])
+        ->assertSessionHasNoErrors();
+    expect($local->refresh()->only('name', 'email'))->toBe(['name' => 'Renamed', 'email' => 'renamed@example.com']);
+
+    $this->actingAs($admin)->put("/users/{$sso->id}", ['name' => 'Hacked', 'roles' => []])->assertSessionHasErrors('name');
+    expect($sso->refresh()->name)->toBe('Sso');
+});
+
+test('admin can resend an invite only while it is pending', function () {
+    \Illuminate\Support\Facades\Notification::fake();
+    $admin = User::factory()->create();
+    $pending = User::factory()->noRoles()->create(['password' => null]);
+    $active = User::factory()->noRoles()->create();
+
+    $this->actingAs($admin)->post("/users/{$pending->id}/invite")->assertSessionHasNoErrors();
+    $this->actingAs($admin)->post("/users/{$active->id}/invite")->assertSessionHasErrors('user');
+
+    \Illuminate\Support\Facades\Notification::assertSentToTimes($pending, \App\Notifications\InviteNotification::class, 1);
+    \Illuminate\Support\Facades\Notification::assertNotSentTo($active, \App\Notifications\InviteNotification::class);
+});
+
+test('Add user is hidden only for SSO-only sign-in with auto-provisioning on', function (bool $basic, bool $autoProvision, bool $canCreate) {
+    config(['auth.sso_enabled' => true, 'auth.basic_enabled' => $basic, 'auth.sso_auto_provision' => $autoProvision]);
+    $admin = User::factory()->create();
+
+    $this->actingAs($admin)->get('/users')->assertInertia(fn ($page) => $page->where('canCreate', $canCreate));
+    $this->actingAs($admin)->post('/users', ['name' => 'N', 'email' => 'n@example.com', 'roles' => []])
+        ->assertStatus($canCreate ? 302 : 403);
+})->with([
+    'both on' => [true, true, true],
+    'sso only, auto-provision on' => [false, true, false],
+    'sso only, auto-provision off' => [false, false, true],
+    'basic on, auto-provision off' => [true, false, true],
+]);

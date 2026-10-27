@@ -1,16 +1,23 @@
 import { FlashToast } from '@/components/flash-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { CreateUserDialog } from '@/components/users/create-user-dialog';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
-import { ShieldCheck } from 'lucide-react';
-import { globalRoleLabel, timeAgo, type UserListItem } from './types';
+import { Plus, ShieldCheck } from 'lucide-react';
+import { useState } from 'react';
+import { globalRoleLabel, timeAgo, type RoleOption, type UserListItem } from './types';
 
 interface UsersIndexProps {
     users: UserListItem[];
     canManage: boolean;
+    roleOptions: RoleOption[];
+    basicEnabled: boolean;
+    ssoEnabled: boolean;
+    canCreate: boolean;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -20,7 +27,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-function UserRow({ user, isSelf }: { user: UserListItem; isSelf: boolean }) {
+function UserRow({ user, isSelf, ssoEnabled }: { user: UserListItem; isSelf: boolean; ssoEnabled: boolean }) {
     const getInitials = useInitials();
 
     return (
@@ -35,6 +42,21 @@ function UserRow({ user, isSelf }: { user: UserListItem; isSelf: boolean }) {
             <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-2 text-sm font-medium">
                     <span className="truncate">{user.name}</span>
+                    {user.invitePending && (
+                        <Badge variant="outline" className="text-[10px]">
+                            Invite pending
+                        </Badge>
+                    )}
+                    {user.mustChangePassword && (
+                        <Badge variant="outline" className="border-amber-500/40 text-[10px] text-amber-700 dark:text-amber-400">
+                            Password reset required
+                        </Badge>
+                    )}
+                    {user.ssoOnly && ssoEnabled && (
+                        <Badge variant="secondary" className="text-[10px]">
+                            SSO only
+                        </Badge>
+                    )}
                     {isSelf && (
                         <Badge variant="secondary" className="text-[10px]">
                             You
@@ -66,17 +88,26 @@ function UserRow({ user, isSelf }: { user: UserListItem; isSelf: boolean }) {
     );
 }
 
-export default function UsersIndex({ users, canManage }: UsersIndexProps) {
+export default function UsersIndex({ users, canManage, roleOptions, basicEnabled, ssoEnabled, canCreate }: UsersIndexProps) {
     const { auth } = usePage<SharedData>().props;
+    const [creating, setCreating] = useState(false);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Users" />
 
             <div className="flex h-full flex-1 flex-col gap-4 p-4">
-                <div>
-                    <h1 className="text-xl font-semibold tracking-tight">Users</h1>
-                    <p className="text-muted-foreground text-sm">Who can sign in, their global roles, and their zone access.</p>
+                <div className="flex items-start justify-between gap-3">
+                    <div>
+                        <h1 className="text-xl font-semibold tracking-tight">Users</h1>
+                        <p className="text-muted-foreground text-sm">Who can sign in, their global roles, and their zone access.</p>
+                    </div>
+                    {canManage && canCreate && (
+                        <Button size="sm" onClick={() => setCreating(true)}>
+                            <Plus className="size-3.5" />
+                            Add user
+                        </Button>
+                    )}
                 </div>
 
                 {!canManage && (
@@ -88,7 +119,7 @@ export default function UsersIndex({ users, canManage }: UsersIndexProps) {
 
                 <div className="divide-border divide-y rounded-lg border">
                     {users.map((user) => (
-                        <UserRow key={user.id} user={user} isSelf={user.id === auth.user.id} />
+                        <UserRow key={user.id} user={user} isSelf={user.id === auth.user.id} ssoEnabled={ssoEnabled} />
                     ))}
                 </div>
 
@@ -97,6 +128,16 @@ export default function UsersIndex({ users, canManage }: UsersIndexProps) {
                     access.
                 </p>
             </div>
+
+            {canCreate && (
+                <CreateUserDialog
+                    open={creating}
+                    onOpenChange={setCreating}
+                    roleOptions={roleOptions}
+                    basicEnabled={basicEnabled}
+                    ssoEnabled={ssoEnabled}
+                />
+            )}
 
             <FlashToast />
         </AppLayout>

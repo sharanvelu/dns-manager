@@ -15,7 +15,8 @@ Manage DNS entries across multiple providers from one place. Records live in **D
 
 - Laravel 12 (PHP 8.4) + Inertia.js 2 + React 19 + TypeScript + Tailwind CSS 4
 - PostgreSQL 16 (managed migrations), Redis (queue)
-- OIDC authentication (any spec-compliant provider: Authentik, Keycloak, Auth0, ...)
+- OIDC authentication (any spec-compliant provider: Authentik, Keycloak, Auth0, ...) and/or email + password sign-in, each toggled by env (`SSO_ENABLED`, `BASIC_AUTH_ENABLED`)
+- Forgot-password emails, admin-created users invited by email, user management (add/edit/delete)
 - Provider credentials stored encrypted at rest (AES-256 via `APP_KEY`)
 
 ## Local development
@@ -42,6 +43,7 @@ Run tests with `./vendor/bin/pest`, format with `./vendor/bin/pint`.
 | `OIDC_BASE_URL` | Issuer base URL (the part before `/.well-known/openid-configuration`) |
 | `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` | OIDC client credentials |
 | `OIDC_REDIRECT_URI` | Defaults to `${APP_URL}/auth/callback` |
+| `SSO_ENABLED` / `SSO_AUTO_PROVISION` / `BASIC_AUTH_ENABLED` | Switch SSO / password sign-in on or off (password auth can only be disabled while SSO is on); also `PASSWORD_MIN_LENGTH`, `PASSWORD_RESET_EXPIRE_MINUTES`, `INVITE_EXPIRE_HOURS`, `LOGIN_MAX_ATTEMPTS`. First admin without SSO: `php artisan dns:create-user --super-admin` |
 | `OIDC_PROVIDER_LABEL` | Sign-in button label, e.g. `Sentrix` → "Sign in with Sentrix" |
 | `QUEUE_CONNECTION` | `redis` in production |
 | `ACTIVITY_LOGS_RETENTION_DAYS` | Optional — auto-delete audit-trail activities older than N days (daily schedule; unset keeps them forever) |
