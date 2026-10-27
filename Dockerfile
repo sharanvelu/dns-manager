@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # Stage 1: build frontend assets (Vite / React / Tailwind)
 # ---------------------------------------------------------------------------
-FROM node:22-alpine AS assets
+FROM node:24-alpine AS assets
 
 WORKDIR /app
 
@@ -24,7 +24,7 @@ RUN npm run build
 # ---------------------------------------------------------------------------
 # Stage 2: build the static documentation site (Next.js export)
 # ---------------------------------------------------------------------------
-FROM node:22-alpine AS docs
+FROM node:24-alpine AS docs
 
 WORKDIR /app
 

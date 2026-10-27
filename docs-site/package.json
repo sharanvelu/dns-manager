@@ -2,6 +2,9 @@
   "name": "dns-manager-docs-site",
   "version": "0.0.0",
   "private": true,
+  "engines": {
+    "node": "24.x"
+  },
   "description": "Standalone static documentation site for DNS Manager (latest version).",
   "scripts": {
     "dev": "next dev",

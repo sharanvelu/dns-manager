@@ -77,6 +77,8 @@ routes/console.php       # the schedule (Laravel 12 has no console Kernel — th
 
 ## Key gotchas (learned the hard way — keep current)
 
+- **Node 24 is pinned in four places — bump them together**: both `FROM node:…-alpine` stages in `Dockerfile` (assets + docs; Node exists only in these build stages, the runtime image is PHP), `node-version` in `.github/actions/setup/action.yml` (every CI workflow), `engines.node` in `docs-site/package.json` (Vercel reads it and overrides the dashboard's Node setting; Vercel only offers 24.x/22.x as of its docs), and the README requirement. Vitest 5 (`^22.12 || ^24 || >=26`) and ESLint 10 (`^22.13 || >=24`) set the floor for the root toolchain.
+
 - Provider `config` cast requires a valid `APP_KEY`; tests inherit it from `.env`.
 - Postgres-only SQL (`ilike`) breaks the sqlite test DB — use portable `LOWER(x) LIKE ?`.
 - Vite preloading is **disabled** (`Vite::usePreloadTagAttributes(false)` in `AppServiceProvider`): the preload `Link` header (~4KB+) overflowed default nginx `fastcgi_buffer_size` (4KB) causing 502s on full-page refreshes. `docker/nginx.conf` also raises the buffers. Do not re-enable preloading without checking both.
