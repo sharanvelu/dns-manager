@@ -18,7 +18,12 @@ interface CreateUserDialogProps {
 }
 
 export function CreateUserDialog({ open, onOpenChange, roleOptions, basicEnabled, ssoEnabled }: CreateUserDialogProps) {
-    const { data, setData, post, processing, errors, reset, clearErrors } = useForm<{ name: string; email: string; roles: string[]; sso_only: boolean }>({
+    const { data, setData, post, processing, errors, reset, clearErrors } = useForm<{
+        name: string;
+        email: string;
+        roles: string[];
+        sso_only: boolean;
+    }>({
         name: '',
         email: '',
         roles: [],
@@ -74,7 +79,11 @@ export function CreateUserDialog({ open, onOpenChange, roleOptions, basicEnabled
 
                     {ssoEnabled && basicEnabled && (
                         <label htmlFor="new-user-sso-only" className="flex items-start gap-2.5 rounded-md border p-2.5">
-                            <Checkbox id="new-user-sso-only" checked={data.sso_only} onCheckedChange={(checked) => setData('sso_only', checked === true)} />
+                            <Checkbox
+                                id="new-user-sso-only"
+                                checked={data.sso_only}
+                                onCheckedChange={(checked) => setData('sso_only', checked === true)}
+                            />
                             <span className="grid gap-0.5">
                                 <span className="text-sm leading-none font-medium">Single sign-on only</span>
                                 <span className="text-muted-foreground text-xs">
