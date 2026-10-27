@@ -1,6 +1,5 @@
-import { defaultConfigFor } from '@/components/config-fields';
+import { type ConfigValues, defaultConfigFor } from '@/components/config-fields';
 import { ProviderCloudflareMark, ProviderGenericMark, ProviderPiholeMark, ProviderTechnitiumMark } from '@/components/icons';
-import type { FormDataConvertible } from '@inertiajs/core';
 import type { ComponentType, SVGProps } from 'react';
 import type { Connector, Provider } from './types';
 
@@ -48,7 +47,7 @@ export function relativeTime(iso: string | null): string | null {
 }
 
 /** Build the default (empty) config for a connector from its schema defaults. */
-export function defaultConfig(connector: Connector | undefined): Record<string, FormDataConvertible> {
+export function defaultConfig(connector: Connector | undefined): ConfigValues {
     return defaultConfigFor(connector?.configSchema ?? []);
 }
 
@@ -60,6 +59,6 @@ export function providerPayload(provider: Provider) {
         enabled: provider.enabled,
         managed_record_types: provider.managedRecordTypes,
         // The backend only ever sends scalar config values; secrets arrive as ''.
-        config: provider.config as Record<string, FormDataConvertible>,
+        config: provider.config as ConfigValues,
     };
 }

@@ -1,4 +1,4 @@
-import { ConfigFieldInput } from '@/components/config-fields';
+import { ConfigFieldInput, type ConfigValues } from '@/components/config-fields';
 import { RecordTypeBadge } from '@/components/icons';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import type { FormDataConvertible } from '@inertiajs/core';
 import { useForm } from '@inertiajs/react';
 import { CircleAlert, CircleCheck, LoaderCircle, Plug } from 'lucide-react';
 import { FormEventHandler, useState } from 'react';
@@ -22,8 +21,7 @@ interface FormData {
     type: string;
     enabled: boolean;
     managed_record_types: string[];
-    config: Record<string, FormDataConvertible>;
-    [key: string]: FormDataConvertible;
+    config: ConfigValues;
 }
 
 interface ProviderFormDialogProps {
@@ -82,7 +80,7 @@ export function ProviderFormDialog({ connectors, provider, onClose }: ProviderFo
         type: provider?.type ?? initialConnector?.type ?? '',
         enabled: provider?.enabled ?? true,
         managed_record_types: provider ? [...provider.managedRecordTypes] : [...(initialConnector?.supportedRecordTypes ?? [])],
-        config: provider ? ({ ...provider.config } as Record<string, FormDataConvertible>) : defaultConfig(initialConnector),
+        config: provider ? ({ ...provider.config } as ConfigValues) : defaultConfig(initialConnector),
     });
 
     const [test, setTest] = useState<TestState>({ status: 'idle' });
@@ -107,7 +105,7 @@ export function ProviderFormDialog({ connectors, provider, onClose }: ProviderFo
         }));
     };
 
-    const setConfigValue = (key: string, value: FormDataConvertible) => {
+    const setConfigValue = (key: string, value: ConfigValues[string]) => {
         setTest({ status: 'idle' });
         setData('config', { ...data.config, [key]: value });
     };
