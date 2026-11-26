@@ -55,7 +55,7 @@ app/Http/Controllers/    # Dashboard, DnsEntry(+Bulk), Zone, ZoneProvider, Provi
 resources/js/pages/      # Inertia React pages (dashboard, entries/, zones/{index,records,providers,activity,access}, providers/, users/{index,show}, auth/, settings/)
 resources/js/components/entries/   # shared EntriesView + dialogs — serves /entries AND /zones/{id}/records via EntriesScope
 resources/js/components/activity/  # shared ActivityTable — serves settings activity AND zone activity via baseUrl
-resources/js/components/zones/     # zone dialogs (form/delete/attach/detach/attachment-config/import-records); zone-tabs.tsx header lives one level up
+resources/js/components/zones/     # zone dialogs (form/delete/attach/detach/attachment-config/import-records + import-from-provider toolbar picker); zone-tabs.tsx header lives one level up
 resources/js/components/profile/   # profile-page sections (TwoFactorSection, RecoveryCodes)
 resources/js/components/users/     # sso-only-toggle, force-password-reset-button, create-user-dialog; GrantDialog — shared zone-access grant/edit dialog (user detail page AND zone Access tab); nav-group.tsx (collapsible sidebar group) lives one level up
 resources/js/components/icons/     # custom SVG icon set (original artwork; provider marks are real brand logos — see DESIGN.md)

@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { ImportFromProvider } from '@/components/zones/import-from-provider';
 import { type ZoneCanMap } from '@/types';
 import { Link, router } from '@inertiajs/react';
 import { ArrowDown, ArrowUp, ArrowUpDown, Plus, SearchX, Upload } from 'lucide-react';
@@ -249,6 +250,12 @@ export function EntriesView({ scope, entries, filters, zones, zoneAttachments, c
                         <RefreshControls storageKey={refreshStorageKey} />
                         {canManageAny && (
                             <>
+                                <ImportFromProvider
+                                    zones={manageableZones}
+                                    zoneAttachments={zoneAttachments}
+                                    lockedZone={scope.zone}
+                                    defaultZoneId={defaultZoneId}
+                                />
                                 <Button variant="outline" onClick={() => setImportOpen(true)} disabled={noZones}>
                                     <Upload className="size-4" />
                                     Import CSV

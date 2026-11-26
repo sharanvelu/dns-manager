@@ -249,9 +249,11 @@ export const PAGES: DocPage[] = [
       "The attachment is removed",
       "Zoneless providers and opting out",
       "Import records from a provider",
+      "Open the import",
       "Review the remote records",
-      "Note what was filtered out",
+      "Check what can't be imported",
       "Select and import",
+      "Stop tracking records (optional)",
     ],
   },
   {
