@@ -24,6 +24,15 @@ enum RecordType: string
         return in_array($this, [self::MX, self::SRV], true);
     }
 
+    /**
+     * Record types a provider proxy can sit in front of (Cloudflare proxies
+     * only A, AAAA, and CNAME).
+     */
+    public function isProxiable(): bool
+    {
+        return in_array($this, [self::A, self::AAAA, self::CNAME], true);
+    }
+
     public static function values(): array
     {
         return array_column(self::cases(), 'value');
