@@ -2,6 +2,7 @@ import Callout from "@/components/docs/Callout";
 import CodeBlock from "@/components/docs/CodeBlock";
 import DocArticle, { docMetadata } from "@/components/docs/DocArticle";
 import { Step, Steps } from "@/components/docs/Steps";
+import { siteConfig } from "@/lib/site";
 
 export const metadata = docMetadata("installation", "upgrading");
 
@@ -12,7 +13,10 @@ export default function Page() {
         <Step title="Pull the new image tag">
           <p>
             Grab the release you want from{" "}
-            <code>ghcr.io/OWNER/dns-manager</code>.
+            <code>ghcr.io/OWNER/dns-manager</code>. Each version&apos;s
+            changes are listed in its{" "}
+            <a href={`${siteConfig.githubUrl}/releases`}>release notes</a>{" "}
+            — read them before upgrading.
           </p>
         </Step>
 
