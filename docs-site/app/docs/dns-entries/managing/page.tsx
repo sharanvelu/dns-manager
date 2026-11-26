@@ -175,7 +175,12 @@ export default function Page() {
             </td>
             <td>
               Bulk-edits the <strong>type</strong>, <strong>value</strong>,{" "}
-              <strong>TTL</strong>, and/or <strong>comment</strong> (works across zones).
+              <strong>TTL</strong>, <strong>proxy</strong>, and/or <strong>comment</strong>{" "}
+              (works across zones). Turning the proxy <strong>on</strong> only applies to A,
+              AAAA, and CNAME records — other types are skipped and counted in the result
+              message; turning it <strong>off</strong> applies to every selected entry. Proxying
+              takes effect on providers that support it (Cloudflare). Changing the type to
+              one that can&apos;t be proxied also turns the proxy off.
             </td>
           </tr>
           <tr>

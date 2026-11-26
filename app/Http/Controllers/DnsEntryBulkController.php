@@ -115,18 +115,25 @@ class DnsEntryBulkController extends Controller
      * Apply the given field changes to every selected entry. Each entry is
      * re-validated with the change merged in; entries that would become
      * invalid or duplicate another entry are skipped, never half-applied.
+     * Turning the proxy on skips entries whose (resulting) type cannot be
+     * proxied; a type change to such a type clears the proxy flag.
      */
     public function update(Request $request): RedirectResponse
     {
         $request->validate([
-            'set' => ['required', 'array:type,content,ttl,comment'],
+            'set' => ['required', 'array:type,content,ttl,proxied,comment'],
             'set.type' => ['sometimes', Rule::enum(RecordType::class)],
             'set.content' => ['sometimes', 'string', 'max:2048'],
             'set.ttl' => ['sometimes', 'nullable', 'integer', 'min:60', 'max:86400'],
+            'set.proxied' => ['sometimes', 'boolean'],
             'set.comment' => ['sometimes', 'nullable', 'string', 'max:255'],
         ]);
 
         $set = $request->input('set', []);
+
+        if (array_key_exists('proxied', $set)) {
+            $set['proxied'] = filter_var($set['proxied'], FILTER_VALIDATE_BOOLEAN);
+        }
 
         if ($set === []) {
             return back()->withErrors(['set' => 'Pick at least one field to change.']);
@@ -137,6 +144,7 @@ class DnsEntryBulkController extends Controller
         $updated = 0;
         $invalid = 0;
         $duplicates = 0;
+        $unproxiable = 0;
 
         foreach ($entries as $entry) {
             $payload = array_merge([
@@ -161,9 +169,19 @@ class DnsEntryBulkController extends Controller
 
             $data = $validator->validated();
 
+            if (($set['proxied'] ?? false) === true && ! $type->isProxiable()) {
+                $unproxiable++;
+
+                continue;
+            }
+
             // A type change can leave fields behind that no longer apply.
             if (! $type->hasPriority()) {
                 $data['priority'] = null;
+            }
+
+            if (! $type->isProxiable()) {
+                $data['proxied'] = false;
             }
 
             $collision = DnsEntry::query()
@@ -194,6 +212,7 @@ class DnsEntryBulkController extends Controller
         $skippedParts = array_filter([
             $invalid > 0 ? "{$invalid} skipped as invalid after the change" : null,
             $duplicates > 0 ? "{$duplicates} skipped to avoid duplicates" : null,
+            $unproxiable > 0 ? "{$unproxiable} skipped — only A, AAAA, and CNAME records can be proxied" : null,
         ]);
 
         if ($skippedParts !== []) {

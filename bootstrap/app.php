@@ -2,6 +2,7 @@
 
 declare(strict_types = 1);
 
+use App\Support\EntryQuery;
 use Illuminate\Foundation\Application;
 use App\Http\Middleware\EnsureAuthMethod;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -26,6 +27,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: '*');
 
         $middleware->alias(['auth.method' => EnsureAuthMethod::class]);
+
+        // Written by the frontend, so it can't be encrypted; the value is
+        // only read through EntryQuery's page-size allowlist.
+        $middleware->encryptCookies(except: [EntryQuery::PAGE_SIZE_COOKIE]);
 
         $middleware->web(append: [
             HandleInertiaRequests::class,

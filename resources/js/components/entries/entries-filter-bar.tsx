@@ -4,6 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { router } from '@inertiajs/react';
 import { Search, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { pageSizeParam } from './page-size';
 import { RECORD_TYPES, SYNC_STATUSES, type EntriesScope, type EntryFilters, type ZoneOption } from './types';
 
 const ALL = 'all';
@@ -26,7 +27,7 @@ export function EntriesFilterBar({ scope, filters, zones, providers }: EntriesFi
     const suppressNextSearchApply = useRef(false);
     const zoneLocked = scope.zone !== undefined;
 
-    const apply = (overrides: Partial<Record<keyof EntryFilters, string>>) => {
+    const apply = (overrides: Partial<Record<Exclude<keyof EntryFilters, 'per_page'>, string>>) => {
         const next: Record<string, string> = {
             search: search.trim(),
             type: filters.type ?? '',
@@ -36,6 +37,8 @@ export function EntriesFilterBar({ scope, filters, zones, providers }: EntriesFi
             // Filtering must not reset the active column sort.
             sort: filters.sort ?? '',
             direction: filters.direction ?? '',
+            // ...nor the chosen page size.
+            ...pageSizeParam(filters),
             ...overrides,
         };
 
