@@ -57,7 +57,9 @@ export default function Page() {
               to the user who asked for it (the eventual <strong>deleted</strong> event is
               recorded by the system once the last provider confirms). Bulk provider reassignment
               logs a <strong>providers-changed</strong> event listing the providers each entry
-              now syncs to.
+              now syncs to. Accepting a provider&apos;s values for a drifted entry logs one{" "}
+              <strong>accepted-remote</strong> event naming the provider, with old → new diffs for
+              the fields that were adopted.
             </td>
           </tr>
           <tr>

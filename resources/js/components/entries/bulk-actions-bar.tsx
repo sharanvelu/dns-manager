@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { router } from '@inertiajs/react';
-import { LoaderCircle, Pencil, RefreshCw, Server, Trash2, X } from 'lucide-react';
+import { ArrowDownToLine, LoaderCircle, Pencil, RefreshCw, Server, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { BulkEditDialog } from './bulk-edit-dialog';
 import { BulkProvidersDialog } from './bulk-providers-dialog';
@@ -21,6 +21,7 @@ export function BulkActionsBar({ selectedIds, selectionZoneId, attachments, onCl
     const [providersOpen, setProvidersOpen] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
+    const [acceptOpen, setAcceptOpen] = useState(false);
     const [busy, setBusy] = useState(false);
 
     const count = selectedIds.length;
@@ -35,6 +36,22 @@ export function BulkActionsBar({ selectedIds, selectionZoneId, attachments, onCl
             {
                 preserveScroll: true,
                 onSuccess: onClear,
+                onFinish: () => setBusy(false),
+            },
+        );
+    };
+
+    const acceptRemote = () => {
+        setBusy(true);
+        router.post(
+            route('entries.bulk.accept-remote'),
+            { ids: selectedIds },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setAcceptOpen(false);
+                    onClear();
+                },
                 onFinish: () => setBusy(false),
             },
         );
@@ -86,6 +103,10 @@ export function BulkActionsBar({ selectedIds, selectionZoneId, attachments, onCl
                         <TooltipContent>Select entries from a single zone to change providers.</TooltipContent>
                     </Tooltip>
                 )}
+                <Button variant="outline" size="sm" className="h-8" onClick={() => setAcceptOpen(true)} disabled={busy}>
+                    <ArrowDownToLine className="size-3.5" />
+                    Accept remote
+                </Button>
                 <Button variant="outline" size="sm" className="h-8" onClick={() => setEditOpen(true)} disabled={busy}>
                     <Pencil className="size-3.5" />
                     Edit
@@ -110,6 +131,30 @@ export function BulkActionsBar({ selectedIds, selectionZoneId, attachments, onCl
                 onDone={onClear}
             />
             <BulkEditDialog open={editOpen} onOpenChange={setEditOpen} selectedIds={selectedIds} onDone={onClear} />
+
+            <Dialog open={acceptOpen} onOpenChange={setAcceptOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>
+                            Accept remote values for {count} {noun}?
+                        </DialogTitle>
+                        <DialogDescription>
+                            Each entry that drifted on exactly one provider is updated to what that provider holds now (re-read live), then re-pushed
+                            to its other providers. Entries that are not drifted, or drifted on several providers, are skipped — accept those one at a
+                            time from the row menu. Values that would be invalid or duplicate another entry are refused.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2">
+                        <Button type="button" variant="outline" onClick={() => setAcceptOpen(false)} disabled={busy}>
+                            Cancel
+                        </Button>
+                        <Button type="button" onClick={acceptRemote} disabled={busy}>
+                            {busy && <LoaderCircle className="size-4 animate-spin" />}
+                            Accept remote values
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
                 <DialogContent className="sm:max-w-md">

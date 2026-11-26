@@ -39,6 +39,7 @@ class DnsZone extends Model
         return $this->hasMany(DnsEntry::class, 'dns_zone_id');
     }
 
+    /** @return HasMany<ZoneProvider, $this> */
     public function zoneProviders(): HasMany
     {
         return $this->hasMany(ZoneProvider::class, 'dns_zone_id');

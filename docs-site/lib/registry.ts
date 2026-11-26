@@ -304,9 +304,16 @@ export const PAGES: DocPage[] = [
     slug: "sync",
     title: "Sync & drift",
     description:
-      "Automatic pushes, per-provider status chips, scheduled drift checks, and re-pushing with Sync now and Sync all.",
+      "Automatic pushes, per-provider status chips, scheduled drift checks, re-pushing with Sync now and Sync all, and accepting a provider's values.",
     order: 2,
-    headings: ["Sync statuses", "The drift check", "Sync now", "Sync all and the Drifted tile", "Watching statuses settle"],
+    headings: [
+      "Sync statuses",
+      "The drift check",
+      "Sync now",
+      "Accepting a provider's values",
+      "Sync all and the Drifted tile",
+      "Watching statuses settle",
+    ],
   },
 
   // ── Providers ──────────────────────────────────────────────────────

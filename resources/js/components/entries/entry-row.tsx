@@ -6,10 +6,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { Link, router } from '@inertiajs/react';
-import { Cloud, History, MoreHorizontal, Pencil, RefreshCw, Trash2 } from 'lucide-react';
+import { ArrowDownToLine, Cloud, History, MoreHorizontal, Pencil, RefreshCw, Trash2 } from 'lucide-react';
 import { useState, type ComponentType, type SVGProps } from 'react';
+import { acceptableDriftStates, driftFieldLabel, formatDriftValue } from './drift';
 import { relativeTime } from './helpers';
-import type { DriftDetail, EntryItem, SyncStateItem, SyncStatus } from './types';
+import type { EntryItem, SyncStateItem, SyncStatus } from './types';
 
 const statusConfig: Record<SyncStatus, { icon: ComponentType<SVGProps<SVGSVGElement>>; iconClass: string; nameClass?: string; label: string }> = {
     synced: { icon: StatusSyncedIcon, iconClass: 'text-emerald-600 dark:text-emerald-400', label: 'Synced' },
@@ -19,13 +20,7 @@ const statusConfig: Record<SyncStatus, { icon: ComponentType<SVGProps<SVGSVGElem
     deleting: { icon: StatusDeletingIcon, iconClass: 'text-muted-foreground', nameClass: 'line-through', label: 'Deleting' },
 };
 
-function formatDriftValue(detail: DriftDetail, value: DriftDetail['tracked']): string {
-    if (value === null) return detail.field === 'ttl' ? 'Auto' : '—';
-    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-    return String(value);
-}
-
-function SyncStateChip({ state }: { state: SyncStateItem }) {
+function SyncStateChip({ state, canManage }: { state: SyncStateItem; canManage: boolean }) {
     const config = statusConfig[state.status];
     const Icon = config.icon;
     const providerName = state.providerName ?? 'Unknown provider';
@@ -57,7 +52,7 @@ function SyncStateChip({ state }: { state: SyncStateItem }) {
                         <div className="border-border/50 mt-1.5 flex flex-col gap-1 border-t pt-1.5">
                             {state.driftDetails.map((detail) => (
                                 <div key={detail.field} className="text-xs">
-                                    <span className="font-medium capitalize">{detail.field === 'ttl' ? 'TTL' : detail.field}</span>
+                                    <span className="font-medium capitalize">{driftFieldLabel(detail.field)}</span>
                                     <span className="text-muted-foreground block font-mono break-all">
                                         tracked: {formatDriftValue(detail, detail.tracked)}
                                     </span>
@@ -67,6 +62,13 @@ function SyncStateChip({ state }: { state: SyncStateItem }) {
                                 </div>
                             ))}
                         </div>
+                    )}
+                    {state.status === 'drifted' && canManage && (
+                        <p className="text-muted-foreground border-border/50 mt-1.5 border-t pt-1.5 text-xs">
+                            {state.driftDetails && state.driftDetails.length > 0
+                                ? `Row menu: “Accept values from ${providerName}” keeps these, “Sync now” overwrites them.`
+                                : 'Row menu: “Sync now” recreates the record.'}
+                        </p>
                     )}
                 </TooltipContent>
             </Tooltip>
@@ -90,10 +92,23 @@ interface EntryRowProps {
     onSelect: (entry: EntryItem, checked: boolean) => void;
     onEdit: (entry: EntryItem) => void;
     onDelete: (entry: EntryItem) => void;
+    onAcceptRemote: (entry: EntryItem, state: SyncStateItem) => void;
 }
 
-export function EntryRow({ entry, canManage, canViewActivity, showSelection, showZone, selected, onSelect, onEdit, onDelete }: EntryRowProps) {
+export function EntryRow({
+    entry,
+    canManage,
+    canViewActivity,
+    showSelection,
+    showZone,
+    selected,
+    onSelect,
+    onEdit,
+    onDelete,
+    onAcceptRemote,
+}: EntryRowProps) {
     const [viewingActivity, setViewingActivity] = useState(false);
+    const acceptable = canManage ? acceptableDriftStates(entry) : [];
 
     const syncNow = () => {
         router.post(route('entries.sync', entry.id), {}, { preserveScroll: true });
@@ -156,7 +171,7 @@ export function EntryRow({ entry, canManage, canViewActivity, showSelection, sho
                 {entry.syncStates.length > 0 ? (
                     <div className="flex flex-wrap gap-1">
                         {entry.syncStates.map((state) => (
-                            <SyncStateChip key={state.id} state={state} />
+                            <SyncStateChip key={state.id} state={state} canManage={canManage} />
                         ))}
                     </div>
                 ) : (
@@ -172,7 +187,7 @@ export function EntryRow({ entry, canManage, canViewActivity, showSelection, sho
                                 <MoreHorizontal className="size-4" />
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuContent align="end" className={acceptable.length > 0 ? 'w-60' : 'w-40'}>
                             {canManage && (
                                 <>
                                     <DropdownMenuItem onSelect={() => onEdit(entry)}>
@@ -183,6 +198,12 @@ export function EntryRow({ entry, canManage, canViewActivity, showSelection, sho
                                         <RefreshCw />
                                         Sync now
                                     </DropdownMenuItem>
+                                    {acceptable.map((state) => (
+                                        <DropdownMenuItem key={state.id} onSelect={() => onAcceptRemote(entry, state)}>
+                                            <ArrowDownToLine />
+                                            <span className="truncate">Accept values from {state.providerName ?? 'provider'}</span>
+                                        </DropdownMenuItem>
+                                    ))}
                                 </>
                             )}
                             {canViewActivity && (

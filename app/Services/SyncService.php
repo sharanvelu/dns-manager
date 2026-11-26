@@ -69,6 +69,32 @@ class SyncService
     }
 
     /**
+     * Re-push an entry to its assignment EXCEPT one attachment — used after
+     * adopting that attachment's remote values, so the source (already
+     * holding them) is not rewritten. Only active attachments that manage
+     * the entry's type are queued; paused ones stay untouched. The type
+     * never changes here, so nothing is unassigned. Returns the queue count.
+     */
+    public function syncEntryExcept(DnsEntry $entry, int $exceptZoneProviderId): int
+    {
+        $states = EntrySyncState::query()
+            ->where('dns_entry_id', $entry->id)
+            ->where('zone_provider_id', '!=', $exceptZoneProviderId)
+            ->where('sync_status', '!=', SyncStatus::Deleting)
+            ->with('zoneProvider.provider')
+            ->get()
+            ->filter(fn (EntrySyncState $state) => $state->zoneProvider?->managesType($entry->type->value) ?? false);
+
+        foreach ($states as $state) {
+            $state->update(['sync_status' => SyncStatus::Pending, 'last_error' => null, 'drift_details' => null]);
+
+            SyncEntryToProvider::dispatch($entry->id, $state->zone_provider_id);
+        }
+
+        return $states->count();
+    }
+
+    /**
      * Add attachments to an entry's assignment without touching the rest of
      * it. Only attachments of the entry's own zone that manage its record
      * type apply; already-assigned ones are simply re-pushed.

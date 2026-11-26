@@ -58,6 +58,7 @@ Route::middleware(['auth'])->group(function () {
     // Ids in zones the user cannot manage silently shrink the selection.
     Route::post('entries/bulk/sync', [DnsEntryBulkController::class, 'sync'])->name('entries.bulk.sync');
     Route::post('entries/bulk/providers', [DnsEntryBulkController::class, 'providers'])->name('entries.bulk.providers');
+    Route::post('entries/bulk/accept-remote', [DnsEntryBulkController::class, 'acceptRemote'])->name('entries.bulk.accept-remote');
     Route::patch('entries/bulk', [DnsEntryBulkController::class, 'update'])->name('entries.bulk.update');
     Route::delete('entries/bulk', [DnsEntryBulkController::class, 'destroy'])->name('entries.bulk.destroy');
 
@@ -65,6 +66,7 @@ Route::middleware(['auth'])->group(function () {
     Route::put('entries/{entry}', [DnsEntryController::class, 'update'])->name('entries.update');
     Route::delete('entries/{entry}', [DnsEntryController::class, 'destroy'])->name('entries.destroy');
     Route::post('entries/{entry}/sync', [DnsEntryController::class, 'sync'])->name('entries.sync');
+    Route::post('entries/{entry}/accept-remote', [DnsEntryController::class, 'acceptRemote'])->name('entries.accept-remote');
 
     // Zone CRUD — creation is global (Super Admin), the rest is per zone.
     Route::post('zones', [ZoneController::class, 'store'])->name('zones.store')->middleware('can:create-zones');
