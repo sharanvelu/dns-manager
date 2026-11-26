@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace App\Connectors\DTOs;
 
 use App\Models\DnsEntry;
+use Illuminate\Support\Collection;
 
 /**
  * Normalized view of a record as it exists at a provider, used for drift
@@ -21,6 +22,34 @@ final readonly class RemoteRecord
         public ?int $priority = null,
         public bool $proxied = false,
     ) {
+    }
+
+    /**
+     * The record a sync state tracks, as the provider holds it now — the
+     * shared lookup behind the drift check and "accept remote values".
+     * Prefers an id match that still agrees with the entry, then any id
+     * match; tuple-encoded external ids (Technitium, Pi-hole) change with
+     * the record's data, so a remotely edited record has no id match and
+     * falls back to the record at the same name+type that no sibling state
+     * claims (multi-value record sets never cross-match).
+     *
+     * @param  Collection<int, self>  $remote
+     * @param  Collection<string, mixed>  $claimed  external ids other states track, as keys
+     */
+    public static function closest(
+        Collection $remote,
+        ?string $externalId,
+        DnsEntry $entry,
+        ConnectorCapabilities $capabilities,
+        Collection $claimed,
+    ): ?self {
+        $candidates = $remote->where('externalId', $externalId);
+
+        return $candidates->first(fn (self $record) => $record->matches($entry, $capabilities))
+            ?? $candidates->first()
+            ?? $remote->first(fn (self $record) => $record->type === $entry->type->value
+                && strcasecmp(rtrim($record->name, '.'), rtrim($entry->fqdn, '.')) === 0
+                && ! $claimed->has($record->externalId));
     }
 
     /**

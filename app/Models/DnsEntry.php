@@ -16,6 +16,20 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
+/**
+ * @property int $id
+ * @property int $dns_zone_id
+ * @property string $name
+ * @property RecordType $type
+ * @property string $content
+ * @property int|null $ttl
+ * @property int|null $priority
+ * @property bool $proxied
+ * @property string|null $comment
+ * @property-read string $fqdn
+ * @property-read DnsZone|null $zone
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, EntrySyncState> $syncStates
+ */
 class DnsEntry extends Model
 {
     /** @use HasFactory<DnsEntryFactory> */

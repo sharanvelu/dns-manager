@@ -131,7 +131,7 @@ export default function Page() {
       <p>
         Tick the checkbox on one or more rows (the header checkbox selects the whole page;
         selections accumulate across pages) and a <strong>bulk actions bar</strong> appears
-        above the table showing the count, a <strong>Clear</strong> button, and four actions
+        above the table showing the count, a <strong>Clear</strong> button, and five actions
         applied to every selected entry. Selection is limited to entries in zones you can
         manage — read-only rows have no checkbox, and the server drops any entry you cannot
         manage from a bulk request rather than failing it.
@@ -158,6 +158,19 @@ export default function Page() {
               <strong>Providers</strong>
             </td>
             <td>Changes each entry&apos;s provider assignment — see below.</td>
+          </tr>
+          <tr>
+            <td>
+              <strong>Accept remote</strong>
+            </td>
+            <td>
+              For each entry drifted on exactly one provider, adopts that provider&apos;s current
+              values and re-pushes the entry to its other providers — see{" "}
+              <a href="/docs/dns-entries/sync/#accepting-a-providers-values">
+                Accepting a provider&apos;s values
+              </a>
+              . Entries drifted nowhere or on several providers are skipped and counted.
+            </td>
           </tr>
           <tr>
             <td>

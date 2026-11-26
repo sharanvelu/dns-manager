@@ -7,6 +7,7 @@ import { type ZoneCanMap } from '@/types';
 import { Link, router } from '@inertiajs/react';
 import { ArrowDown, ArrowUp, ArrowUpDown, Plus, SearchX, Upload } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
+import { AcceptRemoteDialog, type AcceptRemoteTarget } from './accept-remote-dialog';
 import { BulkActionsBar } from './bulk-actions-bar';
 import { DeleteEntryDialog } from './delete-entry-dialog';
 import { EntriesFilterBar, type ProviderOption } from './entries-filter-bar';
@@ -171,6 +172,7 @@ export function EntriesView({ scope, entries, filters, zones, zoneAttachments, c
     const [importOpen, setImportOpen] = useState(false);
     const [editingEntry, setEditingEntry] = useState<EntryItem | null>(null);
     const [deletingEntry, setDeletingEntry] = useState<EntryItem | null>(null);
+    const [acceptTarget, setAcceptTarget] = useState<AcceptRemoteTarget | null>(null);
     // Selected entry id → its zone id, so bulk actions know whether the
     // selection stays within a single zone (selection survives pagination).
     const [selected, setSelected] = useState<Map<number, number>>(new Map());
@@ -353,6 +355,7 @@ export function EntriesView({ scope, entries, filters, zones, zoneAttachments, c
                                             onSelect={toggleEntry}
                                             onEdit={openEdit}
                                             onDelete={setDeletingEntry}
+                                            onAcceptRemote={(entry, state) => setAcceptTarget({ entry, state })}
                                         />
                                     ))}
                                 </tbody>
@@ -389,6 +392,7 @@ export function EntriesView({ scope, entries, filters, zones, zoneAttachments, c
                 defaultZoneId={defaultZoneId}
             />
             <DeleteEntryDialog entry={deletingEntry} onOpenChange={(open) => !open && setDeletingEntry(null)} />
+            <AcceptRemoteDialog target={acceptTarget} onOpenChange={(open) => !open && setAcceptTarget(null)} />
         </TooltipProvider>
     );
 }
