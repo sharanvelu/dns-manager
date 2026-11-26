@@ -488,6 +488,86 @@ test('bulk edit clears the priority when the type change drops it', function () 
         ->and($mx->priority)->toBeNull();
 });
 
+test('bulk edit turns the proxy on for proxiable entries and re-syncs', function () {
+    $a = bulkEntry($this->cfAttachment, ['name' => 'a', 'proxied' => false]);
+    $alias = bulkEntry($this->cfAttachment, ['name' => 'alias', 'type' => 'CNAME', 'content' => 'target.example.com', 'proxied' => false]);
+
+    $this->patch('/entries/bulk', [
+        'ids' => [$a->id, $alias->id],
+        'set' => ['proxied' => true],
+    ])->assertRedirect()->assertSessionHas('success', fn ($message) => str_contains($message, 'Updated 2 entries'));
+
+    expect($a->refresh()->proxied)->toBeTrue()
+        ->and($alias->refresh()->proxied)->toBeTrue()
+        // Untouched fields keep their per-entry values.
+        ->and($alias->content)->toBe('target.example.com');
+
+    Queue::assertPushed(SyncEntryToProvider::class, 2);
+});
+
+test('bulk edit turns the proxy off', function () {
+    $entry = bulkEntry($this->cfAttachment, ['name' => 'a', 'proxied' => true]);
+
+    $this->patch('/entries/bulk', [
+        'ids' => [$entry->id],
+        'set' => ['proxied' => false],
+    ])->assertRedirect()->assertSessionHas('success', fn ($message) => str_contains($message, 'Updated 1 entry'));
+
+    expect($entry->refresh()->proxied)->toBeFalse();
+});
+
+test('turning the proxy on skips record types that cannot be proxied and reports them', function () {
+    $a = bulkEntry($this->cfAttachment, ['name' => 'a', 'proxied' => false]);
+    $txt = bulkEntry($this->cfAttachment, ['name' => 'note', 'type' => 'TXT', 'content' => 'hello', 'proxied' => false]);
+
+    $this->patch('/entries/bulk', [
+        'ids' => [$a->id, $txt->id],
+        'set' => ['proxied' => true],
+    ])->assertRedirect()->assertSessionHas(
+        'success',
+        fn ($message) => str_contains($message, 'Updated 1 entry')
+            && str_contains($message, '1 skipped — only A, AAAA, and CNAME records can be proxied'),
+    );
+
+    expect($a->refresh()->proxied)->toBeTrue()
+        ->and($txt->refresh()->proxied)->toBeFalse();
+
+    Queue::assertPushed(SyncEntryToProvider::class, 1);
+});
+
+test('turning the proxy on checks the type the entry is being changed to', function () {
+    $alias = bulkEntry($this->cfAttachment, ['name' => 'alias', 'type' => 'CNAME', 'content' => 'target.example.com', 'proxied' => false]);
+
+    $this->patch('/entries/bulk', [
+        'ids' => [$alias->id],
+        'set' => ['type' => 'TXT', 'proxied' => true],
+    ])->assertRedirect()->assertSessionHas('success', fn ($message) => str_contains($message, '1 skipped — only A, AAAA'));
+
+    expect($alias->refresh()->type->value)->toBe('CNAME')
+        ->and($alias->proxied)->toBeFalse();
+});
+
+test('bulk edit clears the proxy when the type change makes it unproxiable', function () {
+    $alias = bulkEntry($this->cfAttachment, ['name' => 'alias', 'type' => 'CNAME', 'content' => 'target.example.com', 'proxied' => true]);
+
+    $this->patch('/entries/bulk', [
+        'ids' => [$alias->id],
+        'set' => ['type' => 'TXT'],
+    ])->assertRedirect()->assertSessionHas('success', fn ($message) => str_contains($message, 'Updated 1 entry'));
+
+    expect($alias->refresh()->type->value)->toBe('TXT')
+        ->and($alias->proxied)->toBeFalse();
+});
+
+test('bulk edit rejects a non-boolean proxy value', function () {
+    $entry = bulkEntry($this->cfAttachment, ['name' => 'a']);
+
+    $this->patch('/entries/bulk', [
+        'ids' => [$entry->id],
+        'set' => ['proxied' => 'sometimes'],
+    ])->assertSessionHasErrors('set.proxied');
+});
+
 test('bulk edit requires at least one field', function () {
     $entry = bulkEntry($this->cfAttachment);
 

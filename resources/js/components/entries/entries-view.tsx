@@ -1,6 +1,7 @@
 import { EmptyEntriesIllustration } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { type ZoneCanMap } from '@/types';
 import { Link, router } from '@inertiajs/react';
@@ -12,6 +13,7 @@ import { EntriesFilterBar, type ProviderOption } from './entries-filter-bar';
 import { EntryFormDialog } from './entry-form-dialog';
 import { EntryRow } from './entry-row';
 import { ImportEntriesDialog } from './import-entries-dialog';
+import { DEFAULT_PAGE_SIZE, PAGE_SIZES, pageSizeParam, rememberPageSize } from './page-size';
 import { RefreshControls } from './refresh-controls';
 import type {
     ConnectorInfo,
@@ -29,21 +31,26 @@ function decodeLabel(label: string): string {
     return label.replace('&laquo;', '«').replace('&raquo;', '»').replace('&hellip;', '…');
 }
 
+/** The active filters as query params (no sort, no page) — for requests that keep the current view. */
+function filterParams(filters: EntryFilters, scope: EntriesScope): Record<string, string> {
+    return Object.fromEntries(
+        Object.entries({
+            search: filters.search ?? '',
+            type: filters.type ?? '',
+            provider: filters.provider ?? '',
+            status: filters.status ?? '',
+            zone: scope.zone ? '' : (filters.zone ?? ''),
+        }).filter(([, value]) => value !== ''),
+    );
+}
+
 function SortableHeader({ column, label, filters, scope }: { column: SortColumn; label: string; filters: EntryFilters; scope: EntriesScope }) {
     const active = (filters.sort ?? 'name') === column;
     const direction = active ? (filters.direction ?? 'asc') : undefined;
     const Icon = active ? (direction === 'desc' ? ArrowDown : ArrowUp) : ArrowUpDown;
 
     const toggle = () => {
-        const params: Record<string, string> = Object.fromEntries(
-            Object.entries({
-                search: filters.search ?? '',
-                type: filters.type ?? '',
-                provider: filters.provider ?? '',
-                status: filters.status ?? '',
-                zone: scope.zone ? '' : (filters.zone ?? ''),
-            }).filter(([, value]) => value !== ''),
-        );
+        const params: Record<string, string> = { ...filterParams(filters, scope), ...pageSizeParam(filters) };
 
         params.sort = column;
         params.direction = active && direction === 'asc' ? 'desc' : 'asc';
@@ -66,32 +73,76 @@ function SortableHeader({ column, label, filters, scope }: { column: SortColumn;
     );
 }
 
-function Pagination({ links, total, currentPage, lastPage }: { links: PaginatorLink[]; total: number; currentPage: number; lastPage: number }) {
-    if (lastPage <= 1) return null;
+interface PaginationProps {
+    links: PaginatorLink[];
+    total: number;
+    currentPage: number;
+    lastPage: number;
+    filters: EntryFilters;
+    scope: EntriesScope;
+}
+
+function Pagination({ links, total, currentPage, lastPage, filters, scope }: PaginationProps) {
+    const pageSize = filters.per_page ?? DEFAULT_PAGE_SIZE;
+
+    // Nothing to page and nothing a smaller page size would change.
+    if (lastPage <= 1 && total <= PAGE_SIZES[0]) return null;
+
+    const changePageSize = (value: string) => {
+        const size = Number(value);
+        rememberPageSize(size);
+
+        // Back to page 1: the current page number means something else at a new size.
+        const params: Record<string, string> = { ...filterParams(filters, scope), per_page: String(size) };
+        if (filters.sort) params.sort = filters.sort;
+        if (filters.direction) params.direction = filters.direction;
+
+        router.get(scope.baseUrl, params, { preserveState: true, preserveScroll: true, replace: true });
+    };
 
     return (
         <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-muted-foreground text-xs tabular-nums">
-                Page {currentPage} of {lastPage} · {total} {total === 1 ? 'entry' : 'entries'}
-            </p>
-            <nav className="flex flex-wrap items-center gap-1" aria-label="Pagination">
-                {links.map((link, index) => (
-                    <Button
-                        key={`${link.label}-${index}`}
-                        variant={link.active ? 'default' : 'outline'}
-                        size="sm"
-                        className="h-8 min-w-8 px-2.5 text-xs tabular-nums"
-                        disabled={link.url === null}
-                        onClick={() => {
-                            if (link.url) {
-                                router.get(link.url, {}, { preserveState: true, preserveScroll: true });
-                            }
-                        }}
-                    >
-                        {decodeLabel(link.label)}
-                    </Button>
-                ))}
-            </nav>
+            <div className="flex flex-wrap items-center gap-3">
+                <p className="text-muted-foreground text-xs tabular-nums">
+                    {lastPage > 1 && `Page ${currentPage} of ${lastPage} · `}
+                    {total} {total === 1 ? 'entry' : 'entries'}
+                </p>
+                <label className="text-muted-foreground flex items-center gap-2 text-xs">
+                    Rows per page
+                    <Select value={String(pageSize)} onValueChange={changePageSize}>
+                        <SelectTrigger className="h-8 w-[4.5rem] text-xs tabular-nums" aria-label="Rows per page">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {PAGE_SIZES.map((size) => (
+                                <SelectItem key={size} value={String(size)} className="text-xs tabular-nums">
+                                    {size}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </label>
+            </div>
+            {lastPage > 1 && (
+                <nav className="flex flex-wrap items-center gap-1" aria-label="Pagination">
+                    {links.map((link, index) => (
+                        <Button
+                            key={`${link.label}-${index}`}
+                            variant={link.active ? 'default' : 'outline'}
+                            size="sm"
+                            className="h-8 min-w-8 px-2.5 text-xs tabular-nums"
+                            disabled={link.url === null}
+                            onClick={() => {
+                                if (link.url) {
+                                    router.get(link.url, {}, { preserveState: true, preserveScroll: true });
+                                }
+                            }}
+                        >
+                            {decodeLabel(link.label)}
+                        </Button>
+                    ))}
+                </nav>
+            )}
         </div>
     );
 }
@@ -308,7 +359,14 @@ export function EntriesView({ scope, entries, filters, zones, zoneAttachments, c
                             </table>
                         </div>
 
-                        <Pagination links={entries.links} total={entries.total} currentPage={entries.current_page} lastPage={entries.last_page} />
+                        <Pagination
+                            links={entries.links}
+                            total={entries.total}
+                            currentPage={entries.current_page}
+                            lastPage={entries.last_page}
+                            filters={filters}
+                            scope={scope}
+                        />
                     </>
                 )}
             </div>

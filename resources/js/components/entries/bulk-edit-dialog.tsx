@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { router } from '@inertiajs/react';
-import { LoaderCircle } from 'lucide-react';
+import { Cloud, LoaderCircle } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { RECORD_TYPES, type RecordType } from './types';
 
@@ -38,20 +38,22 @@ function FieldRow({ label, enabled, onEnabledChange, error, children }: FieldRow
 }
 
 export function BulkEditDialog({ open, onOpenChange, selectedIds, onDone }: BulkEditDialogProps) {
-    const [enabled, setEnabled] = useState({ type: false, content: false, ttl: false, comment: false });
+    const [enabled, setEnabled] = useState({ type: false, content: false, ttl: false, proxied: false, comment: false });
     const [type, setType] = useState<RecordType>('A');
     const [content, setContent] = useState('');
     const [ttl, setTtl] = useState('');
+    const [proxied, setProxied] = useState<'on' | 'off'>('on');
     const [comment, setComment] = useState('');
     const [processing, setProcessing] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     useEffect(() => {
         if (open) {
-            setEnabled({ type: false, content: false, ttl: false, comment: false });
+            setEnabled({ type: false, content: false, ttl: false, proxied: false, comment: false });
             setType('A');
             setContent('');
             setTtl('');
+            setProxied('on');
             setComment('');
             setErrors({});
         }
@@ -65,10 +67,11 @@ export function BulkEditDialog({ open, onOpenChange, selectedIds, onDone }: Bulk
     const missingContent = enabled.content && content.trim() === '';
 
     const submit = () => {
-        const set: { type?: RecordType; content?: string; ttl?: number | null; comment?: string | null } = {};
+        const set: { type?: RecordType; content?: string; ttl?: number | null; proxied?: boolean; comment?: string | null } = {};
         if (enabled.type) set.type = type;
         if (enabled.content) set.content = content.trim();
         if (enabled.ttl) set.ttl = ttl === '' ? null : Number(ttl);
+        if (enabled.proxied) set.proxied = proxied === 'on';
         if (enabled.comment) set.comment = comment.trim() === '' ? null : comment.trim();
 
         setProcessing(true);
@@ -148,6 +151,32 @@ export function BulkEditDialog({ open, onOpenChange, selectedIds, onDone }: Bulk
                             className="tabular-nums"
                         />
                         <p className="text-muted-foreground mt-1.5 text-xs">60–86400 seconds, empty = automatic</p>
+                    </FieldRow>
+
+                    <FieldRow
+                        label="Proxy"
+                        enabled={enabled.proxied}
+                        onEnabledChange={(value) => setField('proxied', value)}
+                        error={errors['set.proxied']}
+                    >
+                        <Select value={proxied} onValueChange={(value) => setProxied(value as 'on' | 'off')}>
+                            <SelectTrigger aria-label="Proxy">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="on">
+                                    <span className="flex items-center gap-1.5">
+                                        <Cloud className="size-3.5 text-orange-500 dark:text-orange-400" />
+                                        On (proxied)
+                                    </span>
+                                </SelectItem>
+                                <SelectItem value="off">Off (DNS only)</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p className="text-muted-foreground mt-1.5 text-xs">
+                            Applies on providers that support proxying (Cloudflare). Only A, AAAA, and CNAME records can be proxied — other types are
+                            skipped when turning it on.
+                        </p>
                     </FieldRow>
 
                     <FieldRow
