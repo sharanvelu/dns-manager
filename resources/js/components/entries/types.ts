@@ -86,6 +86,8 @@ export interface EntryFilters {
     zone?: string;
     sort?: SortColumn;
     direction?: SortDirection;
+    /** Rows per page — always set by the server (query param, remembered cookie, or default). */
+    per_page?: number;
 }
 
 export interface PaginatorLink {
