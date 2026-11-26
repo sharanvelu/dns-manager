@@ -225,8 +225,11 @@ export default function Page() {
       <Callout type="important">
         <strong>Records at the provider are left untouched</strong> — the app just stops
         managing them. The confirmation dialog states exactly that, including how many zones it
-        will be detached from. If you want the remote records gone, delete the entries (or
-        deselect this provider on them) <em>before</em> deleting the provider.
+        will be detached from. If you want the remote records gone, delete the entries,
+        deselect this provider on them, or{" "}
+        <a href="/docs/zones/providers/#detach-and-delete-the-records">detach it from each zone
+        with &quot;Also delete this zone&apos;s records&quot;</a> <em>before</em> deleting the
+        provider.
       </Callout>
 
       <H2>How credentials are stored</H2>

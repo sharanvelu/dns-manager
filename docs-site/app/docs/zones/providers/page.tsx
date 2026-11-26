@@ -140,17 +140,48 @@ export default function Page() {
               <strong>Detach</strong> (or <strong>Opt out</strong> for zoneless providers)
             </td>
             <td>
-              Removes the attachment. The zone&apos;s records stop syncing to that provider.
+              Removes the attachment. The zone&apos;s records stop syncing to that provider. By
+              default nothing is deleted remotely; tick{" "}
+              <strong>Also delete this zone&apos;s records</strong> in the dialog to remove them
+              from the provider too.
             </td>
           </tr>
         </tbody>
       </table>
 
       <Callout type="note">
-        Detaching never deletes anything remotely:{" "}
+        By default detaching never deletes anything remotely:{" "}
         <strong>records already at the provider are NOT deleted</strong> — the app just stops
-        managing them.
+        managing them. The entries themselves stay in the app either way.
       </Callout>
+
+      <H3>Detach and delete the records</H3>
+
+      <p>
+        The detach (and opt-out) dialog has an opt-in checkbox,{" "}
+        <strong>Also delete this zone&apos;s records at the provider</strong>. With it ticked
+        the button reads <strong>Detach and delete records</strong> (or{" "}
+        <strong>Opt out and delete records</strong>) and the detach becomes a two-step,
+        queued operation:
+      </p>
+      <Steps>
+        <Step title="Deletes are queued">
+          A remote delete is queued for every record the zone has pushed to that provider. The
+          attachment stays in place meanwhile — the deletes need it to reach the provider.
+        </Step>
+        <Step title="The attachment is removed">
+          Only once <strong>every</strong> delete has succeeded is the provider detached (a
+          final queued step; records pushed in the meantime are deleted first). If a delete
+          fails, the chain stops: the provider <strong>stays attached</strong>, the failing
+          entry shows an <strong>Error</strong> chip, and you can retry the detach.
+        </Step>
+      </Steps>
+      <p>
+        Your entries are kept in the app (local-only for this provider). The option is
+        unavailable while the attachment is <em>paused</em> (disabled for the zone, or the
+        provider disabled globally) — deletes are never sent through a disabled provider.
+        Enable it first, or detach without deleting.
+      </p>
 
       <H2>Zoneless providers and opting out</H2>
 

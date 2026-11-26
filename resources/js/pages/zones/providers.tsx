@@ -228,6 +228,8 @@ function AttachmentCard({
                                         id: attachment.id,
                                         providerName: attachment.providerName,
                                         supportsZones: attachment.supportsZones,
+                                        paused,
+                                        recordsCount: attachment.recordsCount,
                                     })
                                 }
                             >

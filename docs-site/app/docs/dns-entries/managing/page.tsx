@@ -111,10 +111,13 @@ export default function Page() {
         <li>
           <strong>Deselecting a provider deletes the record from that provider</strong> when
           you save — the app pushes the change to the still-selected attachments and queues a
-          remote delete on the deselected ones. Exception: attachments that are currently{" "}
-          <em>paused</em> (attachment disabled for the zone, or provider disabled globally) are
-          left untouched — their records stay in place and their assignment is kept until
-          re-enabled.
+          remote delete on the deselected ones. To avoid that, tick{" "}
+          <strong>Keep the record at …</strong>, which appears as soon as a provider that holds
+          the record would lose it: the app then <strong>stops managing</strong> the record
+          there without deleting it (no remote delete is sent; the record simply stays live at
+          the provider). Exception either way: attachments that are currently <em>paused</em>{" "}
+          (attachment disabled for the zone, or provider disabled globally) are left untouched
+          — their records stay in place and their assignment is kept until re-enabled.
         </li>
       </ul>
 
@@ -189,7 +192,7 @@ export default function Page() {
         <li>
           <strong>Replace</strong> (the default) makes your selection the entire assignment:
           records sync to the ticked attachments and are{" "}
-          <strong>removed from unticked ones</strong>. It starts with everything ticked;
+          <strong>deleted from unticked ones</strong>. It starts with everything ticked;
           ticking nothing turns the entries local-only.
         </li>
         <li>
@@ -204,6 +207,16 @@ export default function Page() {
           untouched.
         </li>
       </ul>
+      <p>
+        Whenever records would be removed (Detach, or Replace with something unticked) the
+        dialog offers <strong>Keep the records at the provider</strong>. Leave it unticked and
+        the records are deleted remotely (the default — Detach&apos;s button reads{" "}
+        <strong>Detach N entries, delete records</strong> in red). Tick it and the app just{" "}
+        <strong>stops managing</strong> them: the assignment is dropped locally, no remote
+        delete is queued, and the records stay live at the provider (<strong>Detach N entries,
+        keep records</strong>). The success message and the entry&apos;s{" "}
+        <strong>providers-changed</strong> activity record which providers kept their records.
+      </p>
       <p>
         Because targeting is defined per zone, this action requires the selection to stay{" "}
         <strong>within a single zone</strong> — with entries from several zones selected, the
@@ -290,8 +303,8 @@ export default function Page() {
         Deleting an entry <strong>deletes its records at the providers</strong> it is assigned
         to. Note the asymmetry with{" "}
         <a href="/docs/zones/creating/#delete-a-zone">zone deletion</a>: deleting an{" "}
-        <em>entry</em> deletes its remote records; deleting a <em>zone</em> (or detaching a
-        provider) never does.
+        <em>entry</em> deletes its remote records; deleting a <em>zone</em> never does, and
+        detaching a provider only does when you opt in.
       </Callout>
 
       <p>

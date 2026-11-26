@@ -235,7 +235,7 @@ export const PAGES: DocPage[] = [
     slug: "providers",
     title: "Attaching providers",
     description:
-      "Attach providers to a zone, let Cloudflare zone discovery fill the Zone ID, manage attachments, opt out of zoneless providers, and import existing records.",
+      "Attach providers to a zone, let Cloudflare zone discovery fill the Zone ID, manage attachments, detach (optionally deleting the zone's records at the provider), opt out of zoneless providers, and import existing records.",
     order: 2,
     headings: [
       "Attach a provider",
@@ -244,6 +244,9 @@ export const PAGES: DocPage[] = [
       "Fill the zone-specific settings",
       "Zone discovery (Cloudflare)",
       "The attachment card",
+      "Detach and delete the records",
+      "Deletes are queued",
+      "The attachment is removed",
       "Zoneless providers and opting out",
       "Import records from a provider",
       "Open the import",
