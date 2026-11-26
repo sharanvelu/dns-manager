@@ -12,12 +12,15 @@ use App\Enums\SyncStatus;
 use App\Support\EntryQuery;
 use Illuminate\Http\Request;
 use App\Services\SyncService;
+use App\Models\EntrySyncState;
 use App\Support\EntryPresenter;
 use App\Support\ZonePermissions;
 use App\Services\DnsEntryImporter;
 use App\Connectors\ConnectorRegistry;
+use App\Services\AcceptRemoteService;
 use Illuminate\Http\RedirectResponse;
 use App\Http\Requests\DnsEntryRequest;
+use App\Exceptions\AcceptRemoteException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DnsEntryController extends Controller
@@ -115,6 +118,65 @@ class DnsEntryController extends Controller
         $this->sync->syncEntry($entry);
 
         return back()->with('success', "Re-syncing {$entry->fqdn} to all providers.");
+    }
+
+    /**
+     * Adopt one provider's current values for a drifted entry. The provider
+     * is the given attachment, or the entry's only drifted one — when the
+     * entry drifted on several, the caller must pick.
+     */
+    public function acceptRemote(Request $request, DnsEntry $entry, AcceptRemoteService $acceptRemote): RedirectResponse
+    {
+        $this->authorize('manageRecords', $entry->zone);
+
+        $zoneProviderId = $request->validate([
+            'zone_provider_id' => ['nullable', 'integer'],
+        ])['zone_provider_id'] ?? null;
+
+        $drifted = EntrySyncState::query()
+            ->where('dns_entry_id', $entry->id)
+            ->where('sync_status', SyncStatus::Drifted)
+            ->with(['zoneProvider.provider', 'zoneProvider.zone'])
+            ->get();
+
+        if ($zoneProviderId !== null) {
+            $state = EntrySyncState::query()
+                ->where('dns_entry_id', $entry->id)
+                ->where('zone_provider_id', $zoneProviderId)
+                ->first();
+
+            if (! $state) {
+                return back()->with('error', "{$entry->fqdn} is not assigned to that provider.");
+            }
+        } elseif ($drifted->count() > 1) {
+            return back()->with('error', "{$entry->fqdn} drifted on {$drifted->count()} providers — choose which provider's values to accept.");
+        } elseif ($drifted->isEmpty()) {
+            return back()->with('error', "{$entry->fqdn} is not drifted — there is nothing to accept.");
+        } else {
+            $state = $drifted->first();
+        }
+
+        try {
+            ['fields' => $fields, 'repushed' => $repushed] = $acceptRemote->accept($state);
+        } catch (AcceptRemoteException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        $provider = $state->zoneProvider?->provider?->name;
+
+        if ($fields === []) {
+            return back()->with('success', "{$entry->fqdn} already matches {$provider} — marked as synced.");
+        }
+
+        return back()->with('success', sprintf(
+            'Accepted %s values for %s (%s)%s.',
+            $provider,
+            $entry->fqdn,
+            implode(', ', array_map(AcceptRemoteService::label(...), $fields)),
+            $repushed > 0
+                ? sprintf(' — re-syncing %d other %s', $repushed, $repushed === 1 ? 'provider' : 'providers')
+                : '',
+        ));
     }
 
     public function import(Request $request, DnsEntryImporter $importer): RedirectResponse

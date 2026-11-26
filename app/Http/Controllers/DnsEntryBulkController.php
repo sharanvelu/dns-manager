@@ -15,7 +15,9 @@ use Illuminate\Http\Request;
 use App\Services\SyncService;
 use App\Support\DnsEntryRules;
 use Illuminate\Validation\Rule;
+use App\Services\AcceptRemoteService;
 use Illuminate\Http\RedirectResponse;
+use App\Exceptions\AcceptRemoteException;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -235,6 +237,80 @@ class DnsEntryBulkController extends Controller
         }
 
         return back()->with('success', $message);
+    }
+
+    /**
+     * Adopt the remote values for each selected entry from its ONE drifted
+     * provider. Entries drifted nowhere or on several providers are skipped
+     * and counted (several needs an explicit per-entry choice); refusals
+     * (record gone, invalid, duplicate, paused, unreachable) are counted
+     * and change nothing. Each attachment is listed at most once.
+     */
+    public function acceptRemote(Request $request, AcceptRemoteService $acceptRemote): RedirectResponse
+    {
+        $entries = $this->selectedEntries($request)->load([
+            'zone',
+            'syncStates' => fn ($query) => $query->where('sync_status', SyncStatus::Drifted),
+            'syncStates.zoneProvider.provider',
+            'syncStates.zoneProvider.zone',
+        ]);
+
+        $accepted = 0;
+        $notDrifted = 0;
+        $ambiguous = 0;
+        $refused = [];
+        $listings = [];
+
+        foreach ($entries as $entry) {
+            if ($entry->syncStates->count() !== 1) {
+                $entry->syncStates->isEmpty() ? $notDrifted++ : $ambiguous++;
+
+                continue;
+            }
+
+            $state = $entry->syncStates->first();
+            $state->setRelation('entry', $entry);
+
+            $attachmentId = $state->zone_provider_id;
+
+            try {
+                // An unreachable provider fails its listing once, not per entry.
+                if ($state->zoneProvider->isActive() && ! array_key_exists($attachmentId, $listings)) {
+                    try {
+                        $listings[$attachmentId] = $acceptRemote->listRemote($state);
+                    } catch (AcceptRemoteException $e) {
+                        $listings[$attachmentId] = $e;
+                    }
+                }
+
+                $listing = $listings[$attachmentId] ?? null;
+
+                if ($listing instanceof AcceptRemoteException) {
+                    throw $listing;
+                }
+
+                $acceptRemote->accept($state, $listing);
+                $accepted++;
+            } catch (AcceptRemoteException $e) {
+                $refused[] = $e->getMessage();
+            }
+        }
+
+        $message = $accepted > 0
+            ? sprintf('Accepted remote values for %d %s — re-syncing their other providers.', $accepted, Str::plural('entry', $accepted))
+            : 'No remote values were accepted.';
+
+        $skippedParts = array_filter([
+            $notDrifted > 0 ? "{$notDrifted} skipped as not drifted" : null,
+            $ambiguous > 0 ? "{$ambiguous} skipped as drifted on several providers — accept those one at a time" : null,
+            $refused !== [] ? count($refused) . ' refused: ' . rtrim($refused[0], '.') . (count($refused) > 1 ? ' (and ' . (count($refused) - 1) . ' more)' : '') : null,
+        ]);
+
+        if ($skippedParts !== []) {
+            $message .= ' (' . implode('; ', $skippedParts) . '.)';
+        }
+
+        return back()->with($accepted === 0 && $refused !== [] ? 'error' : 'success', $message);
     }
 
     /**

@@ -63,7 +63,9 @@ export default function Page() {
               logs a <strong>providers-changed</strong> event listing the providers each entry
               now syncs to — plus, when providers were removed with{" "}
               <strong>Keep the records at the provider</strong>, the providers that kept their
-              records (also logged when an entry edit keeps a record this way).
+              records (also logged when an entry edit keeps a record this way). Accepting a
+              provider&apos;s values for a drifted entry logs one <strong>accepted-remote</strong>{" "}
+              event naming the provider, with old → new diffs for the fields that were adopted.
             </td>
           </tr>
           <tr>

@@ -184,6 +184,15 @@ export default function Page() {
           </tr>
           <tr>
             <td>
+              <code>accept-remote</code>
+            </td>
+            <td>
+              A user accepted a provider&apos;s values for a drifted entry (which fields were
+              adopted).
+            </td>
+          </tr>
+          <tr>
+            <td>
               <code>drift-check</code>
             </td>
             <td>
@@ -219,7 +228,9 @@ export default function Page() {
           <a href="/docs/dns-entries/">DNS Entries</a>), hover the amber chip to see exactly
           which fields drifted (tracked vs actual values), and use <strong>Sync now</strong> to
           re-push the entry (the app&apos;s database wins and overwrites the remote record). If
-          the remote change is the one you want, edit the entry to match instead. The{" "}
+          the remote change is the one you want, use <strong>Accept values from
+          &lt;provider&gt;</strong> in the row menu instead — the entry adopts the
+          provider&apos;s values and the other providers are updated to match. The{" "}
           <strong>Sync</strong> button on the Records tab&apos;s Drifted tile re-pushes only the
           drifted records to only the providers they drifted on; <strong>Sync all</strong> on
           the zone header stomps widespread drift in one go. See{" "}

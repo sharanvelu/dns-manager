@@ -136,17 +136,7 @@ class CheckProviderDrift implements ShouldQueue
                 continue;
             }
 
-            $candidates = $remote->where('externalId', $state->external_id);
-
-            // The tracked record as the provider holds it now. Tuple-encoded
-            // external ids (Technitium, Pi-hole) change with the record's
-            // data, so a remotely edited record has no id match — fall back
-            // to the unclaimed remote record at the same name+type.
-            $closest = $candidates->first(fn (RemoteRecord $record) => $record->matches($entry, $capabilities))
-                ?? $candidates->first()
-                ?? $remote->first(fn (RemoteRecord $record) => $record->type === $entry->type->value
-                    && strcasecmp(rtrim($record->name, '.'), rtrim($entry->fqdn, '.')) === 0
-                    && ! $claimed->has($record->externalId));
+            $closest = RemoteRecord::closest($remote, $state->external_id, $entry, $capabilities, $claimed);
 
             if ($closest?->matches($entry, $capabilities)) {
                 // Adopt the current identity: a record recreated out-of-band

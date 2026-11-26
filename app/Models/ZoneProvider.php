@@ -12,6 +12,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
+/**
+ * @property int $id
+ * @property int $dns_zone_id
+ * @property int $provider_id
+ * @property array<string, mixed>|null $config
+ * @property bool $enabled
+ * @property-read DnsZone|null $zone
+ * @property-read Provider|null $provider
+ */
 class ZoneProvider extends Model
 {
     /** @use HasFactory<ZoneProviderFactory> */

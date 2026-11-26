@@ -118,6 +118,7 @@ const actionLabels: Record<string, string> = {
     detach: 'Detach',
     import: 'Import',
     'drift-check': 'Drift check',
+    'accept-remote': 'Accept remote',
     'provider-health-check': 'Health check',
 };
 

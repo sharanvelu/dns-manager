@@ -17,6 +17,15 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
+/**
+ * @property int $id
+ * @property string $name
+ * @property ProviderType $type
+ * @property array<string, mixed>|null $config
+ * @property list<string>|null $managed_record_types
+ * @property bool $enabled
+ * @property HealthStatus $health_status
+ */
 class Provider extends Model
 {
     /** @use HasFactory<ProviderFactory> */
