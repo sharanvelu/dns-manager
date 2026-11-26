@@ -235,12 +235,6 @@ parameters:
 			path: app/Http/Controllers/ProviderController.php
 
 		-
-			message: '#^Anonymous function should return array\{id\: int, name\: string, type\: mixed, typeLabel\: mixed, enabled\: bool, healthStatus\: mixed, healthMessage\: string\|null, lastCheckedAt\: mixed, \.\.\.\} but returns array\{id\: int, name\: string, type\: mixed, typeLabel\: mixed, enabled\: bool, healthStatus\: mixed, healthMessage\: string\|null, lastCheckedAt\: mixed, \.\.\.\}\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Http/Controllers/ProviderController.php
-
-		-
 			message: '#^Cannot access property \$value on string\.$#'
 			identifier: property.nonObject
 			count: 2
@@ -307,7 +301,7 @@ parameters:
 			path: app/Http/Controllers/UserController.php
 
 		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{zoneId\: int\<0, max\>, zoneName\: mixed, roles\: array\{\}\|string\}, Closure\(App\\Models\\ZoneUser\)\: array\{zoneId\: int\<0, max\>, zoneName\: mixed, roles\: array\{\}\|string\} given\.$#'
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{zoneId\: int\<0, max\>, zoneName\: mixed, roles\: list\<string\>\}, Closure\(App\\Models\\ZoneUser\)\: array\{zoneId\: int\<0, max\>, zoneName\: mixed, roles\: list\<string\>\} given\.$#'
 			identifier: argument.type
 			count: 1
 			path: app/Http/Controllers/UserController.php
@@ -343,7 +337,7 @@ parameters:
 			path: app/Http/Controllers/ZoneAccessController.php
 
 		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{userId\: int\<0, max\>, userName\: mixed, userEmail\: mixed, userAvatarUrl\: mixed, roles\: array\{\}\|string, createdAt\: string\|null\}, Closure\(App\\Models\\ZoneUser\)\: array\{userId\: int\<0, max\>, userName\: mixed, userEmail\: mixed, userAvatarUrl\: mixed, roles\: array\{\}\|string, createdAt\: string\|null\} given\.$#'
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{userId\: int\<0, max\>, userName\: mixed, userEmail\: mixed, userAvatarUrl\: mixed, roles\: list\<string\>, createdAt\: string\|null\}, Closure\(App\\Models\\ZoneUser\)\: array\{userId\: int\<0, max\>, userName\: mixed, userEmail\: mixed, userAvatarUrl\: mixed, roles\: list\<string\>, createdAt\: string\|null\} given\.$#'
 			identifier: argument.type
 			count: 1
 			path: app/Http/Controllers/ZoneAccessController.php
@@ -463,13 +457,13 @@ parameters:
 			path: app/Http/Controllers/ZoneController.php
 
 		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{id\: int, providerId\: mixed, name\: mixed, type\: mixed, enabled\: bool\}, Closure\(App\\Models\\ZoneProvider\)\: array\{id\: int, providerId\: mixed, name\: mixed, type\: mixed, enabled\: bool\} given\.$#'
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{id\: int\<0, max\>, providerId\: mixed, name\: mixed, type\: mixed, enabled\: bool\}, Closure\(App\\Models\\ZoneProvider\)\: array\{id\: int\<0, max\>, providerId\: mixed, name\: mixed, type\: mixed, enabled\: bool\} given\.$#'
 			identifier: argument.type
 			count: 1
 			path: app/Http/Controllers/ZoneController.php
 
 		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{id\: int, providerId\: mixed, providerName\: mixed, providerType\: mixed, providerEnabled\: mixed, enabled\: bool, healthStatus\: mixed, healthMessage\: mixed, zoneConfig\: array, supportsZones\: bool, recordsCount\: mixed, syncedCount\: mixed, driftedCount\: mixed, errorCount\: mixed\}, Closure\(App\\Models\\ZoneProvider\)\: array\{id\: int, providerId\: mixed, providerName\: mixed, providerType\: mixed, providerEnabled\: mixed, enabled\: bool, healthStatus\: mixed, healthMessage\: mixed, zoneConfig\: array, supportsZones\: bool, recordsCount\: mixed, syncedCount\: mixed, driftedCount\: mixed, errorCount\: mixed\} given\.$#'
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{id\: int\<0, max\>, providerId\: mixed, providerName\: mixed, providerType\: mixed, providerEnabled\: mixed, enabled\: bool, healthStatus\: mixed, healthMessage\: mixed, zoneConfig\: array, supportsZones\: bool, recordsCount\: mixed, syncedCount\: mixed, driftedCount\: mixed, errorCount\: mixed\}, Closure\(App\\Models\\ZoneProvider\)\: array\{id\: int\<0, max\>, providerId\: mixed, providerName\: mixed, providerType\: mixed, providerEnabled\: mixed, enabled\: bool, healthStatus\: mixed, healthMessage\: mixed, zoneConfig\: array, supportsZones\: bool, recordsCount\: mixed, syncedCount\: mixed, driftedCount\: mixed, errorCount\: mixed\} given\.$#'
 			identifier: argument.type
 			count: 1
 			path: app/Http/Controllers/ZoneController.php
@@ -477,12 +471,6 @@ parameters:
 		-
 			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:sortBy\(\) expects array\<array\{string, string\}\|\(callable\(Illuminate\\Database\\Eloquent\\Model, Illuminate\\Database\\Eloquent\\Model\)\: mixed\)\|\(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: mixed\)\|string\>\|\(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: mixed\)\|string, Closure\(App\\Models\\ZoneProvider\)\: mixed given\.$#'
 			identifier: argument.type
-			count: 1
-			path: app/Http/Controllers/ZoneController.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,array\<string, mixed\>\>\:\:filter\(\) contains unresolvable type\.$#'
-			identifier: argument.unresolvableType
 			count: 1
 			path: app/Http/Controllers/ZoneController.php
 
@@ -721,7 +709,7 @@ parameters:
 			path: app/Models/DnsEntry.php
 
 		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:mapWithKeys\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\<int\<0, max\>, array\{\}\|string\>, Closure\(App\\Models\\ZoneUser\)\: non\-empty\-array\<int\<0, max\>, array\{\}\|string\> given\.$#'
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:mapWithKeys\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\<int\<0, max\>, list\<string\>\>, Closure\(App\\Models\\ZoneUser\)\: non\-empty\-array\<int\<0, max\>, list\<string\>\> given\.$#'
 			identifier: argument.type
 			count: 1
 			path: app/Models/User.php
