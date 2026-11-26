@@ -11,6 +11,9 @@ use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
+/**
+ * @property list<string>|null $roles zone-role values
+ */
 class ZoneUser extends Model
 {
     /** @use HasFactory<ZoneUserFactory> */

@@ -21,6 +21,9 @@ use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
+/**
+ * @property \Illuminate\Support\Carbon|null $email_verified_at
+ */
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -32,7 +35,7 @@ class User extends Authenticatable
      * Memoized zone-grant map — every policy check, zoneCan prop, and query
      * scope in a request goes through this single query.
      *
-     * @var Collection<int, array<string>>|null map of dns_zone_id => role values
+     * @var Collection<int, list<string>>|null map of dns_zone_id => role values
      */
     protected ?Collection $zoneRolesMap = null;
 
@@ -148,7 +151,7 @@ class User extends Authenticatable
     }
 
     /**
-     * @return Collection<int, array<string>> dns_zone_id => zone-role values
+     * @return Collection<int, list<string>> dns_zone_id => zone-role values
      */
     public function zoneRolesMap(): Collection
     {
