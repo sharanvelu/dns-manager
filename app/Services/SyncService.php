@@ -10,6 +10,7 @@ use App\Models\ZoneProvider;
 use App\Models\EntrySyncState;
 use App\Jobs\SyncEntryToProvider;
 use App\Jobs\DeleteEntryFromProvider;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SyncService
 {
@@ -23,9 +24,13 @@ class SyncService
      * its zone (the default). A manual re-sync of an existing entry that is
      * deliberately assigned nowhere stays a no-op. Attachments that used to
      * hold the entry but no longer apply (type change, deselection,
-     * reconfiguration) get a remote delete.
+     * reconfiguration) get a remote delete — or, with $keepRemote, are
+     * released: the app stops managing them and the record stays at the
+     * provider.
+     *
+     * @return list<string> provider names whose records were released with $keepRemote
      */
-    public function syncEntry(DnsEntry $entry, ?array $zoneProviderIds = null): void
+    public function syncEntry(DnsEntry $entry, ?array $zoneProviderIds = null, bool $keepRemote = false): array
     {
         $entry->loadMissing('zone');
 
@@ -52,11 +57,10 @@ class SyncService
         // inactive attachments (attachment or provider disabled) are left
         // untouched ("paused"), so temporarily disabling never deletes the
         // remote records.
-        $entry->syncStates()
-            ->whereNotIn('zone_provider_id', $targets->pluck('id'))
-            ->with('zoneProvider.provider')
-            ->get()
-            ->each(fn (EntrySyncState $state) => $this->removeState($state));
+        $released = $this->removeStates(
+            $entry->syncStates()->whereNotIn('zone_provider_id', $targets->pluck('id')),
+            $keepRemote,
+        );
 
         foreach ($targets as $attachment) {
             $entry->syncStates()->updateOrCreate(
@@ -66,6 +70,8 @@ class SyncService
 
             SyncEntryToProvider::dispatch($entry->id, $attachment->id);
         }
+
+        return $released;
     }
 
     /**
@@ -124,14 +130,16 @@ class SyncService
      * other assignment untouched (no re-push, unlike a replace). Paused
      * attachments keep their records AND their assignment — the paused
      * invariant: deletes are never queued against a disabled provider.
+     * With $keepRemote the records stay at the provider (see removeState).
+     *
+     * @return list<string> provider names whose records were released with $keepRemote
      */
-    public function detachEntry(DnsEntry $entry, array $zoneProviderIds): void
+    public function detachEntry(DnsEntry $entry, array $zoneProviderIds, bool $keepRemote = false): array
     {
-        $entry->syncStates()
-            ->whereIn('zone_provider_id', $zoneProviderIds)
-            ->with('zoneProvider.provider')
-            ->get()
-            ->each(fn (EntrySyncState $state) => $this->removeState($state));
+        return $this->removeStates(
+            $entry->syncStates()->whereIn('zone_provider_id', $zoneProviderIds),
+            $keepRemote,
+        );
     }
 
     /**
@@ -165,13 +173,42 @@ class SyncService
     }
 
     /**
-     * Unassign one attachment: queue a remote delete when a record exists
-     * there, drop the bare state otherwise — and never touch paused ones.
+     * @param  HasMany<EntrySyncState, DnsEntry>  $states
+     * @return list<string>
      */
-    private function removeState(EntrySyncState $state): void
+    private function removeStates(HasMany $states, bool $keepRemote): array
+    {
+        // Releasing never cancels a remote delete that is already in flight.
+        return $states
+            ->when($keepRemote, fn ($query) => $query->where('sync_status', '!=', SyncStatus::Deleting))
+            ->with('zoneProvider.provider')
+            ->get()
+            ->filter(fn (EntrySyncState $state) => $this->removeState($state, $keepRemote))
+            ->pluck('zoneProvider.provider.name')
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Unassign one attachment and never touch paused ones. By default a
+     * remote delete is queued when a record exists there (the bare state is
+     * dropped otherwise). With $keepRemote the state is dropped locally
+     * and NO delete is queued — the record stays at the provider, no longer
+     * managed by the app.
+     *
+     * Returns true when a pushed record was released (kept remotely).
+     */
+    private function removeState(EntrySyncState $state, bool $keepRemote = false): bool
     {
         if ($state->zoneProvider && ! $state->zoneProvider->isActive()) {
-            return;
+            return false;
+        }
+
+        if ($keepRemote) {
+            $state->delete();
+
+            return $state->external_id !== null;
         }
 
         if ($state->external_id) {
@@ -180,5 +217,7 @@ class SyncService
         } else {
             $state->delete();
         }
+
+        return false;
     }
 }

@@ -4,10 +4,16 @@ declare(strict_types = 1);
 
 use App\Models\User;
 use App\Models\DnsZone;
+use App\Models\SyncLog;
+use App\Models\DnsEntry;
 use App\Models\Provider;
 use App\Models\ZoneUser;
+use App\Enums\SyncStatus;
 use App\Models\ZoneProvider;
+use App\Models\EntrySyncState;
+use App\Jobs\DetachZoneProvider;
 use Illuminate\Support\Facades\Http;
+use App\Jobs\DeleteEntryFromProvider;
 use Illuminate\Support\Facades\Queue;
 use Spatie\Activitylog\Models\Activity;
 
@@ -134,6 +140,157 @@ test('detaching a provider removes the attachment but keeps remote records', fun
         ->and(session('success'))->toContain('NOT deleted');
 
     Activity::query()->where('log_name', 'zones')->where('event', 'provider-detached')->sole();
+});
+
+function attachmentWithRecords(ZoneProvider $attachment): array
+{
+    $pushed = DnsEntry::factory()->create(['dns_zone_id' => $attachment->dns_zone_id, 'name' => 'pushed', 'type' => 'A', 'content' => '10.0.0.1']);
+    $pushed->syncStates()->create(['zone_provider_id' => $attachment->id, 'sync_status' => SyncStatus::Synced, 'external_id' => 'rec-1']);
+
+    $pending = DnsEntry::factory()->create(['dns_zone_id' => $attachment->dns_zone_id, 'name' => 'pending', 'type' => 'A', 'content' => '10.0.0.2']);
+    $pending->syncStates()->create(['zone_provider_id' => $attachment->id, 'sync_status' => SyncStatus::Pending, 'external_id' => null]);
+
+    return [$pushed, $pending];
+}
+
+test('detaching by default queues no remote deletes and keeps the entries locally', function () {
+    $attachment = ZoneProvider::factory()->cloudflare()->create();
+    [$pushed, $pending] = attachmentWithRecords($attachment);
+
+    $this->delete("/zones/{$attachment->dns_zone_id}/providers/{$attachment->id}", ['delete_records' => false])
+        ->assertRedirect()
+        ->assertSessionHas('success', fn ($message) => str_contains($message, 'NOT deleted'));
+
+    expect(ZoneProvider::count())->toBe(0)
+        ->and(EntrySyncState::count())->toBe(0)
+        ->and(DnsEntry::count())->toBe(2);
+
+    Queue::assertNothingPushed();
+    expect(Activity::query()->where('event', 'provider-detached')->sole()->properties->get('records_deleted'))->toBeFalse();
+});
+
+test('detaching with delete_records queues a delete per pushed record and then the detach', function () {
+    $attachment = ZoneProvider::factory()->cloudflare()->create();
+    [$pushed] = attachmentWithRecords($attachment);
+    $stateId = $pushed->syncStates()->sole()->id;
+
+    $this->delete("/zones/{$attachment->dns_zone_id}/providers/{$attachment->id}", ['delete_records' => true])
+        ->assertRedirect()
+        ->assertSessionHas('success', fn ($message) => str_contains($message, 'Deleting 1 record') && str_contains($message, 'stays attached'));
+
+    // Nothing is removed until the chain has run: the delete job needs the
+    // state and the attachment, and entries are never marked for deletion.
+    expect(ZoneProvider::whereKey($attachment->id)->exists())->toBeTrue()
+        ->and(EntrySyncState::where('sync_status', SyncStatus::Deleting)->exists())->toBeFalse();
+
+    Queue::assertPushed(DeleteEntryFromProvider::class, 1);
+    Queue::assertPushedWithChain(
+        DeleteEntryFromProvider::class,
+        [new DetachZoneProvider($attachment->id, 1)],
+        fn (DeleteEntryFromProvider $job) => $job->syncStateId === $stateId,
+    );
+
+    expect(Activity::query()->where('event', 'provider-detach-requested')->sole()->properties->get('records'))->toBe(1);
+});
+
+test('the delete-records chain deletes remotely, keeps the entries, and removes the attachment', function () {
+    Queue::getFacadeRoot()->except([DeleteEntryFromProvider::class, DetachZoneProvider::class]);
+    Http::fake(['api.cloudflare.com/*' => Http::response(['success' => true, 'errors' => [], 'result' => ['id' => 'rec-1']])]);
+
+    $attachment = ZoneProvider::factory()->cloudflare('cf-zone-9')->create();
+    [$pushed, $pending] = attachmentWithRecords($attachment);
+
+    $this->delete("/zones/{$attachment->dns_zone_id}/providers/{$attachment->id}", ['delete_records' => true])->assertRedirect();
+
+    Http::assertSent(fn ($request) => $request->method() === 'DELETE' && str_ends_with($request->url(), 'zones/cf-zone-9/dns_records/rec-1'));
+
+    expect(ZoneProvider::count())->toBe(0)
+        ->and(EntrySyncState::count())->toBe(0)
+        ->and(DnsEntry::whereKey([$pushed->id, $pending->id])->count())->toBe(2)
+        ->and(SyncLog::where('action', 'detach')->sole()->status)->toBe('success');
+
+    expect(Activity::query()->where('event', 'provider-detached')->sole()->properties->get('records_deleted'))->toBeTrue();
+});
+
+test('a failed remote delete halts the chain and leaves the attachment attached', function () {
+    Queue::getFacadeRoot()->except([DeleteEntryFromProvider::class, DetachZoneProvider::class]);
+    Http::fake(['api.cloudflare.com/*' => Http::response(['success' => false, 'errors' => [['code' => 1000, 'message' => 'boom']]], 500)]);
+
+    $attachment = ZoneProvider::factory()->cloudflare()->create();
+    [$pushed] = attachmentWithRecords($attachment);
+
+    expect(fn () => DetachZoneProvider::chainFor($attachment, [$pushed->syncStates()->sole()->id]))->toThrow(Exception::class);
+
+    expect(ZoneProvider::whereKey($attachment->id)->exists())->toBeTrue()
+        ->and($pushed->syncStates()->sole()->sync_status)->toBe(SyncStatus::Error)
+        ->and(SyncLog::where('action', 'detach')->exists())->toBeFalse();
+});
+
+test('the detach finalizer re-chains records pushed while the deletes were draining', function () {
+    $attachment = ZoneProvider::factory()->cloudflare()->create();
+    [$pushed] = attachmentWithRecords($attachment);
+
+    (new DetachZoneProvider($attachment->id, 3))->handle();
+
+    expect(ZoneProvider::whereKey($attachment->id)->exists())->toBeTrue();
+    Queue::assertPushedWithChain(DeleteEntryFromProvider::class, [new DetachZoneProvider($attachment->id, 4)]);
+});
+
+test('the detach finalizer never deletes against an attachment paused mid-detach', function () {
+    $attachment = ZoneProvider::factory()->cloudflare()->create();
+    attachmentWithRecords($attachment);
+    $attachment->update(['enabled' => false]);
+
+    (new DetachZoneProvider($attachment->id))->handle();
+
+    expect(ZoneProvider::whereKey($attachment->id)->exists())->toBeTrue()
+        ->and(SyncLog::where('action', 'detach')->sole()->status)->toBe('error');
+    Queue::assertNothingPushed();
+});
+
+test('detaching with delete_records removes immediately when nothing was pushed', function () {
+    $attachment = ZoneProvider::factory()->cloudflare()->create();
+
+    $this->delete("/zones/{$attachment->dns_zone_id}/providers/{$attachment->id}", ['delete_records' => true])
+        ->assertRedirect()
+        ->assertSessionHas('success', fn ($message) => str_contains($message, 'no records to delete'));
+
+    expect(ZoneProvider::count())->toBe(0);
+    Queue::assertNothingPushed();
+});
+
+test('detaching with delete_records refuses a paused attachment', function (string $paused) {
+    $attachment = ZoneProvider::factory()->cloudflare()->create();
+    attachmentWithRecords($attachment);
+
+    $paused === 'attachment'
+        ? $attachment->update(['enabled' => false])
+        : $attachment->provider->update(['enabled' => false]);
+
+    $this->delete("/zones/{$attachment->dns_zone_id}/providers/{$attachment->id}", ['delete_records' => true])
+        ->assertRedirect()
+        ->assertSessionHas('error', fn ($message) => str_contains($message, 'cannot be deleted'));
+
+    expect(ZoneProvider::whereKey($attachment->id)->exists())->toBeTrue()
+        ->and(EntrySyncState::count())->toBe(2);
+    Queue::assertNothingPushed();
+})->with(['attachment', 'provider']);
+
+test('opting a zone out of a zoneless provider is worded as an opt-out', function () {
+    $attachment = ZoneProvider::factory()->create(['provider_id' => Provider::factory()->pihole()->create()->id]);
+    $zone = $attachment->zone;
+
+    $this->delete("/zones/{$zone->id}/providers/{$attachment->id}")
+        ->assertSessionHas('success', fn ($message) => str_contains($message, "{$zone->name} opted out of"));
+});
+
+test('delete_records must be a boolean', function () {
+    $attachment = ZoneProvider::factory()->cloudflare()->create();
+
+    $this->delete("/zones/{$attachment->dns_zone_id}/providers/{$attachment->id}", ['delete_records' => 'yes please'])
+        ->assertSessionHasErrors('delete_records');
+
+    expect(ZoneProvider::whereKey($attachment->id)->exists())->toBeTrue();
 });
 
 test('attachments are scoped to their zone', function () {
@@ -266,6 +423,7 @@ test('attachments require attachment management on the zone', function () {
     $this->post("/zones/{$zone->id}/providers", $payload)->assertForbidden();
     $this->put("/zones/{$zone->id}/providers/{$attachment->id}", ['enabled' => false])->assertForbidden();
     $this->delete("/zones/{$zone->id}/providers/{$attachment->id}")->assertForbidden();
+    $this->delete("/zones/{$zone->id}/providers/{$attachment->id}", ['delete_records' => true])->assertForbidden();
     $this->postJson("/zones/{$zone->id}/providers/{$attachment->id}/test")->assertForbidden();
     $this->postJson("/zones/{$zone->id}/providers/discover", ['provider_id' => $provider->id])->assertForbidden();
 
