@@ -50,7 +50,9 @@ class DnsEntryBulkController extends Controller
      * different zone are silently dropped per entry (mirroring the
      * missing-ids policy); attachments that do not manage an entry's record
      * type are skipped by the sync engine; paused attachments always keep
-     * their records.
+     * their records. `keep_remote` (replace/detach) releases the removed
+     * attachments instead of deleting their records: the app stops
+     * managing them and the records stay at the provider.
      */
     public function providers(Request $request): RedirectResponse
     {
@@ -60,10 +62,12 @@ class DnsEntryBulkController extends Controller
             // send; only a replace may be empty (= make local-only).
             'zone_providers' => ['present', 'array', ...in_array($request->input('mode'), ['attach', 'detach'], true) ? ['min:1'] : []],
             'zone_providers.*' => ['integer', 'exists:zone_providers,id'],
+            'keep_remote' => ['sometimes', 'boolean'],
         ]);
 
         $mode = $validated['mode'] ?? 'replace';
         $zoneProviderIds = $validated['zone_providers'];
+        $keepRemote = $request->boolean('keep_remote');
 
         $entries = $this->selectedEntries($request);
 
@@ -73,14 +77,20 @@ class DnsEntryBulkController extends Controller
             ->groupBy('dns_zone_id')
             ->map(fn ($group) => $group->pluck('id')->all());
 
-        $entries->each(function (DnsEntry $entry) use ($mode, $zoneProviderIds, $attachmentsByZone) {
+        $keptCount = 0;
+
+        $entries->each(function (DnsEntry $entry) use ($mode, $zoneProviderIds, $attachmentsByZone, $keepRemote, &$keptCount) {
             $ownIds = array_values(array_intersect($zoneProviderIds, $attachmentsByZone->get($entry->dns_zone_id, [])));
+
+            $kept = [];
 
             match ($mode) {
                 'attach' => $this->sync->attachEntry($entry, $ownIds),
-                'detach' => $this->sync->detachEntry($entry, $ownIds),
-                default => $this->sync->syncEntry($entry, $ownIds),
+                'detach' => $kept = $this->sync->detachEntry($entry, $ownIds, $keepRemote),
+                default => $kept = $this->sync->syncEntry($entry, $ownIds, $keepRemote),
             };
+
+            $keptCount += count($kept);
 
             $assigned = $entry->syncStates()
                 ->where('sync_status', '!=', SyncStatus::Deleting)
@@ -94,19 +104,26 @@ class DnsEntryBulkController extends Controller
             activity('entries')
                 ->performedOn($entry)
                 ->event('providers-changed')
-                ->withProperties(['providers' => $assigned])
+                ->withProperties(['providers' => $assigned] + ($kept !== [] ? ['kept_at_providers' => $kept] : []))
                 ->log('providers-changed');
         });
 
-        return back()->with('success', sprintf(
-            match ($mode) {
-                'attach' => 'Attaching %d %s to the selected providers — records are being pushed.',
-                'detach' => 'Detaching %d %s from the selected providers — their records are being removed.',
-                default => 'Retargeting %d %s — records sync to the selected providers and are removed from deselected ones.',
-            },
-            $entries->count(),
-            Str::plural('entry', $entries->count()),
-        ));
+        $count = $entries->count();
+        $noun = Str::plural('entry', $count);
+
+        $message = match (true) {
+            $mode === 'attach' => "Attaching {$count} {$noun} to the selected providers — records are being pushed.",
+            $mode === 'detach' && $keepRemote => "Detached {$count} {$noun} from the selected providers without deleting — their records were kept at the provider and are no longer managed by the app.",
+            $mode === 'detach' => "Detaching {$count} {$noun} from the selected providers — their records are being deleted at the provider.",
+            $keepRemote => "Retargeting {$count} {$noun} — records sync to the selected providers; records at deselected providers were kept there and are no longer managed by the app.",
+            default => "Retargeting {$count} {$noun} — records sync to the selected providers and are deleted from deselected ones.",
+        };
+
+        if ($keepRemote && $mode !== 'attach') {
+            $message .= sprintf(' (%d %s kept.)', $keptCount, Str::plural('record', $keptCount));
+        }
+
+        return back()->with('success', $message);
     }
 
     /**

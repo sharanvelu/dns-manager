@@ -115,6 +115,7 @@ const providerTypeLabels: Record<string, string> = {
 const actionLabels: Record<string, string> = {
     push: 'Push',
     delete: 'Delete',
+    detach: 'Detach',
     import: 'Import',
     'drift-check': 'Drift check',
     'provider-health-check': 'Health check',

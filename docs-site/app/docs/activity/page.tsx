@@ -41,7 +41,11 @@ export default function Page() {
               Attachment changes are logged on the zone: <strong>provider-attached</strong>,{" "}
               <strong>attachment-updated</strong> (settings or per-zone enable/disable — recorded
               as the fact that the configuration changed, never any value), and{" "}
-              <strong>provider-detached</strong>, each naming the provider involved.
+              <strong>provider-detached</strong>, each naming the provider involved (a detach also
+              records whether the zone&apos;s records were deleted at the provider). A detach that
+              deletes records first logs <strong>provider-detach-requested</strong> with the
+              record count; the final <strong>provider-detached</strong> is recorded by the
+              system once every delete has succeeded.
             </td>
           </tr>
           <tr>
@@ -57,7 +61,9 @@ export default function Page() {
               to the user who asked for it (the eventual <strong>deleted</strong> event is
               recorded by the system once the last provider confirms). Bulk provider reassignment
               logs a <strong>providers-changed</strong> event listing the providers each entry
-              now syncs to.
+              now syncs to — plus, when providers were removed with{" "}
+              <strong>Keep the records at the provider</strong>, the providers that kept their
+              records (also logged when an entry edit keeps a record this way).
             </td>
           </tr>
           <tr>

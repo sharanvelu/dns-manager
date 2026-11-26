@@ -10,22 +10,29 @@ import type { ZoneAttachment } from './types';
 
 type BulkProvidersMode = 'replace' | 'attach' | 'detach';
 
-const modeCopy: Record<BulkProvidersMode, { description: string; verb: string }> = {
-    replace: {
-        description:
-            "Replaces each entry's provider assignment: records sync to the ticked providers and are removed from unticked ones. Providers that don't manage an entry's record type are skipped for that entry.",
-        verb: 'Apply to',
-    },
-    attach: {
-        description:
-            "Adds the ticked providers to each entry's assignment and pushes the records to them — existing assignments are kept as they are. Providers that don't manage an entry's record type are skipped for that entry.",
-        verb: 'Attach to',
-    },
-    detach: {
-        description:
-            "Removes the ticked providers from each entry's assignment and deletes the records from them — other assignments are untouched. Paused providers keep their records.",
-        verb: 'Detach from',
-    },
+const modeCopy = (mode: BulkProvidersMode, keepRemote: boolean): { description: string; label: (entries: string) => string } => {
+    switch (mode) {
+        case 'attach':
+            return {
+                description:
+                    "Adds the ticked providers to each entry's assignment and pushes the records to them — existing assignments are kept as they are. Providers that don't manage an entry's record type are skipped for that entry.",
+                label: (entries) => `Attach to ${entries}`,
+            };
+        case 'detach':
+            return {
+                description: keepRemote
+                    ? "Removes the ticked providers from each entry's assignment but keeps the records there — the app just stops managing them. Other assignments are untouched. Paused providers are left as they are."
+                    : "Removes the ticked providers from each entry's assignment and deletes the records from them — other assignments are untouched. Paused providers keep their records.",
+                label: (entries) => (keepRemote ? `Detach ${entries}, keep records` : `Detach ${entries}, delete records`),
+            };
+        default:
+            return {
+                description: keepRemote
+                    ? "Replaces each entry's provider assignment: records sync to the ticked providers; at unticked ones they are kept but no longer managed. Providers that don't manage an entry's record type are skipped for that entry."
+                    : "Replaces each entry's provider assignment: records sync to the ticked providers and are deleted from unticked ones. Providers that don't manage an entry's record type are skipped for that entry.",
+                label: (entries) => `Apply to ${entries}`,
+            };
+    }
 };
 
 interface BulkProvidersDialogProps {
@@ -41,6 +48,7 @@ export function BulkProvidersDialog({ open, onOpenChange, selectedIds, attachmen
     const enabledAttachments = attachments.filter((attachment) => attachment.enabled);
     const [mode, setMode] = useState<BulkProvidersMode>('replace');
     const [selected, setSelected] = useState<Set<number>>(new Set());
+    const [keepRemote, setKeepRemote] = useState(false);
     const [processing, setProcessing] = useState(false);
 
     // Replace starts from "everything ticked" (the common retarget); attach
@@ -52,6 +60,7 @@ export function BulkProvidersDialog({ open, onOpenChange, selectedIds, attachmen
         if (open) {
             setMode('replace');
             setSelected(defaultSelection('replace'));
+            setKeepRemote(false);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
@@ -61,6 +70,7 @@ export function BulkProvidersDialog({ open, onOpenChange, selectedIds, attachmen
 
         setMode(next);
         setSelected(defaultSelection(next));
+        setKeepRemote(false);
     };
 
     const toggle = (id: number, checked: boolean) => {
@@ -76,11 +86,16 @@ export function BulkProvidersDialog({ open, onOpenChange, selectedIds, attachmen
         });
     };
 
+    // Only removals can keep records: detaching, or a replace that unticks something.
+    const offersKeep = mode === 'detach' || (mode === 'replace' && selected.size < enabledAttachments.length);
+    const copy = modeCopy(mode, offersKeep && keepRemote);
+    const deletesRemote = mode === 'detach' && !keepRemote;
+
     const submit = () => {
         setProcessing(true);
         router.post(
             route('entries.bulk.providers'),
-            { ids: selectedIds, zone_providers: [...selected], mode },
+            { ids: selectedIds, zone_providers: [...selected], mode, ...(offersKeep ? { keep_remote: keepRemote } : {}) },
             {
                 preserveScroll: true,
                 onSuccess: () => {
@@ -99,7 +114,7 @@ export function BulkProvidersDialog({ open, onOpenChange, selectedIds, attachmen
                     <DialogTitle>
                         Providers for {selectedIds.length} {selectedIds.length === 1 ? 'entry' : 'entries'}
                     </DialogTitle>
-                    <DialogDescription>{modeCopy[mode].description}</DialogDescription>
+                    <DialogDescription>{copy.description}</DialogDescription>
                 </DialogHeader>
 
                 <ToggleGroup type="single" variant="outline" size="sm" className="justify-start" value={mode} onValueChange={changeMode}>
@@ -131,8 +146,30 @@ export function BulkProvidersDialog({ open, onOpenChange, selectedIds, attachmen
                 {mode === 'replace' && selected.size === 0 && (
                     <p className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
                         <TriangleAlert className="mt-px size-3.5 shrink-0" />
-                        No providers selected — the entries will be removed from all their providers and kept locally only. Disabled providers are
-                        paused and keep their records.
+                        {keepRemote
+                            ? 'No providers selected — the app stops managing the entries at all their providers (records stay there) and keeps them locally only.'
+                            : 'No providers selected — the entries will be deleted from all their providers and kept locally only.'}{' '}
+                        Disabled providers are paused and keep their records.
+                    </p>
+                )}
+
+                {offersKeep && (
+                    <label className="flex items-start gap-2.5 rounded-lg border p-3 text-sm">
+                        <Checkbox className="mt-0.5" checked={keepRemote} onCheckedChange={(checked) => setKeepRemote(checked === true)} />
+                        <span className="grid gap-0.5">
+                            <span className="font-medium">Keep the records at the provider</span>
+                            <span className="text-muted-foreground text-xs">
+                                Stop managing them without syncing a delete — the records stay live at {mode === 'detach' ? 'the ticked' : 'unticked'}{' '}
+                                providers and the app no longer tracks or changes them.
+                            </span>
+                        </span>
+                    </label>
+                )}
+
+                {offersKeep && !keepRemote && (
+                    <p className="flex items-start gap-2 text-xs text-red-700 dark:text-red-400">
+                        <TriangleAlert className="mt-px size-3.5 shrink-0" />
+                        Records will be deleted at {mode === 'detach' ? 'the ticked' : 'unticked'} providers.
                     </p>
                 )}
 
@@ -140,9 +177,14 @@ export function BulkProvidersDialog({ open, onOpenChange, selectedIds, attachmen
                     <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={processing}>
                         Cancel
                     </Button>
-                    <Button type="button" onClick={submit} disabled={processing || (mode !== 'replace' && selected.size === 0)}>
+                    <Button
+                        type="button"
+                        variant={deletesRemote ? 'destructive' : 'default'}
+                        onClick={submit}
+                        disabled={processing || (mode !== 'replace' && selected.size === 0)}
+                    >
                         {processing && <LoaderCircle className="size-4 animate-spin" />}
-                        {modeCopy[mode].verb} {selectedIds.length} {selectedIds.length === 1 ? 'entry' : 'entries'}
+                        {copy.label(`${selectedIds.length} ${selectedIds.length === 1 ? 'entry' : 'entries'}`)}
                     </Button>
                 </DialogFooter>
             </DialogContent>

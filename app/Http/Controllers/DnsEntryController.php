@@ -8,6 +8,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use App\Models\DnsZone;
 use App\Models\DnsEntry;
+use App\Enums\SyncStatus;
 use App\Support\EntryQuery;
 use Illuminate\Http\Request;
 use App\Services\SyncService;
@@ -49,7 +50,7 @@ class DnsEntryController extends Controller
 
     public function store(DnsEntryRequest $request): RedirectResponse
     {
-        $entry = DnsEntry::create($request->safe()->except('zone_providers'));
+        $entry = DnsEntry::create($request->safe()->except(['zone_providers', 'keep_remote']));
 
         $this->sync->syncEntry($entry, $request->validated('zone_providers'));
 
@@ -58,11 +59,35 @@ class DnsEntryController extends Controller
 
     public function update(DnsEntryRequest $request, DnsEntry $entry): RedirectResponse
     {
-        $entry->update($request->safe()->except('zone_providers'));
+        $entry->update($request->safe()->except(['zone_providers', 'keep_remote']));
 
-        $this->sync->syncEntry($entry, $request->validated('zone_providers'));
+        // keep_remote: providers removed from the selection keep the record
+        // (the app just stops managing it) instead of getting a remote delete.
+        $kept = $this->sync->syncEntry($entry, $request->validated('zone_providers'), $request->boolean('keep_remote'));
 
-        return back()->with('success', "Entry {$entry->fqdn} updated — syncing to providers.");
+        $message = "Entry {$entry->fqdn} updated — syncing to providers.";
+
+        if ($kept === []) {
+            return back()->with('success', $message);
+        }
+
+        activity('entries')
+            ->performedOn($entry)
+            ->event('providers-changed')
+            ->withProperties([
+                'providers' => $entry->syncStates()
+                    ->where('sync_status', '!=', SyncStatus::Deleting)
+                    ->with('zoneProvider.provider:id,name')
+                    ->get()
+                    ->pluck('zoneProvider.provider.name')
+                    ->filter()
+                    ->values()
+                    ->all(),
+                'kept_at_providers' => $kept,
+            ])
+            ->log('providers-changed');
+
+        return back()->with('success', $message . ' The record was kept at ' . implode(', ', $kept) . ' (no longer managed by the app).');
     }
 
     public function destroy(DnsEntry $entry): RedirectResponse

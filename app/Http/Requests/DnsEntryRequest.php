@@ -49,6 +49,9 @@ class DnsEntryRequest extends FormRequest
                 'integer',
                 Rule::exists('zone_providers', 'id')->where('dns_zone_id', $zone?->id ?? 0),
             ],
+            // Providers removed from the selection keep their record (the
+            // app stops managing it) instead of getting a remote delete.
+            'keep_remote' => ['sometimes', 'boolean'],
         ];
     }
 

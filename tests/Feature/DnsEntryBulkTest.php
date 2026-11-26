@@ -12,6 +12,7 @@ use App\Models\ZoneProvider;
 use App\Jobs\SyncEntryToProvider;
 use App\Jobs\DeleteEntryFromProvider;
 use Illuminate\Support\Facades\Queue;
+use Spatie\Activitylog\Models\Activity;
 
 beforeEach(function () {
     $this->actingAs(User::factory()->create());
@@ -204,6 +205,195 @@ test('bulk detach leaves paused attachments untouched', function () {
 
     expect($entry->syncStates()->where('zone_provider_id', $pihole->id)->sole()->sync_status)->toBe(SyncStatus::Synced);
     Queue::assertNotPushed(DeleteEntryFromProvider::class);
+});
+
+test('bulk detach with keep_remote releases the records without deleting them at the provider', function () {
+    $pihole = piholeAttachment($this->zone);
+
+    $entry = bulkEntry($this->cfAttachment, ['name' => 'keep']);
+    $entry->syncStates()->create([
+        'zone_provider_id' => $pihole->id,
+        'sync_status' => SyncStatus::Synced,
+        'external_id' => "pi-{$entry->id}",
+    ]);
+
+    $this->post('/entries/bulk/providers', [
+        'ids' => [$entry->id],
+        'zone_providers' => [$pihole->id],
+        'mode' => 'detach',
+        'keep_remote' => true,
+    ])
+        ->assertRedirect()
+        ->assertSessionHas('success', fn ($message) => str_contains($message, 'without deleting') && str_contains($message, '1 record kept'));
+
+    expect($entry->syncStates()->where('zone_provider_id', $pihole->id)->exists())->toBeFalse()
+        ->and($entry->syncStates()->where('zone_provider_id', $this->cfAttachment->id)->sole()->sync_status)->toBe(SyncStatus::Synced)
+        ->and(DnsEntry::whereKey($entry->id)->exists())->toBeTrue();
+
+    Queue::assertNotPushed(DeleteEntryFromProvider::class);
+    Queue::assertNotPushed(SyncEntryToProvider::class);
+
+    $activity = Activity::query()->where('event', 'providers-changed')->sole();
+    expect($activity->properties->get('providers'))->toBe([$this->cloudflare->name])
+        ->and($activity->properties->get('kept_at_providers'))->toBe([$pihole->provider->name]);
+});
+
+test('bulk detach without keep_remote still deletes at the provider and records nothing kept', function () {
+    $entry = bulkEntry($this->cfAttachment, ['name' => 'gone']);
+
+    $this->post('/entries/bulk/providers', [
+        'ids' => [$entry->id],
+        'zone_providers' => [$this->cfAttachment->id],
+        'mode' => 'detach',
+        'keep_remote' => false,
+    ])
+        ->assertRedirect()
+        ->assertSessionHas('success', fn ($message) => str_contains($message, 'being deleted at the provider'));
+
+    expect($entry->syncStates()->sole()->sync_status)->toBe(SyncStatus::Deleting);
+    Queue::assertPushed(DeleteEntryFromProvider::class, 1);
+
+    expect(Activity::query()->where('event', 'providers-changed')->sole()->properties->has('kept_at_providers'))->toBeFalse();
+});
+
+test('bulk replace with keep_remote releases deselected attachments and pushes the rest', function () {
+    $pihole = piholeAttachment($this->zone);
+
+    $entry = bulkEntry($this->cfAttachment, ['name' => 'swap']);
+
+    $this->post('/entries/bulk/providers', [
+        'ids' => [$entry->id],
+        'zone_providers' => [$pihole->id],
+        'keep_remote' => true,
+    ])
+        ->assertRedirect()
+        ->assertSessionHas('success', fn ($message) => str_contains($message, 'kept there'));
+
+    expect($entry->syncStates()->where('zone_provider_id', $this->cfAttachment->id)->exists())->toBeFalse()
+        ->and($entry->syncStates()->where('zone_provider_id', $pihole->id)->sole()->sync_status)->toBe(SyncStatus::Pending);
+
+    Queue::assertNotPushed(DeleteEntryFromProvider::class);
+    Queue::assertPushed(SyncEntryToProvider::class, fn ($job) => $job->zoneProviderId === $pihole->id);
+});
+
+test('keep_remote never touches paused attachments', function () {
+    $pihole = piholeAttachment($this->zone);
+    $pihole->provider->update(['enabled' => false]);
+
+    $entry = bulkEntry($this->cfAttachment, ['name' => 'paused-keep']);
+    $entry->syncStates()->create([
+        'zone_provider_id' => $pihole->id,
+        'sync_status' => SyncStatus::Synced,
+        'external_id' => "pi-{$entry->id}",
+    ]);
+
+    foreach (['detach', 'replace'] as $mode) {
+        $this->post('/entries/bulk/providers', [
+            'ids' => [$entry->id],
+            'zone_providers' => $mode === 'detach' ? [$pihole->id] : [$this->cfAttachment->id],
+            'mode' => $mode,
+            'keep_remote' => true,
+        ])->assertRedirect();
+
+        expect($entry->syncStates()->where('zone_provider_id', $pihole->id)->sole()->sync_status)->toBe(SyncStatus::Synced);
+    }
+
+    Queue::assertNotPushed(DeleteEntryFromProvider::class);
+});
+
+test('keep_remote leaves a delete that is already in flight alone', function () {
+    $entry = bulkEntry($this->cfAttachment, ['name' => 'inflight']);
+    $entry->syncStates()->update(['sync_status' => SyncStatus::Deleting]);
+
+    $this->post('/entries/bulk/providers', [
+        'ids' => [$entry->id],
+        'zone_providers' => [$this->cfAttachment->id],
+        'mode' => 'detach',
+        'keep_remote' => true,
+    ])->assertRedirect();
+
+    expect($entry->syncStates()->sole()->sync_status)->toBe(SyncStatus::Deleting);
+});
+
+test('keep_remote must be a boolean', function () {
+    $entry = bulkEntry($this->cfAttachment, ['name' => 'strict']);
+
+    $this->post('/entries/bulk/providers', [
+        'ids' => [$entry->id],
+        'zone_providers' => [$this->cfAttachment->id],
+        'mode' => 'detach',
+        'keep_remote' => 'sometimes',
+    ])->assertSessionHasErrors('keep_remote');
+
+    expect($entry->syncStates()->sole()->sync_status)->toBe(SyncStatus::Synced);
+});
+
+test('updating an entry with keep_remote releases unticked providers without a remote delete', function () {
+    $pihole = piholeAttachment($this->zone);
+
+    $entry = bulkEntry($this->cfAttachment, ['name' => 'edit']);
+    $entry->syncStates()->create([
+        'zone_provider_id' => $pihole->id,
+        'sync_status' => SyncStatus::Synced,
+        'external_id' => "pi-{$entry->id}",
+    ]);
+
+    $payload = ['name' => 'edit', 'type' => 'A', 'content' => '10.0.0.1', 'proxied' => false, 'zone_providers' => [$this->cfAttachment->id]];
+
+    $this->put("/entries/{$entry->id}", $payload + ['keep_remote' => true])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors()
+        ->assertSessionHas('success', fn ($message) => str_contains($message, "kept at {$pihole->provider->name}"));
+
+    expect($entry->syncStates()->where('zone_provider_id', $pihole->id)->exists())->toBeFalse();
+    Queue::assertNotPushed(DeleteEntryFromProvider::class);
+    Queue::assertPushed(SyncEntryToProvider::class, fn ($job) => $job->zoneProviderId === $this->cfAttachment->id);
+
+    expect(Activity::query()->where('event', 'providers-changed')->sole()->properties->get('kept_at_providers'))
+        ->toBe([$pihole->provider->name]);
+});
+
+test('updating an entry without keep_remote still deletes unticked providers remotely', function () {
+    $pihole = piholeAttachment($this->zone);
+
+    $entry = bulkEntry($this->cfAttachment, ['name' => 'edit-delete']);
+    $entry->syncStates()->create([
+        'zone_provider_id' => $pihole->id,
+        'sync_status' => SyncStatus::Synced,
+        'external_id' => "pi-{$entry->id}",
+    ]);
+
+    $this->put("/entries/{$entry->id}", [
+        'name' => 'edit-delete', 'type' => 'A', 'content' => '10.0.0.1', 'proxied' => false,
+        'zone_providers' => [$this->cfAttachment->id],
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect($entry->syncStates()->where('zone_provider_id', $pihole->id)->sole()->sync_status)->toBe(SyncStatus::Deleting);
+    Queue::assertPushed(DeleteEntryFromProvider::class, 1);
+    expect(Activity::query()->where('event', 'providers-changed')->exists())->toBeFalse();
+
+    $this->put("/entries/{$entry->id}", [
+        'name' => 'edit-delete', 'type' => 'A', 'content' => '10.0.0.1', 'zone_providers' => [], 'keep_remote' => 'nope',
+    ])->assertSessionHasErrors('keep_remote');
+});
+
+test('keep_remote does not widen who may change providers', function () {
+    $entry = bulkEntry($this->cfAttachment, ['name' => 'guarded']);
+
+    $this->actingAs(User::factory()->superViewer()->create());
+
+    $this->post('/entries/bulk/providers', [
+        'ids' => [$entry->id],
+        'zone_providers' => [$this->cfAttachment->id],
+        'mode' => 'detach',
+        'keep_remote' => true,
+    ])->assertRedirect()->assertSessionHas('success', fn ($message) => str_contains($message, '0 entries'));
+
+    $this->put("/entries/{$entry->id}", [
+        'name' => 'guarded', 'type' => 'A', 'content' => '10.0.0.1', 'zone_providers' => [], 'keep_remote' => true,
+    ])->assertForbidden();
+
+    expect($entry->syncStates()->sole()->sync_status)->toBe(SyncStatus::Synced);
 });
 
 test('bulk attach and detach require at least one provider', function () {
