@@ -280,8 +280,12 @@ export default function Page() {
       <p>
         Above the table you can search (matches name and content, case-insensitive) and filter
         by zone (global page only), record type, provider, and sync status. Results are
-        paginated 25 per page; filters combine, and a &quot;Clear filters&quot; button appears
-        when a filtered view is empty.
+        paginated — 25 rows per page by default; pick 10, 25, 50, or 100 with{" "}
+        <strong>Rows per page</strong> below the table. Your choice is remembered in this
+        browser (for the global page and every zone&apos;s records page), kept while you
+        filter, sort, and page, and part of the URL so a shared link opens at the same size.
+        Filters combine, and a &quot;Clear filters&quot; button appears when a filtered view
+        is empty.
       </p>
       <p>
         Row actions live behind the kebab menu at the end of each row: <strong>Edit</strong>,{" "}
