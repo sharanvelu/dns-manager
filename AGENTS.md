@@ -11,7 +11,7 @@ Companion files: [ARCHITECTURE.md](ARCHITECTURE.md) (system design), [DESIGN.md]
 > - `ARCHITECTURE.md` — data model, connectors, sync engine, deployment
 > - `DESIGN.md` — UI patterns, components, status colors
 > - `docs-site/app/docs/**/page.tsx` — user-facing docs (one Next.js site: baked into the Docker image at `/docs` AND deployed to Vercel; content lives IN the TSX pages + `docs-site/lib/registry.ts`)
-> - `VERSION` — bump on every release (merging the bump to `master` tags `v<VERSION>`, publishes a GitHub Release with generated notes, and builds the image — see ARCHITECTURE.md CI section; the new version must be above every existing `v*` tag)
+> - `VERSION` — bump on every release (merging the bump to `master` tags `v<VERSION>`, publishes the Release Drafter draft as that release, and builds the image — see ARCHITECTURE.md CI section; the new version must be above every existing `v*` tag; the latest `tag` workflow run summary shows the suggested version). Release notes and PR labels come from the Conventional Commit PR title — write titles for the changelog reader; add `security` or `skip-changelog` by hand when needed
 >
 > If you add a route, change a form, alter sync semantics, add a connector, or modify deployment — update the matching doc before finishing. Do not leave documentation drift behind.
 

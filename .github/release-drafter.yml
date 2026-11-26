@@ -1,0 +1,201 @@
+# Release Drafter configuration (v7 schema) — single source for
+# release notes, the suggested next version, and PR auto-labelling.
+#
+# - .github/workflows/tag.yml keeps a draft release up to date on every
+#   master push and publishes it when a push changes VERSION.
+# - .github/workflows/pr-labeler.yml runs the autolabeler + Check PR on
+#   every pull request.
+#
+# Categorisation is title-first: PR titles are enforced as Conventional
+# Commits (pr-title.yml), so the `conventional` conditions classify every
+# PR even before labels exist. Labels are a second path (Dependabot's own
+# labels, or `security` / `skip-changelog` added by hand).
+
+name-template: "v$RESOLVED_VERSION"
+tag-template: "v$RESOLVED_VERSION"
+
+change-template: "- $TITLE (#$NUMBER) $AUTHORS"
+change-title-escapes: '\<*_&' # stop titles being read as Markdown/HTML
+
+replacers:
+  # Dependency entries already sit under "Dependencies" — drop the prefix.
+  - target: change-title
+    search: '/^\w+\(deps(?:-dev)?\)!?: (.*)$/'
+    replace: '\u$1'
+  # "feat: add x" -> "Add x"
+  - target: change-title
+    search: '/^\w+!?: (.*)$/'
+    replace: '\u$1'
+  # "fix(connectors): quote TXT" -> "connectors: Quote TXT"
+  - target: change-title
+    search: '/^\w+\(([^)]+)\)!?: (.*)$/'
+    replace: '$1: \u$2'
+
+template: |
+  **Docker image:** `ghcr.io/$OWNER/$REPOSITORY:$RESOLVED_VERSION`
+
+  $CHANGES
+
+  **Full changelog:** https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...$RESOLVED_TAG
+
+no-changes-template: "- No user-facing changes"
+
+categories:
+  - type: pre-exclude
+    when:
+      label: skip-changelog
+
+  # Order matters: every changelog category is `exclusive`, so a PR lands
+  # in the FIRST section it matches (a `feat!:` shows only under Breaking,
+  # a security dependency bump only under Security).
+  - title: "⚠️ Breaking changes"
+    semver-increment: major
+    exclusive: true
+    when:
+      - conventional:
+          breaking: true
+      - label: breaking-change
+
+  - title: "🔒 Security"
+    semver-increment: patch
+    exclusive: true
+    when:
+      - conventional:
+          scope: security
+      - label: security
+
+  - title: "🚀 Features"
+    semver-increment: minor
+    exclusive: true
+    when:
+      - conventional:
+          type: feat
+      - label: enhancement
+
+  - title: "🐛 Bug fixes"
+    semver-increment: patch
+    exclusive: true
+    when:
+      - conventional:
+          type: fix
+      - label: bug
+
+  - title: "⚡ Performance"
+    semver-increment: patch
+    exclusive: true
+    when:
+      - conventional:
+          type: perf
+      - label: performance
+
+  - title: "📚 Documentation"
+    semver-increment: patch
+    exclusive: true
+    when:
+      - conventional:
+          type: docs
+      - label: documentation
+
+  - title: "⬆️ Dependencies"
+    semver-increment: patch
+    exclusive: true
+    collapse-after: 5
+    when:
+      - conventional:
+          scopes: [deps, deps-dev]
+      - label: dependencies
+
+  - title: "🧰 Maintenance"
+    semver-increment: patch
+    exclusive: true
+    when:
+      - conventional:
+          types: [refactor, test, build, ci, chore, style, revert]
+
+  # Fallback for anything unmatched (no `when`).
+  - title: "📦 Other changes"
+
+  # Fallback version increment when nothing above matched.
+  - type: version-resolver
+    semver-increment: patch
+
+# --- Autolabeler (pr-labeler.yml) ------------------------------------------
+# sync-labels removes configured labels that no longer match, so editing a
+# title from `fix:` to `feat:` swaps `bug` for `enhancement`. Labels NOT
+# listed below (security, skip-changelog, triage labels) are never touched —
+# keep hand-applied labels out of these rules.
+sync-labels: true
+
+autolabeler:
+  # Areas (by changed files). Match Dependabot's own ecosystem labels so
+  # syncing never strips them.
+  - labels: [php]
+    files:
+      - "app/**"
+      - "bootstrap/**"
+      - "config/**"
+      - "database/**"
+      - "routes/**"
+      - "tests/**"
+      - "composer.json"
+      - "composer.lock"
+      - "phpstan*.neon"
+      - "pint.json"
+  - labels: [javascript]
+    files:
+      - "resources/js/**"
+      - "package.json"
+      - "package-lock.json"
+      - "docs-site/package.json"
+      - "docs-site/package-lock.json"
+      - "vite.config.js"
+      - "vitest.config.ts"
+      - "tsconfig.json"
+      - "eslint.config.js"
+  - labels: [github_actions]
+    files:
+      - ".github/**"
+  - labels: [docker]
+    files:
+      - "Dockerfile"
+      - ".dockerignore"
+      - "docker/**"
+      - "k8s/**"
+  - labels: [database]
+    files:
+      - "database/migrations/**"
+
+  # Breaking changes: `type!:` or a BREAKING CHANGE footer.
+  - labels: [breaking-change]
+    title:
+      - '/^\w+(\([^)]*\))?!:/'
+    body:
+      - '/^BREAKING[ -]CHANGE:/m'
+
+  # Dependency updates get only `dependencies` (not also `chore`/`build`).
+  - labels: [dependencies]
+    stop-on-match: true
+    title:
+      - '/^\w+\((deps|deps-dev)\)!?:/i'
+
+  # One type label per Conventional Commit type.
+  - labels: [enhancement]
+    title: ['/^feat(\([^)]*\))?!?:/i']
+  - labels: [bug]
+    title: ['/^fix(\([^)]*\))?!?:/i']
+  - labels: [performance]
+    title: ['/^perf(\([^)]*\))?!?:/i']
+  - labels: [documentation]
+    title: ['/^docs(\([^)]*\))?!?:/i']
+  - labels: [refactor]
+    title: ['/^refactor(\([^)]*\))?!?:/i']
+  - labels: [tests]
+    title: ['/^test(\([^)]*\))?!?:/i']
+  - labels: [ci]
+    title: ['/^ci(\([^)]*\))?!?:/i']
+  - labels: [build]
+    title: ['/^build(\([^)]*\))?!?:/i']
+  - labels: [chore]
+    title: ['/^(chore|style)(\([^)]*\))?!?:/i']
+  - labels: [revert]
+    title: ['/^revert(\([^)]*\))?!?:/i']

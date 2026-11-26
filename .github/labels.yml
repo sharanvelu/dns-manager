@@ -1,0 +1,90 @@
+# Repository labels as code — synced by .github/workflows/labels.yml on
+# every master push that changes this file. The sync creates missing labels
+# and updates colour/description of existing ones; it never deletes, so a
+# label removed here must be deleted by hand.
+#
+# Type labels are applied automatically from the PR title by the
+# autolabeler (.github/release-drafter.yml); area labels from changed files.
+
+# --- Change type (autolabeled from the Conventional Commit title) ---
+- name: breaking-change
+  color: b60205
+  description: "Breaking change (`type!:` or BREAKING CHANGE footer) — major release"
+- name: enhancement
+  color: a2eeef
+  description: "New feature (`feat:`) — minor release"
+- name: bug
+  color: d73a4a
+  description: "Bug fix (`fix:`)"
+- name: performance
+  color: fbca04
+  description: "Performance improvement (`perf:`)"
+- name: documentation
+  color: 0075ca
+  description: "Documentation only (`docs:`)"
+- name: dependencies
+  color: 0366d6
+  description: "Dependency update (`chore(deps):`)"
+- name: refactor
+  color: c5def5
+  description: "Code change that neither fixes a bug nor adds a feature (`refactor:`)"
+- name: tests
+  color: bfd4f2
+  description: "Tests only (`test:`)"
+- name: ci
+  color: 5319e7
+  description: "CI/CD workflows (`ci:`)"
+- name: build
+  color: d4c5f9
+  description: "Build system or tooling (`build:`)"
+- name: chore
+  color: ededed
+  description: "Maintenance (`chore:` / `style:`)"
+- name: revert
+  color: e99695
+  description: "Reverts a previous change (`revert:`)"
+
+# --- Applied by hand (never auto-removed) ---
+- name: security
+  color: ee0701
+  description: "Security fix — listed first in release notes"
+- name: skip-changelog
+  color: ffffff
+  description: "Exclude this PR from release notes"
+
+# --- Area (autolabeled from changed files; also used by Dependabot) ---
+- name: php
+  color: 45229e
+  description: "PHP / Laravel code or Composer dependencies"
+- name: javascript
+  color: "168700"
+  description: "Frontend, docs-site, or npm dependencies"
+- name: github_actions
+  color: "000000"
+  description: "GitHub workflows, actions, or repo config"
+- name: docker
+  color: 1d76db
+  description: "Dockerfile, container config, or Kubernetes manifests"
+- name: database
+  color: "006b75"
+  description: "Database migrations"
+
+# --- Triage (GitHub defaults) ---
+- name: duplicate
+  color: cfd3d7
+  description: "This issue or pull request already exists"
+- name: good first issue
+  color: 7057ff
+  description: "Good for newcomers"
+- name: help wanted
+  color: "008672"
+  description: "Extra attention is needed"
+- name: invalid
+  color: e4e669
+  description: "This doesn't seem right"
+- name: question
+  color: d876e3
+  description: "Further information is requested"
+- name: wontfix
+  color: ffffff
+  description: "This will not be worked on"
