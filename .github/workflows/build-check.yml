@@ -48,6 +48,15 @@ jobs:
               - '.dockerignore'
               - 'docker/**'
               - 'docs-site/**'
+              # Dependency and boot-path changes decide whether the image
+              # can start (v1.2.0 shipped dev packages in composer.lock's
+              # prod section and could not boot) — build and boot it.
+              - 'composer.json'
+              - 'composer.lock'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'bootstrap/**'
+              - 'config/**'
               - '.github/workflows/build-check.yml'
 
   frontend:
@@ -89,15 +98,31 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-      # Single platform and no push — this only proves the image still
-      # builds; build.yml does the real multi-arch build after merge.
+      # Single platform and no push — build.yml does the real multi-arch
+      # build after merge. `load` keeps the image for the boot check below.
       - name: Build (no push)
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           push: false
+          load: true
+          tags: dns-manager:ci
           platforms: linux/amd64
           cache-from: type=gha,scope=build-amd64
+
+      # Building is not enough: v1.2.0 built fine but every container died
+      # at start ("Class ...CollisionServiceProvider not found") because a
+      # dev package was in composer.lock's prod section. Run the real
+      # entrypoint (package:discover, config/view/route cache) and then a
+      # strict package:discover — any boot failure fails the PR. No DB or
+      # Redis needed; AUTO_MIGRATE stays off.
+      - name: Boot check (entrypoint + artisan)
+        run: |
+          docker run --rm \
+            -e APP_ENV=production \
+            -e APP_KEY="base64:$(openssl rand -base64 32)" \
+            dns-manager:ci \
+            sh -c 'php artisan package:discover --ansi && php artisan --version'
 
   gate:
     name: Build Check Gate
