@@ -757,12 +757,6 @@ parameters:
 			path: app/Services/SyncService.php
 
 		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:each\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: mixed, Closure\(App\\Models\\EntrySyncState\)\: void given\.$#'
-			identifier: argument.type
-			count: 2
-			path: app/Services/SyncService.php
-
-		-
 			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:filter\(\) expects \(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: bool\)\|null, Closure\(App\\Models\\EntrySyncState\)\: bool given\.$#'
 			identifier: argument.type
 			count: 1

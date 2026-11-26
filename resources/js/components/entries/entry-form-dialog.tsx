@@ -34,6 +34,8 @@ type EntryFormData = {
     proxied: boolean;
     comment: string;
     zone_providers: number[];
+    /** Edit only: providers removed from the selection keep their record (no remote delete). */
+    keep_remote: boolean;
 };
 
 function compatibleAttachments(attachments: ZoneAttachment[], type: RecordType): ZoneAttachment[] {
@@ -57,6 +59,7 @@ function initialData(entry: EntryItem | null, defaultZoneId: number | undefined,
         zone_providers: entry
             ? entry.syncStates.filter((state) => state.status !== 'deleting').map((state) => state.zoneProviderId)
             : compatibleAttachments(zoneAttachments[zoneId ?? -1] ?? [], type).map((attachment) => attachment.id),
+        keep_remote: false,
     };
 }
 
@@ -121,6 +124,18 @@ export function EntryFormDialog({ open, onOpenChange, entry, lockedZone, zones, 
         setData('zone_providers', checked ? [...data.zone_providers, id] : data.zone_providers.filter((selected) => selected !== id));
     };
 
+    // Edit: active providers that currently hold the record but would lose it
+    // (unticked, or no longer managing the type). Paused ones are never touched.
+    const removedAttachments = entry
+        ? (zoneId != null ? (zoneAttachments[zoneId] ?? []) : []).filter(
+              (attachment) =>
+                  attachment.enabled &&
+                  !(data.zone_providers.includes(attachment.id) && attachment.managedRecordTypes.includes(data.type)) &&
+                  entry.syncStates.some((state) => state.zoneProviderId === attachment.id && state.status !== 'deleting'),
+          )
+        : [];
+    const removedNames = removedAttachments.map((attachment) => attachment.providerName).join(', ');
+
     const connectorByType = new Map(connectors.map((connector) => [connector.type, connector]));
     const showProxied = targetAttachments.some(
         (attachment) => data.zone_providers.includes(attachment.id) && connectorByType.get(attachment.providerType)?.capabilities.supportsProxied,
@@ -140,6 +155,7 @@ export function EntryFormDialog({ open, onOpenChange, entry, lockedZone, zones, 
             proxied: showProxied ? form.proxied : false,
             comment: form.comment.trim() === '' ? null : form.comment.trim(),
             zone_providers: form.zone_providers,
+            ...(entry && removedAttachments.length > 0 ? { keep_remote: form.keep_remote } : {}),
         }));
 
         const options = {
@@ -342,13 +358,38 @@ export function EntryFormDialog({ open, onOpenChange, entry, lockedZone, zones, 
                                         {entry ? ' and removed from providers it currently syncs to' : ''}.
                                     </p>
                                 )}
-                                <InputError className="mt-2" message={errors.zone_providers} />
+                                <InputError className="mt-2" message={errors.zone_providers ?? errors.keep_remote} />
                             </>
                         ) : (
                             <p className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
                                 <TriangleAlert className="mt-px size-3.5 shrink-0" />
                                 No enabled provider attached to this zone manages {data.type} records — this entry will not sync anywhere.
                             </p>
+                        )}
+                        {removedAttachments.length > 0 && (
+                            <div className="bg-background mt-3 grid gap-2 rounded-md border p-2.5">
+                                <label htmlFor="entry-keep-remote" className="flex items-start gap-2.5 text-sm">
+                                    <Checkbox
+                                        id="entry-keep-remote"
+                                        className="mt-0.5"
+                                        checked={data.keep_remote}
+                                        onCheckedChange={(checked) => setData('keep_remote', checked === true)}
+                                    />
+                                    <span className="grid gap-0.5">
+                                        <span className="font-medium">Keep the record at {removedNames}</span>
+                                        <span className="text-muted-foreground text-xs">
+                                            Stop managing it there without deleting — the record stays live and the app no longer tracks or changes
+                                            it.
+                                        </span>
+                                    </span>
+                                </label>
+                                {!data.keep_remote && (
+                                    <p className="flex items-start gap-2 text-xs text-red-700 dark:text-red-400">
+                                        <TriangleAlert className="mt-px size-3.5 shrink-0" />
+                                        Saving deletes the record at {removedNames}.
+                                    </p>
+                                )}
+                            </div>
                         )}
                     </div>
 
