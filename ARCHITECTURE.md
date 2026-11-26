@@ -6,7 +6,7 @@ System design reference for DNS Manager. Keep in sync with the code — see the 
 
 ```
                       ┌────────────────────────────────────────────┐
-                      │  Laravel 12 (single image, three roles)    │
+                      │  Laravel 13 (single image, three roles)    │
  Browser ── Inertia ──▶  web (nginx+fpm) ─┐                        │
                       │  worker (queue:work redis) ◀─ Redis queue  │
                       │  scheduler (schedule:work, 15-min drift)   │

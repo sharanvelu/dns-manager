@@ -13,7 +13,7 @@ Manage DNS entries across multiple providers from one place. Records live in **D
 
 ## Stack
 
-- Laravel 12 (PHP 8.4) + Inertia.js 2 + React 19 + TypeScript + Tailwind CSS 4
+- Laravel 13 (PHP 8.4) + Inertia.js 3 + React 19 + TypeScript + Tailwind CSS 4
 - PostgreSQL 16 (managed migrations), Redis (queue)
 - OIDC authentication (any spec-compliant provider: Authentik, Keycloak, Auth0, ...) and/or email + password sign-in, each toggled by env (`SSO_ENABLED`, `BASIC_AUTH_ENABLED`)
 - Forgot-password emails, admin-created users invited by email, user management (add/edit/delete)
