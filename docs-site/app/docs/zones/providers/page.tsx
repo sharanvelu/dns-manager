@@ -173,37 +173,57 @@ export default function Page() {
       <H2>Import records from a provider</H2>
 
       <p>
-        <strong>Import records</strong> (on the attachment card) pulls the provider&apos;s live
-        records into the zone — the way to take over records that predate DNS Manager, or to
-        seed a fresh install.
+        Importing pulls a provider&apos;s live records into the zone — the way to take over
+        records that predate DNS Manager, or to seed a fresh install. It needs permission to
+        manage the zone&apos;s records.
       </p>
 
       <Steps>
+        <Step title="Open the import">
+          <p>
+            Use <strong>Import records</strong> on an attachment card, or{" "}
+            <strong>Import from provider</strong> in the records toolbar — on the zone&apos;s
+            Records tab it asks which of the zone&apos;s providers to read (skipped when there is
+            only one); on the <a href="/docs/dns-entries/managing/">DNS Entries</a> page it asks
+            for the zone first, offering only zones whose records you can manage.
+          </p>
+        </Step>
         <Step title="Review the remote records">
           <p>
             The dialog lists the remote records that fall inside this zone, each marked{" "}
             <strong>New</strong> (no matching entry), <strong>Will update</strong> (a matching
             entry exists and will be updated and linked), or <strong>Managed</strong> (already
-            linked to this attachment — shown for completeness, not selectable). Remote names
-            are shown zone-relative.
+            linked to this attachment — shown ticked and locked). Remote names are shown
+            zone-relative.
+          </p>
+          <p>
+            Narrow long lists with the <strong>search</strong> box (matches name or content),
+            the <strong>type</strong> picker, and the status chips —{" "}
+            <strong>All / New / Matches existing / Managed</strong> — each showing a live count
+            for the current search and type. Large zones render the first 200 matches; use{" "}
+            <strong>Show more</strong> or refine the search.
           </p>
         </Step>
-        <Step title="Note what was filtered out">
+        <Step title="Check what can't be imported">
           <p>
-            Records that don&apos;t belong are filtered out and only counted: records{" "}
-            <strong>outside the zone</strong> are skipped (<em>&quot;N records outside this
-            zone were skipped&quot;</em> — expected for Pi-hole, which holds records for many
-            zones in one place), and records whose types the provider doesn&apos;t{" "}
-            <a href="/docs/providers/">manage</a> are hidden.
+            A collapsed <strong>&quot;N records can&apos;t be imported&quot;</strong> section at the
+            bottom lists the remote records that were left out, each with its reason:{" "}
+            <strong>Outside <em>zone</em></strong> (expected for Pi-hole, which holds records for
+            many zones in one place) or <strong>Type not managed by <em>provider</em></strong> — enable
+            the type in the provider&apos;s <a href="/docs/providers/">managed record types</a>{" "}
+            to import it. These rows are never selectable; search and type filters apply to them
+            too. Up to 500 are listed (the count is always exact).
           </p>
         </Step>
         <Step title="Select and import">
           <p>
-            Tick what you want — everything not already managed is preselected — and press{" "}
-            <strong>Import</strong>. Selected records are upserted: new entries are created,
-            matching entries (same name, type, and content) are updated in place, and each is
-            linked to <strong>this attachment only</strong>, already in sync — nothing is
-            pushed anywhere else and nothing is duplicated.
+            Tick what you want — everything not already managed is preselected. The{" "}
+            <strong>Select all</strong> checkbox applies to the rows matching the current
+            filters only; selections hidden by a filter are kept and counted. Press{" "}
+            <strong>Import</strong> (up to 1000 records at a time). Selected records are
+            upserted: new entries are created, matching entries (same name, type, and content)
+            are updated in place, and each is linked to <strong>this attachment only</strong>,
+            already in sync — nothing is pushed anywhere else and nothing is duplicated.
           </p>
         </Step>
       </Steps>

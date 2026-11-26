@@ -2,21 +2,31 @@ import { RecordTypeBadge } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { router } from '@inertiajs/react';
-import { LoaderCircle, TriangleAlert } from 'lucide-react';
-import { useEffect, useState } from 'react';
-
-interface RemoteRecord {
-    externalId: string;
-    type: string;
-    name: string;
-    content: string;
-    ttl: number | null;
-    priority: number | null;
-    proxied: boolean;
-    status: 'new' | 'exists' | 'managed';
-}
+import { ChevronRight, LoaderCircle, Search, TriangleAlert } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+    applySelectAll,
+    EMPTY_IMPORT_FILTERS,
+    filterExcluded,
+    filterRecords,
+    initialSelection,
+    recordKey,
+    recordTypes,
+    rowState,
+    selectAllState,
+    statusCounts,
+    type ExcludedReason,
+    type ExcludedRecord,
+    type ImportFilters,
+    type ImportStatus,
+    type RemoteRecord,
+} from './import-records';
 
 interface ImportRecordsDialogProps {
     zone: { id: number; name: string };
@@ -25,26 +35,41 @@ interface ImportRecordsDialogProps {
     onOpenChange: (open: boolean) => void;
 }
 
-const statusBadge: Record<RemoteRecord['status'], { label: string; className: string }> = {
+/** Rows rendered at once — large zones page in more on demand so the dialog stays responsive. */
+const RENDER_STEP = 200;
+/** Mirrors the `records` max on the import endpoint. */
+const MAX_IMPORT = 1000;
+const ALL_TYPES = '__all';
+
+const statusBadge: Record<ImportStatus, { label: string; className: string }> = {
     new: { label: 'New', className: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' },
     exists: { label: 'Will update', className: 'bg-amber-500/10 text-amber-700 dark:text-amber-400' },
     managed: { label: 'Managed', className: 'text-muted-foreground' },
 };
 
-function recordKey(record: RemoteRecord): string {
-    return `${record.type}|${record.name}|${record.content}|${record.externalId}`;
+const statusFilterLabel: Record<ImportStatus, string> = {
+    new: 'New',
+    exists: 'Matches existing',
+    managed: 'Managed',
+};
+
+function reasonLabel(reason: ExcludedReason, providerName: string, zoneName: string): string {
+    return reason === 'out-of-zone' ? `Outside ${zoneName}` : `Type not managed by ${providerName}`;
 }
 
 /**
  * Import a zone attachment's remote records into the zone. Names arrive
- * zone-relative; records outside the zone are skipped server-side and only
- * surfaced as a count.
+ * zone-relative. Rows can be searched and filtered by type/status; records
+ * that cannot be imported (unmanaged types, outside the zone) are listed in a
+ * collapsed, non-selectable section with the reason.
  */
 export function ImportRecordsDialog({ zone, attachment, open, onOpenChange }: ImportRecordsDialogProps) {
     const [records, setRecords] = useState<RemoteRecord[]>([]);
-    const [unmanagedCount, setUnmanagedCount] = useState(0);
-    const [outOfZoneCount, setOutOfZoneCount] = useState(0);
+    const [excluded, setExcluded] = useState<ExcludedRecord[]>([]);
+    const [excludedTotal, setExcludedTotal] = useState(0);
     const [selected, setSelected] = useState<Set<string>>(new Set());
+    const [filters, setFilters] = useState<ImportFilters>(EMPTY_IMPORT_FILTERS);
+    const [renderLimit, setRenderLimit] = useState(RENDER_STEP);
     const [loading, setLoading] = useState(false);
     const [importing, setImporting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -55,7 +80,10 @@ export function ImportRecordsDialog({ zone, attachment, open, onOpenChange }: Im
         setLoading(true);
         setError(null);
         setRecords([]);
+        setExcluded([]);
+        setExcludedTotal(0);
         setSelected(new Set());
+        setFilters(EMPTY_IMPORT_FILTERS);
 
         fetch(route('zones.import.records', [zone.id, attachment.id]), {
             headers: { Accept: 'application/json' },
@@ -69,18 +97,32 @@ export function ImportRecordsDialog({ zone, attachment, open, onOpenChange }: Im
                 }
 
                 const remote: RemoteRecord[] = body.records;
+                const skipped: ExcludedRecord[] = body.excluded ?? [];
                 setRecords(remote);
-                setUnmanagedCount(body.unmanagedTypeCount ?? 0);
-                setOutOfZoneCount(body.outOfZoneCount ?? 0);
+                setExcluded(skipped);
+                setExcludedTotal(body.excludedTotal ?? skipped.length);
                 // Preselect everything that is not already managed here.
-                setSelected(new Set(remote.filter((record) => record.status !== 'managed').map(recordKey)));
+                setSelected(initialSelection(remote));
             })
             .catch((fetchError: Error) => setError(fetchError.message))
             .finally(() => setLoading(false));
     }, [open, zone.id, attachment.id]);
 
-    const selectable = records.filter((record) => record.status !== 'managed');
-    const allSelected = selectable.length > 0 && selectable.every((record) => selected.has(recordKey(record)));
+    const updateFilters = (change: Partial<ImportFilters> | ImportFilters) => {
+        setFilters((current) => ({ ...current, ...change }));
+        setRenderLimit(RENDER_STEP);
+    };
+
+    const types = useMemo(() => recordTypes(records, excluded), [records, excluded]);
+    const visible = useMemo(() => filterRecords(records, filters), [records, filters]);
+    const visibleExcluded = useMemo(() => filterExcluded(excluded, filters), [excluded, filters]);
+    const counts = useMemo(() => statusCounts(records, filters), [records, filters]);
+    const countsTotal = counts.new + counts.exists + counts.managed;
+
+    const visibleSelectable = visible.filter((record) => rowState(record) === 'selectable');
+    const headerState = selectAllState(visible, selected);
+    const hiddenSelected = selected.size - visibleSelectable.filter((record) => selected.has(recordKey(record))).length;
+    const hasFilters = filters.search !== '' || filters.type !== '' || filters.status !== 'all';
 
     const toggle = (record: RemoteRecord, checked: boolean) => {
         setSelected((current) => {
@@ -93,10 +135,6 @@ export function ImportRecordsDialog({ zone, attachment, open, onOpenChange }: Im
 
             return next;
         });
-    };
-
-    const toggleAll = (checked: boolean) => {
-        setSelected(checked ? new Set(selectable.map(recordKey)) : new Set());
     };
 
     const submit = () => {
@@ -124,16 +162,11 @@ export function ImportRecordsDialog({ zone, attachment, open, onOpenChange }: Im
         );
     };
 
-    const skippedNotes = [
-        unmanagedCount > 0 ? `${unmanagedCount} record(s) hidden (types not managed by this provider)` : null,
-        outOfZoneCount > 0
-            ? `${outOfZoneCount} record${outOfZoneCount === 1 ? '' : 's'} outside this zone ${outOfZoneCount === 1 ? 'was' : 'were'} skipped`
-            : null,
-    ].filter(Boolean);
+    const loaded = !loading && !error;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-2xl">
+            <DialogContent className="flex max-h-[90dvh] flex-col sm:max-w-3xl">
                 <DialogHeader>
                     <DialogTitle>Import records from {attachment.providerName}</DialogTitle>
                     <DialogDescription>
@@ -156,63 +189,190 @@ export function ImportRecordsDialog({ zone, attachment, open, onOpenChange }: Im
                     </div>
                 )}
 
-                {!loading && !error && records.length === 0 && (
-                    <div className="space-y-1 py-8 text-center">
-                        <p className="text-muted-foreground text-sm">No importable records found in this zone at {attachment.providerName}.</p>
-                        {skippedNotes.length > 0 && <p className="text-muted-foreground text-xs">{skippedNotes.join(' · ')}</p>}
+                {loaded && records.length === 0 && (
+                    <p className="text-muted-foreground py-6 text-center text-sm">
+                        No importable records found in this zone at {attachment.providerName}.
+                    </p>
+                )}
+
+                {loaded && (records.length > 0 || excluded.length > 0) && (
+                    <div className="flex min-h-0 flex-1 flex-col gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <div className="relative min-w-48 flex-1">
+                                <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
+                                <Input
+                                    value={filters.search}
+                                    onChange={(event) => updateFilters({ search: event.target.value })}
+                                    placeholder="Search name or content…"
+                                    aria-label="Search records"
+                                    className="h-8 pl-8 text-xs"
+                                />
+                            </div>
+                            <Select
+                                value={filters.type === '' ? ALL_TYPES : filters.type}
+                                onValueChange={(value) => updateFilters({ type: value === ALL_TYPES ? '' : value })}
+                            >
+                                <SelectTrigger className="h-8 w-32 text-xs" aria-label="Filter by type">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value={ALL_TYPES} className="text-xs">
+                                        All types
+                                    </SelectItem>
+                                    {types.map((type) => (
+                                        <SelectItem key={type} value={type} className="font-mono text-xs">
+                                            {type}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {records.length > 0 && (
+                            <ToggleGroup
+                                type="single"
+                                variant="outline"
+                                size="sm"
+                                className="flex-wrap justify-start"
+                                value={filters.status}
+                                onValueChange={(value) => value && updateFilters({ status: value as ImportFilters['status'] })}
+                                aria-label="Filter by status"
+                            >
+                                <ToggleGroupItem value="all" className="gap-1.5 px-2.5 text-xs">
+                                    All <span className="text-muted-foreground tabular-nums">{countsTotal}</span>
+                                </ToggleGroupItem>
+                                {(Object.keys(statusFilterLabel) as ImportStatus[]).map((status) => (
+                                    <ToggleGroupItem key={status} value={status} className="gap-1.5 px-2.5 text-xs">
+                                        {statusFilterLabel[status]} <span className="text-muted-foreground tabular-nums">{counts[status]}</span>
+                                    </ToggleGroupItem>
+                                ))}
+                            </ToggleGroup>
+                        )}
+
+                        {records.length > 0 && (
+                            <div className="text-muted-foreground flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
+                                <label className="flex items-center gap-2">
+                                    <Checkbox
+                                        checked={headerState}
+                                        disabled={visibleSelectable.length === 0}
+                                        onCheckedChange={() => setSelected((current) => applySelectAll(current, visible, headerState !== true))}
+                                        aria-label={hasFilters ? 'Select all matching records' : 'Select all records'}
+                                    />
+                                    {hasFilters ? `Select all ${visibleSelectable.length} matching` : 'Select all'}
+                                </label>
+                                <span className="tabular-nums">
+                                    {selected.size} selected
+                                    {hasFilters && hiddenSelected > 0 && ` (${hiddenSelected} hidden by filters)`}
+                                </span>
+                            </div>
+                        )}
+
+                        {records.length > 0 && (
+                            <div className="max-h-[45dvh] min-h-24 divide-y overflow-y-auto overscroll-contain rounded-lg border">
+                                {visible.length === 0 && (
+                                    <div className="text-muted-foreground flex flex-col items-center gap-2 py-8 text-center text-sm">
+                                        No records match these filters.
+                                        <Button variant="outline" size="sm" onClick={() => updateFilters(EMPTY_IMPORT_FILTERS)}>
+                                            Clear filters
+                                        </Button>
+                                    </div>
+                                )}
+                                {visible.slice(0, renderLimit).map((record) => {
+                                    const badge = statusBadge[record.status];
+                                    const tracked = rowState(record) === 'tracked';
+
+                                    return (
+                                        <label
+                                            key={recordKey(record)}
+                                            title={tracked ? `Already managed from ${attachment.providerName}` : undefined}
+                                            className={`flex items-center gap-3 px-3 py-2 text-sm ${tracked ? 'opacity-60' : 'hover:bg-muted/40 cursor-pointer'}`}
+                                        >
+                                            <Checkbox
+                                                checked={tracked || selected.has(recordKey(record))}
+                                                disabled={tracked}
+                                                onCheckedChange={(checked) => toggle(record, checked === true)}
+                                                aria-label={`${record.type} ${record.name}`}
+                                            />
+                                            <RecordTypeBadge type={record.type} />
+                                            <span className="min-w-0 flex-1">
+                                                <span className="block truncate font-mono text-[13px]">{record.name}</span>
+                                                <span className="text-muted-foreground block truncate font-mono text-xs">{record.content}</span>
+                                            </span>
+                                            <Badge variant="secondary" className={`shrink-0 ${badge.className}`}>
+                                                {badge.label}
+                                            </Badge>
+                                        </label>
+                                    );
+                                })}
+                                {visible.length > renderLimit && (
+                                    <div className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
+                                        <span className="text-muted-foreground tabular-nums">
+                                            Showing {renderLimit} of {visible.length} — search or filter to narrow down.
+                                        </span>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-7 text-xs"
+                                            onClick={() => setRenderLimit((limit) => limit + RENDER_STEP)}
+                                        >
+                                            Show more
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {excludedTotal > 0 && (
+                            <Collapsible className="group/excluded rounded-lg border">
+                                <CollapsibleTrigger className="text-muted-foreground hover:text-foreground flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-xs">
+                                    <ChevronRight className="size-3.5 shrink-0 transition-transform group-data-[state=open]/excluded:rotate-90" />
+                                    <span className="flex-1">
+                                        <span className="tabular-nums">{excludedTotal}</span> record{excludedTotal === 1 ? '' : 's'} can't be imported
+                                        {hasFilters && excluded.length > 0 && (
+                                            <span className="tabular-nums"> · {visibleExcluded.length} match the filters</span>
+                                        )}
+                                    </span>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent>
+                                    <div className="max-h-48 divide-y overflow-y-auto overscroll-contain border-t">
+                                        {visibleExcluded.map((record, index) => (
+                                            <div
+                                                key={`${record.reason}|${record.type}|${record.name}|${index}`}
+                                                className="flex items-center gap-3 px-3 py-2 text-sm"
+                                            >
+                                                <RecordTypeBadge type={record.type} />
+                                                <span className="min-w-0 flex-1">
+                                                    <span className="block truncate font-mono text-[13px]">{record.name}</span>
+                                                    <span className="text-muted-foreground block truncate font-mono text-xs">{record.content}</span>
+                                                </span>
+                                                <span className="text-muted-foreground shrink-0 text-xs">
+                                                    {reasonLabel(record.reason, attachment.providerName, zone.name)}
+                                                </span>
+                                            </div>
+                                        ))}
+                                        {excludedTotal > excluded.length && (
+                                            <p className="text-muted-foreground px-3 py-2 text-xs tabular-nums">
+                                                Showing the first {excluded.length} of {excludedTotal}.
+                                            </p>
+                                        )}
+                                    </div>
+                                </CollapsibleContent>
+                            </Collapsible>
+                        )}
                     </div>
                 )}
 
-                {!loading && !error && records.length > 0 && (
-                    <>
-                        <div className="text-muted-foreground flex items-center justify-between gap-3 text-xs">
-                            <label className="flex items-center gap-2">
-                                <Checkbox checked={allSelected} onCheckedChange={(checked) => toggleAll(checked === true)} />
-                                Select all
-                            </label>
-                            <span className="text-right tabular-nums">
-                                {selected.size} of {selectable.length} selected
-                                {skippedNotes.map((note) => (
-                                    <span key={note}> · {note}</span>
-                                ))}
-                            </span>
-                        </div>
-
-                        <div className="max-h-80 divide-y overflow-y-auto rounded-lg border">
-                            {records.map((record) => {
-                                const badge = statusBadge[record.status];
-                                const isManaged = record.status === 'managed';
-
-                                return (
-                                    <label
-                                        key={recordKey(record)}
-                                        className={`flex items-center gap-3 px-3 py-2 text-sm ${isManaged ? 'opacity-50' : 'hover:bg-muted/40 cursor-pointer'}`}
-                                    >
-                                        <Checkbox
-                                            checked={selected.has(recordKey(record))}
-                                            disabled={isManaged}
-                                            onCheckedChange={(checked) => toggle(record, checked === true)}
-                                        />
-                                        <RecordTypeBadge type={record.type} />
-                                        <span className="min-w-0 flex-1">
-                                            <span className="block truncate font-mono text-[13px]">{record.name}</span>
-                                            <span className="text-muted-foreground block truncate font-mono text-xs">{record.content}</span>
-                                        </span>
-                                        <Badge variant="secondary" className={badge.className}>
-                                            {badge.label}
-                                        </Badge>
-                                    </label>
-                                );
-                            })}
-                        </div>
-                    </>
+                {selected.size > MAX_IMPORT && (
+                    <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs text-amber-700 dark:text-amber-400">
+                        At most {MAX_IMPORT} records can be imported at once — narrow the selection and import in batches.
+                    </p>
                 )}
 
                 <DialogFooter className="gap-2">
                     <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={importing}>
                         Cancel
                     </Button>
-                    <Button type="button" onClick={submit} disabled={importing || loading || selected.size === 0}>
+                    <Button type="button" onClick={submit} disabled={importing || loading || selected.size === 0 || selected.size > MAX_IMPORT}>
                         {importing && <LoaderCircle className="size-4 animate-spin" />}
                         Import {selected.size > 0 ? `${selected.size} record${selected.size === 1 ? '' : 's'}` : ''}
                     </Button>

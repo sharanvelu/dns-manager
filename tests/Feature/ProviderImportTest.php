@@ -121,6 +121,61 @@ test('records outside the zone are excluded and counted', function () {
         ->and($response->json('outOfZoneCount'))->toBe(2);
 });
 
+test('excluded records are returned with their reason alongside status counts', function () {
+    $existing = zoneEntry(['name' => 'exists', 'type' => 'A', 'content' => '10.0.0.2']);
+
+    fakeCloudflareList([
+        cfRecord('cf-1', 'A', 'new.example.com', '10.0.0.1'),
+        cfRecord('cf-2', 'A', 'exists.example.com', '10.0.0.2'),
+        cfRecord('cf-3', 'TXT', 'example.com', '"v=spf1 -all"'), // app type, not managed here
+        cfRecord('cf-4', 'MX', 'www.example.com', 'mail.example.com', ['priority' => 10]), // MX, not managed here
+        cfRecord('cf-6', 'HTTPS', 'example.com', '1 . alpn=h2'), // dropped by the connector itself
+        cfRecord('cf-5', 'TXT', 'stray.other.dev', '"x"'), // outside the zone wins over the type
+    ]);
+
+    $response = $this->getJson(importRecordsUrl())->assertOk();
+
+    expect($response->json('counts'))->toBe(['new' => 1, 'exists' => 1, 'managed' => 0])
+        ->and(collect($response->json('records'))->firstWhere('name', 'exists')['entryId'])->toBe($existing->id)
+        ->and(collect($response->json('records'))->firstWhere('name', 'new')['entryId'])->toBeNull()
+        ->and($response->json('excludedTotal'))->toBe(3)
+        ->and($response->json('unmanagedTypeCount'))->toBe(2)
+        ->and($response->json('outOfZoneCount'))->toBe(1)
+        ->and(collect($response->json('excluded'))->map(fn ($row) => [$row['type'], $row['name'], $row['reason']])->all())
+        ->toEqualCanonicalizing([
+            ['TXT', '@', 'unmanaged-type'],
+            ['MX', 'www', 'unmanaged-type'],
+            ['TXT', 'stray.other.dev', 'out-of-zone'],
+        ]);
+});
+
+test('the excluded list is capped while its total stays exact', function () {
+    $limit = App\Http\Controllers\ProviderImportController::EXCLUDED_LIMIT;
+
+    fakeCloudflareList(collect(range(1, $limit + 5))
+        ->map(fn (int $i) => cfRecord("cf-{$i}", 'TXT', "t{$i}.example.com", '"x"'))
+        ->push(cfRecord('cf-a', 'A', 'kept.example.com', '10.0.0.9'))
+        ->all());
+
+    $response = $this->getJson(importRecordsUrl())->assertOk();
+
+    expect($response->json('excluded'))->toHaveCount($limit)
+        ->and($response->json('excludedTotal'))->toBe($limit + 5)
+        ->and($response->json('unmanagedTypeCount'))->toBe($limit + 5)
+        ->and($response->json('records'))->toHaveCount(1);
+});
+
+test('listing remote records requires record management, not just zone visibility', function () {
+    $viewer = User::factory()->noRoles()->create();
+    ZoneUser::factory()->viewer()->create(['user_id' => $viewer->id, 'dns_zone_id' => $this->zone->id]);
+
+    $this->actingAs($viewer);
+    $this->getJson(importRecordsUrl())->assertForbidden();
+
+    $this->actingAs(User::factory()->superViewer()->create());
+    $this->getJson(importRecordsUrl())->assertForbidden();
+});
+
 test('a connector failure surfaces as a 502 with the message', function () {
     Http::fake(['api.cloudflare.com/*' => Http::response(['success' => false, 'errors' => [['code' => 9109, 'message' => 'Invalid access token']], 'result' => null], 401)]);
 

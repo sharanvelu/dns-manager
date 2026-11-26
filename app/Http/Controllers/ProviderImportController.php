@@ -15,16 +15,24 @@ use Illuminate\Http\Request;
 use App\Support\DnsEntryRules;
 use Illuminate\Validation\Rule;
 use Illuminate\Http\JsonResponse;
+use App\Connectors\DTOs\RemoteRecord;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Validator;
 
 class ProviderImportController extends Controller
 {
     /**
+     * Excluded records returned for display are capped so a zoneless provider
+     * serving many zones cannot blow up the payload; the counts stay exact.
+     */
+    public const EXCLUDED_LIMIT = 500;
+
+    /**
      * Live listing of a zone attachment's remote records, annotated with how
      * each relates to the local database, for the import-selection dialog.
-     * Remote names are relativized to the zone; records outside it are
-     * excluded and counted.
+     * Remote names are relativized to the zone. Records outside the zone or
+     * of a type this attachment does not manage are not importable: they are
+     * returned separately (capped) with the reason, and counted.
      */
     public function records(DnsZone $zone, ZoneProvider $zoneProvider): JsonResponse
     {
@@ -36,13 +44,15 @@ class ProviderImportController extends Controller
 
         $managedTypes = $zoneProvider->provider->managed_record_types ?? [];
 
-        [$records, $unmanaged] = $remote->partition(
-            fn ($record) => in_array($record->type, $managedTypes, true),
-        );
-
-        [$records, $outOfZone] = $records
+        // Out-of-zone wins over type: a foreign record is noise for this zone
+        // whatever its type.
+        [$inZone, $outOfZone] = $remote
             ->map(fn ($record) => ['record' => $record, 'name' => $zone->relativize($record->name)])
             ->partition(fn ($item) => $item['name'] !== null);
+
+        [$records, $unmanaged] = $inZone->partition(
+            fn ($item) => in_array($item['record']->type, $managedTypes, true),
+        );
 
         $entries = DnsEntry::query()
             ->where('dns_zone_id', $zone->id)
@@ -52,26 +62,41 @@ class ProviderImportController extends Controller
 
         $linkedEntryIds = $zoneProvider->syncStates()->pluck('dns_entry_id')->flip();
 
-        return response()->json([
-            'records' => $records->map(function ($item) use ($entries, $linkedEntryIds) {
-                $record = $item['record'];
-                $entry = $entries->get($this->keyFor($item['name'], $record->type, $record->content));
+        $importable = $records->map(function ($item) use ($entries, $linkedEntryIds) {
+            $record = $item['record'];
+            $entry = $entries->get($this->keyFor($item['name'], $record->type, $record->content));
 
-                return [
-                    'externalId' => $record->externalId,
-                    'type' => $record->type,
-                    'name' => $item['name'],
-                    'content' => $record->content,
-                    'ttl' => $record->ttl,
-                    'priority' => $record->priority,
-                    'proxied' => $record->proxied,
-                    'status' => match (true) {
-                        $entry && $linkedEntryIds->has($entry->id) => 'managed',
-                        $entry !== null => 'exists',
-                        default => 'new',
-                    },
-                ];
-            })->values(),
+            return [
+                'externalId' => $record->externalId,
+                'type' => $record->type,
+                'name' => $item['name'],
+                'content' => $record->content,
+                'ttl' => $record->ttl,
+                'priority' => $record->priority,
+                'proxied' => $record->proxied,
+                'status' => match (true) {
+                    $entry && $linkedEntryIds->has($entry->id) => 'managed',
+                    $entry !== null => 'exists',
+                    default => 'new',
+                },
+                'entryId' => $entry?->id,
+            ];
+        })->values();
+
+        $excluded = $unmanaged
+            ->map(fn ($item) => $this->excludedRow($item['record'], $item['name'], 'unmanaged-type'))
+            ->merge($outOfZone->map(fn ($item) => $this->excludedRow($item['record'], rtrim($item['record']->name, '.'), 'out-of-zone')))
+            ->values();
+
+        return response()->json([
+            'records' => $importable,
+            'counts' => [
+                'new' => $importable->where('status', 'new')->count(),
+                'exists' => $importable->where('status', 'exists')->count(),
+                'managed' => $importable->where('status', 'managed')->count(),
+            ],
+            'excluded' => $excluded->take(self::EXCLUDED_LIMIT)->all(),
+            'excludedTotal' => $excluded->count(),
             'unmanagedTypeCount' => $unmanaged->count(),
             'outOfZoneCount' => $outOfZone->count(),
         ]);
@@ -165,6 +190,20 @@ class ProviderImportController extends Controller
         );
 
         return back()->with('success', $message . ($failed > 0 ? " — {$failed} skipped as invalid" : '') . '.');
+    }
+
+    /**
+     * @return array{type: string, name: string, content: string, ttl: int|null, reason: string}
+     */
+    private function excludedRow(RemoteRecord $record, string $name, string $reason): array
+    {
+        return [
+            'type' => $record->type,
+            'name' => $name,
+            'content' => mb_strimwidth($record->content, 0, 255, '…'),
+            'ttl' => $record->ttl,
+            'reason' => $reason,
+        ];
     }
 
     private function keyFor(string $name, string $type, string $content): string

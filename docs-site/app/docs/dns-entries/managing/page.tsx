@@ -268,7 +268,8 @@ export default function Page() {
       </ul>
       <p>
         To pull existing records <em>from a provider</em> instead, use{" "}
-        <strong>Import records</strong> on the zone&apos;s attachment card — see{" "}
+        <strong>Import from provider</strong> in the toolbar (pick the zone, then one of its
+        providers) or <strong>Import records</strong> on the zone&apos;s attachment card — see{" "}
         <a href="/docs/zones/providers/#import-records-from-a-provider">
           Import records from a provider
         </a>
