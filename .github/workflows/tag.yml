@@ -1,7 +1,14 @@
-# Tag-on-version-change: a release happens only when a push to master
-# changes the VERSION file. The version in that file is tagged as-is
-# (v<VERSION>); pushes that don't touch VERSION never tag. A GitHub
-# Release with auto-generated notes is then published for that tag.
+# Release pipeline, driven by the VERSION file and Release Drafter
+# (.github/release-drafter.yml):
+#
+# - Every push to master that does NOT change VERSION refreshes a DRAFT
+#   release: notes for everything merged since the last published release,
+#   grouped by Conventional Commit type / label, plus a suggested next
+#   version (shown in the run summary next to the current VERSION).
+# - A push that changes VERSION tags v<VERSION>, publishes that draft as the
+#   release (notes rendered for exactly that version), and dispatches the
+#   image build. A VERSION below the suggested version (e.g. a patch bump
+#   while a `feat:` is unreleased) is flagged with a warning, not blocked.
 #
 # The tag is pushed with the workflow's own GITHUB_TOKEN. Events created
 # by GITHUB_TOKEN pushes do NOT trigger other workflows, so the tag push
@@ -14,25 +21,104 @@ on:
   push:
     branches:
       - master
-    paths:
-      - VERSION
+  # Manual run = refresh the draft (never tags or publishes).
+  workflow_dispatch:
 
 permissions: {}
 
-concurrency:
-  group: auto-tag
-  cancel-in-progress: false
-
 jobs:
-  tag:
-    name: Tag release from VERSION
+  detect:
+    name: Detect VERSION Change
     if: github.repository_owner == 'sharanvelu'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     permissions:
-      # contents: push the tag + create the release; actions: dispatch build.yml.
+      contents: read
+    outputs:
+      release: ${{ steps.check.outputs.release }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Compare VERSION with the previous master commit
+        id: check
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          version=$(tr -d '[:space:]' < VERSION)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          release=false
+          if [[ "$EVENT" == "push" ]]; then
+            base="$BEFORE"
+            if [[ "$base" =~ ^0+$ ]] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+              base=HEAD~1
+            fi
+            if ! git diff --quiet "$base" HEAD -- VERSION; then
+              release=true
+            fi
+          fi
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+          echo "VERSION=$version — mode: $([[ $release == true ]] && echo publish || echo draft)" >> "$GITHUB_STEP_SUMMARY"
+
+  draft:
+    name: Update Release Draft
+    needs: detect
+    if: needs.detect.outputs.release != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Only the newest draft matters — superseded refreshes can be cancelled.
+    concurrency:
+      group: release-draft
+      cancel-in-progress: true
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Update draft release
+        id: drafter
+        uses: release-drafter/release-drafter@d1a19e60e81a7e650d00a7de9277f87e439117ea # v7.11.0
+        with:
+          config-name: release-drafter.yml
+          commitish: master
+
+      - name: Summarise suggested version
+        env:
+          SUGGESTED: ${{ steps.drafter.outputs.resolved_version }}
+          CURRENT: ${{ needs.detect.outputs.version }}
+          URL: ${{ steps.drafter.outputs.html_url }}
+        run: |
+          {
+            echo "### Release draft updated"
+            echo "- Draft: $URL"
+            echo "- Suggested next version (from unreleased changes): **$SUGGESTED**"
+            echo "- Current VERSION: $CURRENT"
+            echo
+            echo "To release, bump VERSION to **$SUGGESTED** (or higher) in a PR."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  release:
+    name: Tag and Publish Release
+    needs: detect
+    if: needs.detect.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Never cancel a release in flight; queued ones wait.
+    concurrency:
+      group: release-publish
+      cancel-in-progress: false
+    permissions:
+      # contents: push the tag + publish the release; actions: dispatch
+      # build.yml; pull-requests: read merged PRs for the notes.
       contents: write
       actions: write
+      pull-requests: read
+    env:
+      VERSION: ${{ needs.detect.outputs.version }}
     steps:
       - name: Checkout
         # Credentials persist deliberately: this job pushes the tag.
@@ -44,16 +130,21 @@ jobs:
       - name: Create and push tag from VERSION
         id: tag
         run: |
-          version=$(tr -d '[:space:]' < VERSION)
-          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
-            echo "::error file=VERSION::'$version' is not a valid semver version — not tagging."
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error file=VERSION::'$VERSION' is not a valid semver version — not tagging."
             exit 1
           fi
-          tag="v$version"
+          tag="v$VERSION"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          # A '-' suffix (1.2.0-rc.1) publishes a prerelease that is not latest.
+          if [[ "$VERSION" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
           if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
             echo "created=false" >> "$GITHUB_OUTPUT"
-            echo "Tag $tag already exists — nothing to do."
-            echo "VERSION changed but $tag already exists — no new tag." >> "$GITHUB_STEP_SUMMARY"
+            echo "Tag $tag already exists — not re-tagging." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           git config user.name "github-actions[bot]"
@@ -61,33 +152,63 @@ jobs:
           git tag -a "$tag" -m "Release $tag"
           git push origin "$tag"
           echo "created=true" >> "$GITHUB_OUTPUT"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "Created and pushed $tag." >> "$GITHUB_STEP_SUMMARY"
 
-      # Runs whenever VERSION's tag exists without a GitHub Release, so a
-      # failed release step can be fixed by re-running the workflow even
-      # though the tag (and therefore the build dispatch) already happened.
-      # Notes are generated by GitHub from merged PRs since the previous
-      # semver tag, grouped per .github/release.yml.
-      - name: Create GitHub release with generated notes
+      # Idempotent: a re-run after a failed publish finds the tag already
+      # there but no published release, and publishes it.
+      - name: Check for an existing published release
+        id: existing
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
         run: |
-          tag="v$(tr -d '[:space:]' < VERSION)"
-          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $tag already exists — nothing to do." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
+          # The tags endpoint only returns published releases (not drafts).
+          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "Release $TAG is already published — nothing to do." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
           fi
-          # Previous release = highest semver tag below this one (stray
-          # out-of-order tags sort lower and are never chosen over it).
-          previous=$(git tag -l 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' \
-            | { cat; echo "$tag"; } | sort -uV | grep -B1 -x "$tag" | grep -vx "$tag" || true)
-          args=(--repo "$GITHUB_REPOSITORY" --title "$tag" --generate-notes --verify-tag)
-          if [[ -n "$previous" ]]; then
-            args+=(--notes-start-tag "$previous")
+
+      - name: Resolve suggested version
+        id: suggested
+        if: steps.existing.outputs.published == 'false'
+        uses: release-drafter/release-drafter@d1a19e60e81a7e650d00a7de9277f87e439117ea # v7.11.0
+        with:
+          config-name: release-drafter.yml
+          commitish: ${{ github.sha }}
+          dry-run: true
+
+      - name: Warn if VERSION is below the suggested version
+        if: steps.existing.outputs.published == 'false'
+        env:
+          SUGGESTED: ${{ steps.suggested.outputs.resolved_version }}
+        run: |
+          if [[ -n "$SUGGESTED" && "$SUGGESTED" != "$VERSION" ]] \
+            && [[ "$(printf '%s\n%s\n' "$SUGGESTED" "$VERSION" | sort -V | head -1)" == "$VERSION" ]]; then
+            echo "::warning file=VERSION::VERSION $VERSION is below the version suggested by the unreleased changes ($SUGGESTED) — check for unreleased features or breaking changes."
           fi
-          gh release create "$tag" "${args[@]}"
-          echo "Created release $tag (notes since ${previous:-the first commit})." >> "$GITHUB_STEP_SUMMARY"
+          echo "Suggested version: ${SUGGESTED:-n/a}; releasing: $VERSION" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish release notes
+        id: publish
+        if: steps.existing.outputs.published == 'false'
+        uses: release-drafter/release-drafter@d1a19e60e81a7e650d00a7de9277f87e439117ea # v7.11.0
+        with:
+          config-name: release-drafter.yml
+          commitish: ${{ github.sha }}
+          version: ${{ env.VERSION }}
+          tag: ${{ steps.tag.outputs.tag }}
+          name: ${{ steps.tag.outputs.tag }}
+          publish: true
+          prerelease: ${{ steps.tag.outputs.prerelease }}
+          latest: ${{ steps.tag.outputs.prerelease == 'true' && 'false' || 'true' }}
+
+      - name: Summarise release
+        if: steps.existing.outputs.published == 'false'
+        env:
+          URL: ${{ steps.publish.outputs.html_url }}
+        run: echo "Published release $URL" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Dispatch image build for the new tag
         if: steps.tag.outputs.created == 'true'

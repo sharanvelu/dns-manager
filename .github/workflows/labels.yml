@@ -1,0 +1,47 @@
+# Label sync: applies .github/labels.yml to the repository on every master
+# push that changes it (and on demand). Creates missing labels and updates
+# colour/description of existing ones with `gh label create --force`.
+# Never deletes — labels on existing issues/PRs are always preserved.
+name: labels
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - .github/labels.yml
+      - .github/workflows/labels.yml
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: label-sync
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    name: Sync Labels
+    if: github.repository_owner == 'sharanvelu'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Create or update labels
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          count=0
+          # yq ships on GitHub-hosted Ubuntu runners.
+          while IFS=$'\t' read -r name color description; do
+            gh label create "$name" --repo "$GITHUB_REPOSITORY" \
+              --color "$color" --description "$description" --force
+            count=$((count + 1))
+          done < <(yq -r '.[] | [.name, .color, .description] | @tsv' .github/labels.yml)
+          echo "Synced $count labels from .github/labels.yml." >> "$GITHUB_STEP_SUMMARY"

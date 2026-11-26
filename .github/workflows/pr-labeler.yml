@@ -1,0 +1,59 @@
+# PR labelling + release-notes validation, driven by
+# .github/release-drafter.yml:
+#
+# - Autolabeler adds a type label from the Conventional Commit title
+#   (feat -> enhancement, fix -> bug, chore(deps) -> dependencies, `!` ->
+#   breaking-change, ...) and area labels from changed files. `sync-labels`
+#   removes stale ones, so editing the title re-labels the PR.
+# - Check PR validates the Release Drafter config on both the base branch
+#   and the PR head, and that the PR matches a release-notes category — a
+#   broken release-drafter.yml fails here instead of at release time.
+#
+# Uses `pull_request` (not `pull_request_target`): no untrusted code runs
+# with a write token. Fork PRs get a read-only token, so labelling is
+# skipped for them; Dependabot PRs get the elevated `permissions:` below.
+name: pr-labeler
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled, ready_for_review]
+    branches:
+      - master
+
+permissions: {}
+
+concurrency:
+  group: pr-labeler-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  label:
+    name: Auto Label
+    # Label changes don't change what the autolabeler would pick; skip them
+    # so the job's own label edits don't re-trigger it.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.action != 'labeled' && github.event.action != 'unlabeled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Run autolabeler
+        uses: release-drafter/release-drafter/autolabeler@d1a19e60e81a7e650d00a7de9277f87e439117ea # v7.11.0
+        with:
+          config-name: release-drafter.yml
+
+  check:
+    name: Release Notes Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Validate config and PR categorisation
+        uses: release-drafter/release-drafter/check-pr@d1a19e60e81a7e650d00a7de9277f87e439117ea # v7.11.0
+        with:
+          config-name: release-drafter.yml
