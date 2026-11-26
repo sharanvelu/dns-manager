@@ -253,6 +253,7 @@ export const PAGES: DocPage[] = [
       "Review the remote records",
       "Check what can't be imported",
       "Select and import",
+      "Stop tracking records (optional)",
     ],
   },
   {

@@ -44,14 +44,22 @@ export interface ImportFilters {
 export const EMPTY_IMPORT_FILTERS: ImportFilters = { search: '', type: '', status: 'all' };
 
 /**
- * How a row behaves in the checklist. `tracked` rows (already managed from
- * this attachment) render checked and locked today; untracking them from the
- * dialog would turn `tracked` into a toggleable state.
+ * How a row behaves in the checklist. A ticked row ends up managed from this
+ * attachment: `selectable` rows (new / matches existing) import when ticked;
+ * `tracked` rows (already managed) start ticked and stop being tracked when
+ * unticked — the record stays at the provider. `locked` is a tracked row on a
+ * paused attachment, which cannot be untracked (paused invariant).
  */
-export type RowState = 'selectable' | 'tracked';
+export type RowState = 'selectable' | 'tracked' | 'locked';
 
-export function rowState(record: RemoteRecord): RowState {
-    return record.status === 'managed' ? 'tracked' : 'selectable';
+export function rowState(record: RemoteRecord, canUntrack = true): RowState {
+    if (record.status !== 'managed') return 'selectable';
+
+    return canUntrack && record.entryId !== null ? 'tracked' : 'locked';
+}
+
+export function isToggleable(record: RemoteRecord, canUntrack = true): boolean {
+    return rowState(record, canUntrack) !== 'locked';
 }
 
 export function recordKey(record: RemoteRecord): string {
@@ -96,33 +104,66 @@ export function recordTypes(records: RemoteRecord[], excluded: ExcludedRecord[] 
     return [...new Set([...records, ...excluded].map((record) => record.type))].sort();
 }
 
-/** The default selection: every selectable row. */
+/** The default selection: every row ticked — import everything, keep tracking what is tracked. */
 export function initialSelection(records: RemoteRecord[]): Set<string> {
-    return new Set(records.filter((record) => rowState(record) === 'selectable').map(recordKey));
+    return new Set(records.map(recordKey));
 }
 
 export type SelectAllState = boolean | 'indeterminate';
 
-/** Header checkbox state for the visible rows. */
-export function selectAllState(visible: RemoteRecord[], selected: Set<string>): SelectAllState {
-    const selectable = visible.filter((record) => rowState(record) === 'selectable');
-    const chosen = selectable.filter((record) => selected.has(recordKey(record))).length;
+/** Header checkbox state for the visible toggleable rows. */
+export function selectAllState(visible: RemoteRecord[], selected: Set<string>, canUntrack = true): SelectAllState {
+    const toggleable = visible.filter((record) => isToggleable(record, canUntrack));
+    const chosen = toggleable.filter((record) => selected.has(recordKey(record))).length;
 
     if (chosen === 0) return false;
 
-    return chosen === selectable.length ? true : 'indeterminate';
+    return chosen === toggleable.length ? true : 'indeterminate';
 }
 
 /**
- * Select-all applies to the visible (filtered) selectable rows only; rows
- * hidden by the filters keep their current selection.
+ * Select-all applies to the visible (filtered) toggleable rows only; rows
+ * hidden by the filters and locked rows keep their current state.
  */
-export function applySelectAll(selected: Set<string>, visible: RemoteRecord[], checked: boolean): Set<string> {
+export function applySelectAll(selected: Set<string>, visible: RemoteRecord[], checked: boolean, canUntrack = true): Set<string> {
     const next = new Set(selected);
 
     visible
-        .filter((record) => rowState(record) === 'selectable')
+        .filter((record) => isToggleable(record, canUntrack))
         .forEach((record) => (checked ? next.add(recordKey(record)) : next.delete(recordKey(record))));
 
     return next;
+}
+
+export interface ImportPlan {
+    /** Ticked rows not yet managed here. */
+    toImport: RemoteRecord[];
+    /** Entry ids of unticked managed rows — released with the record kept at the provider. */
+    toUntrack: number[];
+}
+
+/** What submitting the current selection does. Locked rows never untrack. */
+export function importPlan(records: RemoteRecord[], selected: Set<string>, canUntrack = true): ImportPlan {
+    const toImport: RemoteRecord[] = [];
+    const toUntrack: number[] = [];
+
+    records.forEach((record) => {
+        const state = rowState(record, canUntrack);
+        const ticked = selected.has(recordKey(record));
+
+        if (state === 'selectable' && ticked) toImport.push(record);
+        if (state === 'tracked' && !ticked && record.entryId !== null) toUntrack.push(record.entryId);
+    });
+
+    return { toImport, toUntrack: [...new Set(toUntrack)] };
+}
+
+const plural = (count: number) => `${count} record${count === 1 ? '' : 's'}`;
+
+/** Submit-button label: "Import 3 records", "Stop tracking 2 records", or "Import 3 · Stop tracking 2". */
+export function submitLabel({ toImport, toUntrack }: ImportPlan): string {
+    if (toImport.length > 0 && toUntrack.length > 0) return `Import ${toImport.length} · Stop tracking ${toUntrack.length}`;
+    if (toUntrack.length > 0) return `Stop tracking ${plural(toUntrack.length)}`;
+
+    return toImport.length > 0 ? `Import ${plural(toImport.length)}` : 'Import';
 }

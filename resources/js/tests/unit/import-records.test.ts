@@ -3,12 +3,14 @@ import {
     EMPTY_IMPORT_FILTERS,
     filterExcluded,
     filterRecords,
+    importPlan,
     initialSelection,
     recordKey,
     recordTypes,
     rowState,
     selectAllState,
     statusCounts,
+    submitLabel,
     type ExcludedRecord,
     type RemoteRecord,
 } from '@/components/zones/import-records';
@@ -77,25 +79,59 @@ describe('recordTypes', () => {
 });
 
 describe('selection', () => {
-    it('locks managed rows as tracked and preselects the rest', () => {
+    it('makes managed rows tracked (toggleable) unless untracking is unavailable', () => {
+        expect(rowState(records[0])).toBe('selectable');
         expect(rowState(records[2])).toBe('tracked');
-        expect([...initialSelection(records)].sort()).toEqual([records[0], records[1], records[3]].map(recordKey).sort());
+        expect(rowState(records[2], false)).toBe('locked');
+        expect(rowState({ ...records[2], entryId: null })).toBe('locked');
     });
 
-    it('select-all only touches the visible selectable rows', () => {
+    it('starts with every row ticked — nothing to untrack', () => {
+        const selected = initialSelection(records);
+
+        expect(selected.size).toBe(4);
+        expect(importPlan(records, selected).toUntrack).toEqual([]);
+        expect(names(importPlan(records, selected).toImport)).toEqual(['www', 'mail', 'api']);
+    });
+
+    it('select-all only touches the visible toggleable rows', () => {
         const visible = filterRecords(records, { ...EMPTY_IMPORT_FILTERS, type: 'CNAME' });
 
         const cleared = applySelectAll(initialSelection(records), visible, false);
         expect([...cleared].sort()).toEqual([records[0], records[1]].map(recordKey).sort());
+        expect(importPlan(records, cleared).toUntrack).toEqual([1]);
 
         const reselected = applySelectAll(cleared, visible, true);
-        expect(reselected.has(recordKey(records[3]))).toBe(true);
-        expect(reselected.has(recordKey(records[2]))).toBe(false);
+        expect(reselected.size).toBe(4);
+    });
+
+    it('select-all leaves locked rows alone on a paused attachment', () => {
+        const cleared = applySelectAll(initialSelection(records), records, false, false);
+
+        expect([...cleared]).toEqual([recordKey(records[2])]);
+        expect(importPlan(records, new Set(), false).toUntrack).toEqual([]);
     });
 
     it('reports the header checkbox state for the visible rows', () => {
         expect(selectAllState(records, new Set())).toBe(false);
         expect(selectAllState(records, new Set([recordKey(records[0])]))).toBe('indeterminate');
         expect(selectAllState(records, initialSelection(records))).toBe(true);
+        // Locked rows don't count towards the header state.
+        expect(selectAllState(records, new Set([records[0], records[1], records[3]].map(recordKey)), false)).toBe(true);
+    });
+
+    it('plans imports for ticked rows and untracks for unticked managed rows', () => {
+        const selected = new Set([recordKey(records[0])]);
+
+        expect(importPlan(records, selected)).toEqual({ toImport: [records[0]], toUntrack: [1] });
+    });
+});
+
+describe('submitLabel', () => {
+    it('describes what submitting does', () => {
+        expect(submitLabel({ toImport: [], toUntrack: [] })).toBe('Import');
+        expect(submitLabel({ toImport: [records[0]], toUntrack: [] })).toBe('Import 1 record');
+        expect(submitLabel({ toImport: [], toUntrack: [4, 5] })).toBe('Stop tracking 2 records');
+        expect(submitLabel({ toImport: [records[0], records[1]], toUntrack: [4] })).toBe('Import 2 · Stop tracking 1');
     });
 });

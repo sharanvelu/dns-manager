@@ -12,12 +12,14 @@ use App\Enums\RecordType;
 use App\Enums\SyncStatus;
 use App\Models\ZoneProvider;
 use Illuminate\Http\Request;
+use App\Services\SyncService;
 use App\Support\DnsEntryRules;
 use Illuminate\Validation\Rule;
 use Illuminate\Http\JsonResponse;
 use App\Connectors\DTOs\RemoteRecord;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class ProviderImportController extends Controller
 {
@@ -26,6 +28,10 @@ class ProviderImportController extends Controller
      * serving many zones cannot blow up the payload; the counts stay exact.
      */
     public const EXCLUDED_LIMIT = 500;
+
+    public function __construct(private SyncService $sync)
+    {
+    }
 
     /**
      * Live listing of a zone attachment's remote records, annotated with how
@@ -97,6 +103,8 @@ class ProviderImportController extends Controller
             ],
             'excluded' => $excluded->take(self::EXCLUDED_LIMIT)->all(),
             'excludedTotal' => $excluded->count(),
+            // Paused attachments can import but not untrack (paused invariant).
+            'attachmentActive' => $zoneProvider->isActive(),
             'unmanagedTypeCount' => $unmanaged->count(),
             'outOfZoneCount' => $outOfZone->count(),
         ]);
@@ -106,12 +114,13 @@ class ProviderImportController extends Controller
      * Import the selected remote records into the zone: insert missing
      * entries, update matching ones, and link them to this attachment as
      * already-synced — never duplicating and never pushing to other
-     * providers.
+     * providers. `untrack` lists entry ids to stop managing from this
+     * attachment while keeping their records at the provider.
      */
     public function store(Request $request, DnsZone $zone, ZoneProvider $zoneProvider): RedirectResponse
     {
         $validated = $request->validate([
-            'records' => ['required', 'array', 'min:1', 'max:1000'],
+            'records' => ['required_without:untrack', 'array', 'max:1000'],
             'records.*.externalId' => ['required', 'string'],
             'records.*.type' => ['required', Rule::enum(RecordType::class)],
             'records.*.name' => ['required', 'string', 'max:253'],
@@ -119,13 +128,30 @@ class ProviderImportController extends Controller
             'records.*.ttl' => ['nullable', 'integer'],
             'records.*.priority' => ['nullable', 'integer'],
             'records.*.proxied' => ['boolean'],
+            'untrack' => ['required_without:records', 'array', 'max:1000'],
+            'untrack.*' => ['integer', 'distinct'],
         ]);
+
+        $records = $validated['records'] ?? [];
+        $untrackIds = $validated['untrack'] ?? [];
+
+        if ($records === [] && $untrackIds === []) {
+            throw ValidationException::withMessages(['records' => 'Select at least one record to import or stop tracking.']);
+        }
+
+        $provider = $zoneProvider->provider->name;
+
+        if ($untrackIds !== [] && ! $zoneProvider->isActive()) {
+            throw ValidationException::withMessages([
+                'untrack' => "{$provider} is paused for this zone — enable it before you stop tracking records from it.",
+            ]);
+        }
 
         $imported = 0;
         $updated = 0;
         $failed = 0;
 
-        foreach ($validated['records'] as $record) {
+        foreach ($records as $record) {
             $name = strtolower(rtrim($record['name'], '.'));
             $record['name'] = $zone->relativize($name) ?? $name;
 
@@ -172,24 +198,94 @@ class ProviderImportController extends Controller
             );
         }
 
-        $message = sprintf(
-            'Imported %d new and updated %d existing entr%s from %s',
-            $imported,
-            $updated,
-            $imported + $updated === 1 ? 'y' : 'ies',
-            $zoneProvider->provider->name,
-        );
+        $untracked = $this->untrack($zone, $zoneProvider, $untrackIds);
+        $skipped = count($untrackIds) - $untracked;
+
+        $parts = [];
+
+        if ($records !== []) {
+            $parts[] = sprintf(
+                'Imported %d new and updated %d existing entr%s from %s',
+                $imported,
+                $updated,
+                $imported + $updated === 1 ? 'y' : 'ies',
+                $provider,
+            );
+        }
+
+        if ($untrackIds !== []) {
+            $parts[] = sprintf(
+                '%s %d entr%s from %s — the record%s stay at the provider',
+                $records === [] ? 'Stopped tracking' : 'stopped tracking',
+                $untracked,
+                $untracked === 1 ? 'y' : 'ies',
+                $provider,
+                $untracked === 1 ? '' : 's',
+            );
+        }
+
+        $notes = array_values(array_filter([
+            $failed > 0 ? "{$failed} skipped as invalid" : null,
+            $skipped > 0 ? "{$skipped} no longer tracked here" : null,
+        ]));
+
+        $message = implode('; ', $parts);
 
         SyncLog::record(
             $zoneProvider->provider,
             null,
             'import',
             $failed > 0 ? 'error' : 'success',
-            $message . ($failed > 0 ? " ({$failed} skipped as invalid)" : '') . '.',
+            $message . ($notes !== [] ? ' (' . implode(', ', $notes) . ')' : '') . '.',
             $zone->id,
         );
 
-        return back()->with('success', $message . ($failed > 0 ? " — {$failed} skipped as invalid" : '') . '.');
+        return back()->with('success', $message . ($notes !== [] ? ' — ' . implode(', ', $notes) : '') . '.');
+    }
+
+    /**
+     * Release the given entries from this attachment through the shared
+     * keep-remote path: the sync state goes, the record stays at the
+     * provider, and the entry stays in the app (local-only if this was its
+     * last provider). Ids outside the zone, not linked to this attachment,
+     * or already being deleted there are dropped.
+     *
+     * @param  list<int>  $entryIds
+     */
+    private function untrack(DnsZone $zone, ZoneProvider $zoneProvider, array $entryIds): int
+    {
+        if ($entryIds === []) {
+            return 0;
+        }
+
+        $entries = DnsEntry::query()
+            ->where('dns_zone_id', $zone->id)
+            ->whereIn('id', $entryIds)
+            ->whereHas('syncStates', fn ($query) => $query
+                ->where('zone_provider_id', $zoneProvider->id)
+                ->where('sync_status', '!=', SyncStatus::Deleting))
+            ->get();
+
+        foreach ($entries as $entry) {
+            $kept = $this->sync->detachEntry($entry, [$zoneProvider->id], keepRemote: true);
+
+            activity('entries')
+                ->performedOn($entry)
+                ->event('providers-changed')
+                ->withProperties([
+                    'providers' => $entry->syncStates()
+                        ->where('sync_status', '!=', SyncStatus::Deleting)
+                        ->with('zoneProvider.provider:id,name')
+                        ->get()
+                        ->pluck('zoneProvider.provider.name')
+                        ->filter()
+                        ->values()
+                        ->all(),
+                ] + ($kept !== [] ? ['kept_at_providers' => $kept] : []))
+                ->log('providers-changed');
+        }
+
+        return $entries->count();
     }
 
     /**

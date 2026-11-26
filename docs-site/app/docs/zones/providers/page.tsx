@@ -224,7 +224,7 @@ export default function Page() {
             The dialog lists the remote records that fall inside this zone, each marked{" "}
             <strong>New</strong> (no matching entry), <strong>Will update</strong> (a matching
             entry exists and will be updated and linked), or <strong>Managed</strong> (already
-            linked to this attachment — shown ticked and locked). Remote names are shown
+            linked to this attachment — shown ticked; untick it to stop tracking, see below). Remote names are shown
             zone-relative.
           </p>
           <p>
@@ -248,13 +248,27 @@ export default function Page() {
         </Step>
         <Step title="Select and import">
           <p>
-            Tick what you want — everything not already managed is preselected. The{" "}
-            <strong>Select all</strong> checkbox applies to the rows matching the current
-            filters only; selections hidden by a filter are kept and counted. Press{" "}
-            <strong>Import</strong> (up to 1000 records at a time). Selected records are
+            Tick what you want — every row starts ticked. The <strong>Select all</strong>{" "}
+            checkbox applies to the rows matching the current filters only; changes hidden by a
+            filter are kept and counted. Press <strong>Import</strong> (up to 1000 records at a
+            time). Ticked records are
             upserted: new entries are created, matching entries (same name, type, and content)
             are updated in place, and each is linked to <strong>this attachment only</strong>,
             already in sync — nothing is pushed anywhere else and nothing is duplicated.
+          </p>
+        </Step>
+        <Step title="Stop tracking records (optional)">
+          <p>
+            Untick a <strong>Managed</strong> row to stop tracking it from this provider — its
+            badge turns to <strong>Stop tracking</strong> and the button reads{" "}
+            <em>&quot;Import N · Stop tracking M&quot;</em>. Untracking{" "}
+            <strong>never deletes anything at the provider</strong>: the app just drops this
+            provider from the entry (the same as{" "}
+            <a href="/docs/dns-entries/managing/">keeping the record at the provider</a> when
+            removing a provider from an entry). The entry stays in the app — local-only if this
+            was its only provider — and a <strong>providers-changed</strong> activity records
+            which provider kept the record. While the attachment is paused, managed rows stay
+            locked and can&apos;t be untracked.
           </p>
         </Step>
       </Steps>

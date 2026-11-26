@@ -11,7 +11,9 @@ use App\Enums\SyncStatus;
 use App\Models\ZoneProvider;
 use App\Jobs\SyncEntryToProvider;
 use Illuminate\Support\Facades\Http;
+use App\Jobs\DeleteEntryFromProvider;
 use Illuminate\Support\Facades\Queue;
+use Spatie\Activitylog\Models\Activity;
 
 beforeEach(function () {
     $this->actingAs(User::factory()->create());
@@ -288,4 +290,123 @@ test('import requires record management on the zone', function () {
     $this->actingAs($dnsManager);
 
     $this->post(importUrl(), ['records' => []])->assertSessionHasErrors('records');
+});
+
+function trackedEntry(string $name, string $externalId, ?ZoneProvider $attachment = null): DnsEntry
+{
+    $entry = zoneEntry(['name' => $name, 'type' => 'A', 'content' => '10.0.0.' . random_int(10, 250)]);
+    $entry->syncStates()->create([
+        'zone_provider_id' => ($attachment ?? test()->attachment)->id,
+        'sync_status' => SyncStatus::Synced,
+        'external_id' => $externalId,
+    ]);
+
+    return $entry;
+}
+
+test('the listing reports whether the attachment can untrack', function () {
+    fakeCloudflareList([]);
+
+    $this->getJson(importRecordsUrl())->assertOk()->assertJsonPath('attachmentActive', true);
+
+    $this->attachment->update(['enabled' => false]);
+
+    $this->getJson(importRecordsUrl())->assertOk()->assertJsonPath('attachmentActive', false);
+});
+
+test('untracking keeps the record at the provider and the entry in the app', function () {
+    // A second provider keeps its assignment.
+    $other = ZoneProvider::factory()->create([
+        'dns_zone_id' => $this->zone->id,
+        'provider_id' => Provider::factory()->pihole()->create(['name' => 'Pi', 'managed_record_types' => ['A']])->id,
+    ]);
+    $shared = trackedEntry('shared', 'cf-1');
+    $shared->syncStates()->create(['zone_provider_id' => $other->id, 'sync_status' => SyncStatus::Synced, 'external_id' => 'pi-1']);
+    $only = trackedEntry('only', 'cf-2');
+
+    $this->post(importUrl(), ['untrack' => [$shared->id, $only->id]])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    Queue::assertNotPushed(DeleteEntryFromProvider::class);
+    Queue::assertNotPushed(SyncEntryToProvider::class);
+
+    expect(DnsEntry::count())->toBe(2)
+        ->and($shared->syncStates()->pluck('zone_provider_id')->all())->toBe([$other->id])
+        // Its only provider released: the entry stays, local-only.
+        ->and($only->fresh())->not->toBeNull()
+        ->and($only->syncStates()->count())->toBe(0)
+        ->and(session('success'))->toContain('Stopped tracking 2 entries from CF Zone')
+        ->and(session('success'))->toContain('stay at the provider');
+
+    $activity = Activity::query()->where('event', 'providers-changed')->where('subject_id', $shared->id)->sole();
+    expect($activity->properties->get('providers'))->toBe(['Pi'])
+        ->and($activity->properties->get('kept_at_providers'))->toBe(['CF Zone']);
+});
+
+test('untrack drops ids outside the zone, not linked here, or already being deleted', function () {
+    $otherZone = DnsZone::factory()->create(['name' => 'other.dev']);
+    $foreign = DnsEntry::factory()->create(['dns_zone_id' => $otherZone->id]);
+    $unlinked = zoneEntry(['name' => 'unlinked', 'type' => 'A', 'content' => '10.0.0.5']);
+    $deleting = trackedEntry('deleting', 'cf-7');
+    $deleting->syncStates()->update(['sync_status' => SyncStatus::Deleting]);
+    $tracked = trackedEntry('tracked', 'cf-8');
+
+    $this->post(importUrl(), ['untrack' => [$foreign->id, $unlinked->id, $deleting->id, $tracked->id, 999999]])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    expect($tracked->syncStates()->count())->toBe(0)
+        ->and($deleting->syncStates()->sole()->sync_status)->toBe(SyncStatus::Deleting)
+        ->and(session('success'))->toContain('Stopped tracking 1 entry')
+        ->and(session('success'))->toContain('4 no longer tracked here');
+});
+
+test('untracking is refused while the attachment is paused', function () {
+    $tracked = trackedEntry('tracked', 'cf-1');
+    $this->attachment->update(['enabled' => false]);
+
+    $this->post(importUrl(), ['untrack' => [$tracked->id]])->assertSessionHasErrors('untrack');
+
+    expect($tracked->syncStates()->count())->toBe(1);
+
+    // A disabled provider pauses the attachment too.
+    $this->attachment->update(['enabled' => true]);
+    $this->provider->update(['enabled' => false]);
+
+    $this->post(importUrl(), ['untrack' => [$tracked->id]])->assertSessionHasErrors('untrack');
+
+    expect($tracked->syncStates()->count())->toBe(1);
+});
+
+test('one submit can import and untrack together', function () {
+    $tracked = trackedEntry('old', 'cf-1');
+
+    $this->post(importUrl(), [
+        'records' => [
+            ['externalId' => 'cf-2', 'type' => 'A', 'name' => 'new', 'content' => '10.0.0.1', 'ttl' => null, 'priority' => null, 'proxied' => false],
+        ],
+        'untrack' => [$tracked->id],
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect(DnsEntry::where('name', 'new')->sole()->syncStates()->sole()->zone_provider_id)->toBe($this->attachment->id)
+        ->and($tracked->syncStates()->count())->toBe(0)
+        ->and(session('success'))->toContain('Imported 1 new')
+        ->and(session('success'))->toContain('stopped tracking 1 entry');
+
+    Queue::assertNotPushed(DeleteEntryFromProvider::class);
+});
+
+test('untracking requires record management on the zone', function () {
+    $tracked = trackedEntry('tracked', 'cf-1');
+
+    foreach ([User::factory()->superViewer()->create(), tap(User::factory()->noRoles()->create(), fn ($user) => ZoneUser::factory()->providerManager()->create(['user_id' => $user->id, 'dns_zone_id' => $this->zone->id]))] as $user) {
+        $this->actingAs($user)->post(importUrl(), ['untrack' => [$tracked->id]])->assertForbidden();
+    }
+
+    expect($tracked->syncStates()->count())->toBe(1);
+});
+
+test('an empty submit is rejected', function () {
+    $this->post(importUrl(), ['records' => [], 'untrack' => []])->assertSessionHasErrors('records');
 });

@@ -15,12 +15,14 @@ import {
     EMPTY_IMPORT_FILTERS,
     filterExcluded,
     filterRecords,
+    importPlan,
     initialSelection,
     recordKey,
     recordTypes,
     rowState,
     selectAllState,
     statusCounts,
+    submitLabel,
     type ExcludedReason,
     type ExcludedRecord,
     type ImportFilters,
@@ -47,6 +49,8 @@ const statusBadge: Record<ImportStatus, { label: string; className: string }> = 
     managed: { label: 'Managed', className: 'text-muted-foreground' },
 };
 
+const untrackBadge = { label: 'Stop tracking', className: 'bg-muted text-foreground' };
+
 const statusFilterLabel: Record<ImportStatus, string> = {
     new: 'New',
     exists: 'Matches existing',
@@ -59,9 +63,12 @@ function reasonLabel(reason: ExcludedReason, providerName: string, zoneName: str
 
 /**
  * Import a zone attachment's remote records into the zone. Names arrive
- * zone-relative. Rows can be searched and filtered by type/status; records
- * that cannot be imported (unmanaged types, outside the zone) are listed in a
- * collapsed, non-selectable section with the reason.
+ * zone-relative. A ticked row ends up managed from this attachment: new /
+ * matching rows import, already-managed rows start ticked and stop being
+ * tracked when unticked (record kept at the provider — never deleted). Rows
+ * can be searched and filtered by type/status; records that cannot be
+ * imported (unmanaged types, outside the zone) are listed in a collapsed,
+ * non-selectable section with the reason.
  */
 export function ImportRecordsDialog({ zone, attachment, open, onOpenChange }: ImportRecordsDialogProps) {
     const [records, setRecords] = useState<RemoteRecord[]>([]);
@@ -73,12 +80,16 @@ export function ImportRecordsDialog({ zone, attachment, open, onOpenChange }: Im
     const [loading, setLoading] = useState(false);
     const [importing, setImporting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [submitError, setSubmitError] = useState<string | null>(null);
+    // Paused attachments can import but never untrack (paused invariant).
+    const [canUntrack, setCanUntrack] = useState(true);
 
     useEffect(() => {
         if (!open) return;
 
         setLoading(true);
         setError(null);
+        setSubmitError(null);
         setRecords([]);
         setExcluded([]);
         setExcludedTotal(0);
@@ -101,7 +112,8 @@ export function ImportRecordsDialog({ zone, attachment, open, onOpenChange }: Im
                 setRecords(remote);
                 setExcluded(skipped);
                 setExcludedTotal(body.excludedTotal ?? skipped.length);
-                // Preselect everything that is not already managed here.
+                setCanUntrack(body.attachmentActive !== false);
+                // Everything starts ticked: import the rest, keep tracking what is tracked.
                 setSelected(initialSelection(remote));
             })
             .catch((fetchError: Error) => setError(fetchError.message))
@@ -119,9 +131,13 @@ export function ImportRecordsDialog({ zone, attachment, open, onOpenChange }: Im
     const counts = useMemo(() => statusCounts(records, filters), [records, filters]);
     const countsTotal = counts.new + counts.exists + counts.managed;
 
-    const visibleSelectable = visible.filter((record) => rowState(record) === 'selectable');
-    const headerState = selectAllState(visible, selected);
-    const hiddenSelected = selected.size - visibleSelectable.filter((record) => selected.has(recordKey(record))).length;
+    const visibleToggleable = visible.filter((record) => rowState(record, canUntrack) !== 'locked');
+    const headerState = selectAllState(visible, selected, canUntrack);
+    const plan = useMemo(() => importPlan(records, selected, canUntrack), [records, selected, canUntrack]);
+    const visiblePlan = importPlan(visible, selected, canUntrack);
+    const hiddenChanges = plan.toImport.length + plan.toUntrack.length - (visiblePlan.toImport.length + visiblePlan.toUntrack.length);
+    const nothingToDo = plan.toImport.length === 0 && plan.toUntrack.length === 0;
+    const overLimit = plan.toImport.length > MAX_IMPORT || plan.toUntrack.length > MAX_IMPORT;
     const hasFilters = filters.search !== '' || filters.type !== '' || filters.status !== 'all';
 
     const toggle = (record: RemoteRecord, checked: boolean) => {
@@ -138,13 +154,13 @@ export function ImportRecordsDialog({ zone, attachment, open, onOpenChange }: Im
     };
 
     const submit = () => {
-        const chosen = records.filter((record) => selected.has(recordKey(record)));
-
         setImporting(true);
+        setSubmitError(null);
         router.post(
             route('zones.import', [zone.id, attachment.id]),
             {
-                records: chosen.map(({ externalId, type, name, content, ttl, priority, proxied }) => ({
+                untrack: plan.toUntrack,
+                records: plan.toImport.map(({ externalId, type, name, content, ttl, priority, proxied }) => ({
                     externalId,
                     type,
                     name,
@@ -157,6 +173,7 @@ export function ImportRecordsDialog({ zone, attachment, open, onOpenChange }: Im
             {
                 preserveScroll: true,
                 onSuccess: () => onOpenChange(false),
+                onError: (errors) => setSubmitError(Object.values(errors)[0] ?? 'The import failed.'),
                 onFinish: () => setImporting(false),
             },
         );
@@ -170,8 +187,9 @@ export function ImportRecordsDialog({ zone, attachment, open, onOpenChange }: Im
                 <DialogHeader>
                     <DialogTitle>Import records from {attachment.providerName}</DialogTitle>
                     <DialogDescription>
-                        Select the records to manage in <span className="font-mono">{zone.name}</span>. Existing entries are updated and linked —
-                        never duplicated. Imported entries stay assigned to this provider only.
+                        Tick the records to manage in <span className="font-mono">{zone.name}</span>. Existing entries are updated and linked — never
+                        duplicated. Imported entries stay assigned to this provider only. Untick a managed record to stop tracking it from{' '}
+                        {attachment.providerName} — the record stays at the provider.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -254,15 +272,18 @@ export function ImportRecordsDialog({ zone, attachment, open, onOpenChange }: Im
                                 <label className="flex items-center gap-2">
                                     <Checkbox
                                         checked={headerState}
-                                        disabled={visibleSelectable.length === 0}
-                                        onCheckedChange={() => setSelected((current) => applySelectAll(current, visible, headerState !== true))}
+                                        disabled={visibleToggleable.length === 0}
+                                        onCheckedChange={() =>
+                                            setSelected((current) => applySelectAll(current, visible, headerState !== true, canUntrack))
+                                        }
                                         aria-label={hasFilters ? 'Select all matching records' : 'Select all records'}
                                     />
-                                    {hasFilters ? `Select all ${visibleSelectable.length} matching` : 'Select all'}
+                                    {hasFilters ? `Select all ${visibleToggleable.length} matching` : 'Select all'}
                                 </label>
                                 <span className="tabular-nums">
-                                    {selected.size} selected
-                                    {hasFilters && hiddenSelected > 0 && ` (${hiddenSelected} hidden by filters)`}
+                                    {plan.toImport.length} to import
+                                    {plan.toUntrack.length > 0 && ` · ${plan.toUntrack.length} to stop tracking`}
+                                    {hasFilters && hiddenChanges > 0 && ` (${hiddenChanges} hidden by filters)`}
                                 </span>
                             </div>
                         )}
@@ -278,18 +299,27 @@ export function ImportRecordsDialog({ zone, attachment, open, onOpenChange }: Im
                                     </div>
                                 )}
                                 {visible.slice(0, renderLimit).map((record) => {
-                                    const badge = statusBadge[record.status];
-                                    const tracked = rowState(record) === 'tracked';
+                                    const state = rowState(record, canUntrack);
+                                    const locked = state === 'locked';
+                                    const ticked = locked || selected.has(recordKey(record));
+                                    const untracking = state === 'tracked' && !ticked;
+                                    const badge = untracking ? untrackBadge : statusBadge[record.status];
 
                                     return (
                                         <label
                                             key={recordKey(record)}
-                                            title={tracked ? `Already managed from ${attachment.providerName}` : undefined}
-                                            className={`flex items-center gap-3 px-3 py-2 text-sm ${tracked ? 'opacity-60' : 'hover:bg-muted/40 cursor-pointer'}`}
+                                            title={
+                                                locked
+                                                    ? `${attachment.providerName} is paused — enable it to stop tracking records`
+                                                    : state === 'tracked'
+                                                      ? `Managed from ${attachment.providerName} — untick to stop tracking (the record stays at the provider)`
+                                                      : undefined
+                                            }
+                                            className={`flex items-center gap-3 px-3 py-2 text-sm ${locked ? 'opacity-60' : 'hover:bg-muted/40 cursor-pointer'} ${untracking ? 'text-muted-foreground' : ''}`}
                                         >
                                             <Checkbox
-                                                checked={tracked || selected.has(recordKey(record))}
-                                                disabled={tracked}
+                                                checked={ticked}
+                                                disabled={locked}
                                                 onCheckedChange={(checked) => toggle(record, checked === true)}
                                                 aria-label={`${record.type} ${record.name}`}
                                             />
@@ -362,19 +392,35 @@ export function ImportRecordsDialog({ zone, attachment, open, onOpenChange }: Im
                     </div>
                 )}
 
-                {selected.size > MAX_IMPORT && (
-                    <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs text-amber-700 dark:text-amber-400">
-                        At most {MAX_IMPORT} records can be imported at once — narrow the selection and import in batches.
+                {plan.toUntrack.length > 0 && (
+                    <p className="bg-muted/40 text-muted-foreground rounded-lg border p-2.5 text-xs">
+                        {plan.toUntrack.length} managed record{plan.toUntrack.length === 1 ? '' : 's'} will stop being tracked from{' '}
+                        {attachment.providerName}. Nothing is deleted — the record{plan.toUntrack.length === 1 ? ' stays' : 's stay'} at the provider,
+                        and the entr{plan.toUntrack.length === 1 ? 'y stays' : 'ies stay'} in the app (local-only if {attachment.providerName} was the
+                        only provider).
                     </p>
+                )}
+
+                {overLimit && (
+                    <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs text-amber-700 dark:text-amber-400">
+                        At most {MAX_IMPORT} records can be imported or untracked at once — narrow the selection and work in batches.
+                    </p>
+                )}
+
+                {submitError && (
+                    <div className="flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-400">
+                        <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                        {submitError}
+                    </div>
                 )}
 
                 <DialogFooter className="gap-2">
                     <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={importing}>
                         Cancel
                     </Button>
-                    <Button type="button" onClick={submit} disabled={importing || loading || selected.size === 0 || selected.size > MAX_IMPORT}>
+                    <Button type="button" onClick={submit} disabled={importing || loading || nothingToDo || overLimit}>
                         {importing && <LoaderCircle className="size-4 animate-spin" />}
-                        Import {selected.size > 0 ? `${selected.size} record${selected.size === 1 ? '' : 's'}` : ''}
+                        {submitLabel(plan)}
                     </Button>
                 </DialogFooter>
             </DialogContent>

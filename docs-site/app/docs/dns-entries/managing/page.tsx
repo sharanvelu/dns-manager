@@ -216,6 +216,12 @@ export default function Page() {
         delete is queued, and the records stay live at the provider (<strong>Detach N entries,
         keep records</strong>). The success message and the entry&apos;s{" "}
         <strong>providers-changed</strong> activity record which providers kept their records.
+        The provider import dialog offers the same keep-at-provider removal per record: untick
+        a <strong>Managed</strong> row to stop tracking it — see{" "}
+        <a href="/docs/zones/providers/#import-records-from-a-provider">
+          Import records from a provider
+        </a>
+        .
       </p>
       <p>
         Because targeting is defined per zone, this action requires the selection to stay{" "}
